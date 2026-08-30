@@ -77,3 +77,5 @@ crashlytics-build.properties
 # Licensed third-party assets
 /Assets/Plugins/CW/
 /Assets/Plugins/CW.meta
+/Assets/GravityEngine/
+/Assets/GravityEngine.meta
