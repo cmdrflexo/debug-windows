@@ -75,6 +75,23 @@ namespace jcan.CelestialSystems
             SgtFloatingCamera.OnSnap -= HandleFloatingCameraSnap;
         }
 
+        protected override void OnSourceActivationChanged(bool active)
+        {
+            if (!active)
+            {
+                return;
+            }
+
+            previousSnappedPointSet = false;
+
+            if (floatingCamera != null &&
+                floatingCamera.SnappedPointSet)
+            {
+                previousSnappedPoint = floatingCamera.SnappedPoint;
+                previousSnappedPointSet = true;
+            }
+        }
+
         private void HandleFloatingCameraSnap(
             SgtFloatingCamera snappedCamera,
             Vector3 sceneDelta)
