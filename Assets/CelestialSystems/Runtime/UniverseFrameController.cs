@@ -80,6 +80,19 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        public bool TryGetActiveAnchorOffsetMeters(
+            out Vector3d offsetMeters)
+        {
+            if (activeAnchorSource == null)
+            {
+                offsetMeters = default;
+                return false;
+            }
+
+            return activeAnchorSource.TryGetFrameOffsetMeters(
+                out offsetMeters);
+        }
+
         public bool InitializeFrameOrigin(
             UniverseAnchorSource source,
             UniversePosition initialFrameOrigin)

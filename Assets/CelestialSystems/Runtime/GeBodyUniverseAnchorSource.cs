@@ -68,31 +68,20 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            gravityEngine ??= GravityEngine.Instance();
-
-            if (gravityEngine == null || !gravityEngine.IsSetup())
-            {
-                return;
-            }
-
             if (!UniverseFrame.FrameOriginInitialized &&
                 !TryInitializeFrameOrigin(default))
             {
                 return;
             }
 
-            var physicalScale = gravityEngine.GetPhysicalScale();
-
-            if (Mathf.Approximately(physicalScale, 0.0f))
+            if (!TryGetFrameOffsetMeters(out var sourceOffsetMeters))
             {
                 return;
             }
 
-            var physicsPosition =
-                gravityEngine.GetPositionDoubleV3(sourceBody);
-            var offsetXMeters = physicsPosition.x * physicalScale;
-            var offsetYMeters = physicsPosition.y * physicalScale;
-            var offsetZMeters = physicsPosition.z * physicalScale;
+            var offsetXMeters = sourceOffsetMeters.x;
+            var offsetYMeters = sourceOffsetMeters.y;
+            var offsetZMeters = sourceOffsetMeters.z;
 
             if (!SgtUniversePositionConverter.TryToSgtPosition(
                     UniverseFrame.FrameOrigin,
@@ -141,6 +130,37 @@ namespace jcan.CelestialSystems
                 offsetZMeters);
 
             TryShiftOrigin(originAdvanceMeters, sceneDelta);
+        }
+
+        public override bool TryGetFrameOffsetMeters(
+            out Vector3d offsetMeters)
+        {
+            gravityEngine ??= GravityEngine.Instance();
+
+            if (gravityEngine == null ||
+                !gravityEngine.IsSetup() ||
+                sourceBody == null)
+            {
+                offsetMeters = default;
+                return false;
+            }
+
+            var physicalScale = gravityEngine.GetPhysicalScale();
+
+            if (Mathf.Approximately(physicalScale, 0.0f))
+            {
+                offsetMeters = default;
+                return false;
+            }
+
+            var physicsPosition =
+                gravityEngine.GetPositionDoubleV3(sourceBody);
+
+            offsetMeters = new Vector3d(
+                physicsPosition.x * physicalScale,
+                physicsPosition.y * physicalScale,
+                physicsPosition.z * physicalScale);
+            return true;
         }
     }
 }
