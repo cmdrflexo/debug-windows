@@ -1367,6 +1367,59 @@ MonoBehaviour:
   starPulseSpeedMin: 0
   starPulseSpeedMax: 1
   model: {fileID: 1865321879}
+--- !u!1 &1583311629
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1583311631}
+  - component: {fileID: 1583311630}
+  m_Layer: 0
+  m_Name: Planet GE Body
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1583311630
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583311629}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8838d515d29034ef69c77eaae0a888f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NBody
+  mass: 100
+  vel: {x: 0, y: 0, z: 0}
+  vel_phys: {x: 0, y: 0, z: 0}
+  initialPos: {x: 0, y: 0, z: 13000000}
+  initialPhysPosition: {x: 0, y: 0, z: 13000000}
+  initWithDouble: 0
+  automaticParticleCapture: 1
+  size: 1
+  rotateFrame: 0
+--- !u!4 &1583311631
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583311629}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.9790099, z: 0, w: 0.20381273}
+  m_LocalPosition: {x: 0, y: 0, z: 13000000}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1598183691
 GameObject:
   m_ObjectHideFlags: 0
@@ -1618,7 +1671,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1798278914}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.28900623, y: -0.39305088, z: 0.13163684, w: 0.8629358}
+  m_LocalRotation: {x: 0.28902373, y: -0.39313024, z: 0.13167879, w: 0.86288744}
   m_LocalPosition: {x: 100000000, y: 100000000, z: -87000000}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1755,3 +1808,4 @@ SceneRoots:
   - {fileID: 1798278919}
   - {fileID: 1210988294}
   - {fileID: 394366034}
+  - {fileID: 1583311631}
