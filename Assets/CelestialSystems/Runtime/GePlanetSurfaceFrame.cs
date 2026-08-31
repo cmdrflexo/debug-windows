@@ -1,5 +1,5 @@
 /*
- * Positions and orients a local tangent frame on the surface of a spherical Gravity Engine body.
+ * Positions and orients a local tangent frame and tracks the active anchor's canonical cube-sphere address.
  */
 
 using System;
@@ -27,8 +27,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Vector3 poleReferenceAxis = Vector3.forward;
 
+        [Header("Runtime")]
         [SerializeField]
         private double anchorAltitudeMeters;
+
+        [SerializeField]
+        private bool hasAnchorAddress;
+
+        [SerializeField]
+        private CubeSphereAddress anchorAddress;
 
         [Header("Gizmos")]
         [SerializeField]
@@ -43,6 +50,12 @@ namespace jcan.CelestialSystems
 
         public double AnchorAltitudeMeters =>
             anchorAltitudeMeters;
+
+        public bool HasAnchorAddress =>
+            hasAnchorAddress;
+
+        public CubeSphereAddress AnchorAddress =>
+            anchorAddress;
 
         private void Start()
         {
@@ -72,6 +85,8 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            hasAnchorAddress = false;
+
             if (universeFrame == null ||
                 planetBody == null ||
                 planetRadiusMeters <= 0.0 ||
@@ -137,6 +152,15 @@ namespace jcan.CelestialSystems
 
             anchorAltitudeMeters =
                 radialDistance - planetRadiusMeters;
+            hasAnchorAddress =
+                CubeSphereMapping.TryDirectionToAddress(
+                    new DoubleVector3(
+                        radialX,
+                        radialY,
+                        radialZ),
+                    anchorAltitudeMeters,
+                    out anchorAddress);
+
             transform.SetPositionAndRotation(
                 surfacePosition,
                 Quaternion.LookRotation(
