@@ -12,6 +12,9 @@ namespace jcan.CelestialSystems
     {
         public const double CellSizeMeters = 1000000000.0;
 
+        private const double HalfCellSizeMeters =
+            CellSizeMeters * 0.5;
+
         [SerializeField]
         private long cellX;
 
@@ -83,7 +86,9 @@ namespace jcan.CelestialSystems
 
         private static void NormalizeAxis(ref long cell, ref double localMeters)
         {
-            var cellShift = (long)(localMeters / CellSizeMeters);
+            var cellShift = (long)Math.Floor(
+                (localMeters + HalfCellSizeMeters) /
+                CellSizeMeters);
 
             if (cellShift != 0)
             {
