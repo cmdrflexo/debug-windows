@@ -1399,6 +1399,7 @@ GameObject:
   - component: {fileID: 1210988294}
   - component: {fileID: 1210988293}
   - component: {fileID: 1210988295}
+  - component: {fileID: 1210988297}
   - component: {fileID: 1210988296}
   m_Layer: 0
   m_Name: Gravity Engine
@@ -1487,15 +1488,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7b7fc567a004c28a012c2d3eb6435be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.SgtGravityOriginBridge
+  universeFrame: {fileID: 1210988297}
   floatingCamera: {fileID: 288112566}
-  logOriginShifts: 0
-  frameOrigin:
-    cellX: 0
-    cellY: 0
-    cellZ: 0
-    localXMeters: 0
-    localYMeters: 0
-    localZMeters: 0
 --- !u!114 &1210988296
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1503,7 +1497,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1210988292}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c469601387b745e5a15236389a068a12, type: 3}
   m_Name: 
@@ -1514,6 +1508,26 @@ MonoBehaviour:
   expectedRadiusMeters: 6771000
   sampleIntervalSeconds: 5
   logEachSample: 1
+--- !u!114 &1210988297
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1210988292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42a88b6470c545a693404d845243d43c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseFrameController
+  logOriginShifts: 0
+  frameOrigin:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
 --- !u!1 &1232706815
 GameObject:
   m_ObjectHideFlags: 0
@@ -1770,7 +1784,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4ea584446214019ac84bbde6ee8180a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.GeSgtBodyView
-  originBridge: {fileID: 1210988295}
+  universeFrame: {fileID: 1210988297}
   sourceBody: {fileID: 1583311630}
   targetVisual: {fileID: 394366033}
 --- !u!1 &1598183691
