@@ -75,6 +75,24 @@ namespace jcan.CelestialSystems
             SgtFloatingCamera.OnSnap -= HandleFloatingCameraSnap;
         }
 
+        public override bool TryGetFrameOffsetMeters(
+            out Vector3d offsetMeters)
+        {
+            if (floatingCamera == null)
+            {
+                offsetMeters = default;
+                return false;
+            }
+
+            var scenePosition = floatingCamera.transform.position;
+
+            offsetMeters = new Vector3d(
+                scenePosition.x,
+                scenePosition.y,
+                scenePosition.z);
+            return true;
+        }
+
         protected override void OnSourceActivationChanged(bool active)
         {
             if (!active)
