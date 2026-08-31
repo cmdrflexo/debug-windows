@@ -158,8 +158,8 @@ namespace jcan.CelestialSystems
         }
 
         private static double Distance(
-            Vector3d first,
-            Vector3d second)
+            DoubleVector3 first,
+            DoubleVector3 second)
         {
             var deltaX = first.x - second.x;
             var deltaY = first.y - second.y;

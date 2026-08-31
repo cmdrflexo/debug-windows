@@ -7,14 +7,14 @@ using System;
 namespace jcan.CelestialSystems
 {
     [Serializable]
-    public struct Vector3d : IEquatable<Vector3d>
+    public struct DoubleVector3 : IEquatable<DoubleVector3>
     {
         public double x;
         public double y;
         public double z;
 
-        public static Vector3d zero =>
-            new Vector3d(0.0, 0.0, 0.0);
+        public static DoubleVector3 zero =>
+            new DoubleVector3(0.0, 0.0, 0.0);
 
         public double SqrMagnitude =>
             x * x +
@@ -24,7 +24,7 @@ namespace jcan.CelestialSystems
         public double Magnitude =>
             Math.Sqrt(SqrMagnitude);
 
-        public Vector3d(
+        public DoubleVector3(
             double x,
             double y,
             double z)
@@ -34,7 +34,7 @@ namespace jcan.CelestialSystems
             this.z = z;
         }
 
-        public bool Equals(Vector3d other)
+        public bool Equals(DoubleVector3 other)
         {
             return
                 x.Equals(other.x) &&
@@ -45,7 +45,7 @@ namespace jcan.CelestialSystems
         public override bool Equals(object obj)
         {
             return
-                obj is Vector3d other &&
+                obj is DoubleVector3 other &&
                 Equals(other);
         }
 
@@ -65,56 +65,56 @@ namespace jcan.CelestialSystems
             return $"({x}, {y}, {z})";
         }
 
-        public static Vector3d operator +(
-            Vector3d first,
-            Vector3d second)
+        public static DoubleVector3 operator +(
+            DoubleVector3 first,
+            DoubleVector3 second)
         {
-            return new Vector3d(
+            return new DoubleVector3(
                 first.x + second.x,
                 first.y + second.y,
                 first.z + second.z);
         }
 
-        public static Vector3d operator -(
-            Vector3d first,
-            Vector3d second)
+        public static DoubleVector3 operator -(
+            DoubleVector3 first,
+            DoubleVector3 second)
         {
-            return new Vector3d(
+            return new DoubleVector3(
                 first.x - second.x,
                 first.y - second.y,
                 first.z - second.z);
         }
 
-        public static Vector3d operator *(
-            Vector3d vector,
+        public static DoubleVector3 operator *(
+            DoubleVector3 vector,
             double scalar)
         {
-            return new Vector3d(
+            return new DoubleVector3(
                 vector.x * scalar,
                 vector.y * scalar,
                 vector.z * scalar);
         }
 
-        public static Vector3d operator /(
-            Vector3d vector,
+        public static DoubleVector3 operator /(
+            DoubleVector3 vector,
             double scalar)
         {
-            return new Vector3d(
+            return new DoubleVector3(
                 vector.x / scalar,
                 vector.y / scalar,
                 vector.z / scalar);
         }
 
         public static bool operator ==(
-            Vector3d first,
-            Vector3d second)
+            DoubleVector3 first,
+            DoubleVector3 second)
         {
             return first.Equals(second);
         }
 
         public static bool operator !=(
-            Vector3d first,
-            Vector3d second)
+            DoubleVector3 first,
+            DoubleVector3 second)
         {
             return !first.Equals(second);
         }

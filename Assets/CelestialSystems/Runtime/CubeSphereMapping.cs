@@ -12,7 +12,7 @@ namespace jcan.CelestialSystems
             Math.PI * 0.25;
 
         public static bool TryPlanetRelativePositionToAddress(
-            Vector3d planetRelativePositionMeters,
+            DoubleVector3 planetRelativePositionMeters,
             double planetRadiusMeters,
             out CubeSphereAddress address)
         {
@@ -40,7 +40,7 @@ namespace jcan.CelestialSystems
         }
 
         public static bool TryDirectionToAddress(
-            Vector3d direction,
+            DoubleVector3 direction,
             double altitudeMeters,
             out CubeSphereAddress address)
         {
@@ -126,7 +126,7 @@ namespace jcan.CelestialSystems
             return true;
         }
 
-        public static Vector3d AddressToDirection(
+        public static DoubleVector3 AddressToDirection(
             CubeSphereAddress address)
         {
             var tangentU = Math.Tan(
@@ -135,47 +135,47 @@ namespace jcan.CelestialSystems
             var tangentV = Math.Tan(
                 address.FaceV *
                 HalfFaceAngleRadians);
-            Vector3d cubeVector;
+            DoubleVector3 cubeVector;
 
             switch (address.Face)
             {
                 case CubeSphereFace.PositiveX:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         1.0,
                         tangentV,
                         -tangentU);
                     break;
 
                 case CubeSphereFace.NegativeX:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         -1.0,
                         tangentV,
                         tangentU);
                     break;
 
                 case CubeSphereFace.PositiveY:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         tangentU,
                         1.0,
                         -tangentV);
                     break;
 
                 case CubeSphereFace.NegativeY:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         tangentU,
                         -1.0,
                         tangentV);
                     break;
 
                 case CubeSphereFace.PositiveZ:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         tangentU,
                         tangentV,
                         1.0);
                     break;
 
                 case CubeSphereFace.NegativeZ:
-                    cubeVector = new Vector3d(
+                    cubeVector = new DoubleVector3(
                         -tangentU,
                         tangentV,
                         -1.0);
@@ -190,13 +190,13 @@ namespace jcan.CelestialSystems
 
             var magnitude = Magnitude(cubeVector);
 
-            return new Vector3d(
+            return new DoubleVector3(
                 cubeVector.x / magnitude,
                 cubeVector.y / magnitude,
                 cubeVector.z / magnitude);
         }
 
-        public static Vector3d AddressToPlanetRelativePosition(
+        public static DoubleVector3 AddressToPlanetRelativePosition(
             CubeSphereAddress address,
             double planetRadiusMeters)
         {
@@ -205,7 +205,7 @@ namespace jcan.CelestialSystems
                 planetRadiusMeters +
                 address.AltitudeMeters;
 
-            return new Vector3d(
+            return new DoubleVector3(
                 direction.x * distanceMeters,
                 direction.y * distanceMeters,
                 direction.z * distanceMeters);
@@ -239,7 +239,7 @@ namespace jcan.CelestialSystems
                     planetRadiusMeters);
         }
 
-        private static double Magnitude(Vector3d vector)
+        private static double Magnitude(DoubleVector3 vector)
         {
             return Math.Sqrt(
                 vector.x * vector.x +
