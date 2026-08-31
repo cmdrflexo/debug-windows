@@ -197,8 +197,20 @@ namespace jcan.CelestialSystems
                 surfaceUp);
         }
 
-        private void OnDrawGizmosSelected()
-        {
+        public enum GizmoDrawMode { Hide, Always, Selected }
+        [SerializeField] private GizmoDrawMode gizmoDrawMode;
+
+		private void OnDrawGizmos() {
+			if(gizmoDrawMode == GizmoDrawMode.Always)
+                DrawGizmos();
+		}
+
+		private void OnDrawGizmosSelected() {
+            if(gizmoDrawMode == GizmoDrawMode.Selected)
+                DrawGizmos();
+        }
+
+        private void DrawGizmos() {
             if (gizmoSize <= 0.0f)
             {
                 return;
