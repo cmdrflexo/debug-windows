@@ -20,6 +20,9 @@ namespace jcan.CelestialSystems
             universeFrame != null &&
             universeFrame.ActiveAnchorSource == this;
 
+        public abstract bool TryGetFrameOffsetMeters(
+            out Vector3d offsetMeters);
+
         internal void SetSourceActive(bool active)
         {
             if (activeBehaviours != null)
