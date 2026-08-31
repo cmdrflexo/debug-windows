@@ -11,6 +11,9 @@ namespace jcan.CelestialSystems
     public sealed class UniverseFrameController : MonoBehaviour
     {
         [SerializeField]
+        private UniverseAnchorSource activeAnchorSource;
+
+        [SerializeField]
         private bool logOriginShifts;
 
         [SerializeField]
@@ -18,6 +21,9 @@ namespace jcan.CelestialSystems
 
         private GravityEngine gravityEngine;
         private bool frameOriginInitialized;
+
+        public UniverseAnchorSource ActiveAnchorSource =>
+            activeAnchorSource;
 
         public UniversePosition FrameOrigin => frameOrigin;
 
@@ -30,19 +36,34 @@ namespace jcan.CelestialSystems
             gravityEngine = GravityEngine.Instance();
         }
 
-        public void InitializeFrameOrigin(UniversePosition initialFrameOrigin)
+        public bool InitializeFrameOrigin(
+            UniverseAnchorSource source,
+            UniversePosition initialFrameOrigin)
         {
-            if (frameOriginInitialized)
+            if (source == null || source != activeAnchorSource)
             {
-                return;
+                return false;
             }
 
-            frameOrigin = initialFrameOrigin;
-            frameOriginInitialized = true;
+            if (!frameOriginInitialized)
+            {
+                frameOrigin = initialFrameOrigin;
+                frameOriginInitialized = true;
+            }
+
+            return true;
         }
 
-        public bool ShiftOrigin(Vector3d originAdvanceMeters, Vector3 sceneDelta)
+        public bool ShiftOrigin(
+            UniverseAnchorSource source,
+            Vector3d originAdvanceMeters,
+            Vector3 sceneDelta)
         {
+            if (source == null || source != activeAnchorSource)
+            {
+                return false;
+            }
+
             gravityEngine ??= GravityEngine.Instance();
 
             if (gravityEngine == null)

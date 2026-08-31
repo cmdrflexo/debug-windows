@@ -1,5 +1,5 @@
 /*
- * Adapts Space Graphics Toolkit floating-camera snaps into project-owned universe-frame shifts.
+ * Uses an SGT floating camera as the active free-flight source for project-owned universe-frame shifts.
  */
 
 using SpaceGraphicsToolkit;
@@ -8,11 +8,9 @@ using UnityEngine;
 namespace jcan.CelestialSystems
 {
     [DisallowMultipleComponent]
-    public sealed class SgtGravityOriginBridge : MonoBehaviour
+    [DefaultExecutionOrder(-100)]
+    public sealed class SgtGravityOriginBridge : UniverseAnchorSource
     {
-        [SerializeField]
-        private UniverseFrameController universeFrame;
-
         [SerializeField]
         private SgtFloatingCamera floatingCamera;
 
@@ -34,7 +32,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (universeFrame == null)
+            if (UniverseFrame == null)
             {
                 Debug.LogError(
                     "The SGT origin bridge requires a universe frame controller.",
@@ -46,9 +44,29 @@ namespace jcan.CelestialSystems
             {
                 previousSnappedPoint = floatingCamera.SnappedPoint;
                 previousSnappedPointSet = true;
-                universeFrame.InitializeFrameOrigin(
-                    SgtUniversePositionConverter.ToUniversePosition(
-                        previousSnappedPoint));
+
+                if (IsActiveSource)
+                {
+                    TryInitializeFrameOrigin(
+                        SgtUniversePositionConverter.ToUniversePosition(
+                            previousSnappedPoint));
+                }
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (!Application.isPlaying ||
+                !IsActiveSource ||
+                floatingCamera == null)
+            {
+                return;
+            }
+
+            if (floatingCamera.transform.position.magnitude >
+                floatingCamera.SnapDistance)
+            {
+                floatingCamera.Snap();
             }
         }
 
@@ -61,7 +79,9 @@ namespace jcan.CelestialSystems
             SgtFloatingCamera snappedCamera,
             Vector3 sceneDelta)
         {
-            if (!Application.isPlaying || snappedCamera != floatingCamera)
+            if (!Application.isPlaying ||
+                !IsActiveSource ||
+                snappedCamera != floatingCamera)
             {
                 return;
             }
@@ -72,24 +92,16 @@ namespace jcan.CelestialSystems
             {
                 previousSnappedPoint = currentSnappedPoint;
                 previousSnappedPointSet = true;
-                universeFrame?.InitializeFrameOrigin(
+                TryInitializeFrameOrigin(
                     SgtUniversePositionConverter.ToUniversePosition(
                         currentSnappedPoint));
-                return;
-            }
-
-            if (universeFrame == null)
-            {
-                Debug.LogError(
-                    "Cannot forward the SGT origin shift because no universe frame controller is assigned.",
-                    this);
                 return;
             }
 
             var originAdvanceMeters =
                 CalculateDeltaMeters(previousSnappedPoint, currentSnappedPoint);
 
-            if (universeFrame.ShiftOrigin(originAdvanceMeters, sceneDelta))
+            if (TryShiftOrigin(originAdvanceMeters, sceneDelta))
             {
                 previousSnappedPoint = currentSnappedPoint;
             }
