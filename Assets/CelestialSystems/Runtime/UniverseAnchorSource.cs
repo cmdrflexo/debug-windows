@@ -11,11 +11,34 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private UniverseFrameController universeFrame;
 
+        [SerializeField]
+        private Behaviour[] activeBehaviours;
+
         public UniverseFrameController UniverseFrame => universeFrame;
 
         public bool IsActiveSource =>
             universeFrame != null &&
             universeFrame.ActiveAnchorSource == this;
+
+        internal void SetSourceActive(bool active)
+        {
+            if (activeBehaviours != null)
+            {
+                foreach (var activeBehaviour in activeBehaviours)
+                {
+                    if (activeBehaviour != null)
+                    {
+                        activeBehaviour.enabled = active;
+                    }
+                }
+            }
+
+            OnSourceActivationChanged(active);
+        }
+
+        protected virtual void OnSourceActivationChanged(bool active)
+        {
+        }
 
         protected bool TryInitializeFrameOrigin(
             UniversePosition initialFrameOrigin)
