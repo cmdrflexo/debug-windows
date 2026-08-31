@@ -30,6 +30,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double anchorAltitudeMeters;
 
+        [Header("Gizmos")]
+        [SerializeField]
+        private GizmoDrawMode gizmoDrawMode;
+
         [SerializeField]
         private float gizmoSize = 100000.0f;
 
@@ -197,20 +201,24 @@ namespace jcan.CelestialSystems
                 surfaceUp);
         }
 
-        public enum GizmoDrawMode { Hide, Always, Selected }
-        [SerializeField] private GizmoDrawMode gizmoDrawMode;
-
-		private void OnDrawGizmos() {
-			if(gizmoDrawMode == GizmoDrawMode.Always)
+        private void OnDrawGizmos()
+        {
+            if (gizmoDrawMode == GizmoDrawMode.Always)
+            {
                 DrawGizmos();
-		}
-
-		private void OnDrawGizmosSelected() {
-            if(gizmoDrawMode == GizmoDrawMode.Selected)
-                DrawGizmos();
+            }
         }
 
-        private void DrawGizmos() {
+        private void OnDrawGizmosSelected()
+        {
+            if (gizmoDrawMode == GizmoDrawMode.Selected)
+            {
+                DrawGizmos();
+            }
+        }
+
+        private void DrawGizmos()
+        {
             if (gizmoSize <= 0.0f)
             {
                 return;
