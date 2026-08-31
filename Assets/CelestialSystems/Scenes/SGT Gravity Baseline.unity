@@ -1000,6 +1000,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.GeBodyUniverseAnchorSource
   universeFrame: {fileID: 1210988297}
+  activeBehaviours: []
   sourceBody: {fileID: 644146783}
   floatingCamera: {fileID: 288112566}
   recenterDistanceMeters: 100000
@@ -1502,6 +1503,7 @@ GameObject:
   - component: {fileID: 1210988293}
   - component: {fileID: 1210988295}
   - component: {fileID: 1210988297}
+  - component: {fileID: 1210988298}
   - component: {fileID: 1210988296}
   m_Layer: 0
   m_Name: Gravity Engine
@@ -1591,6 +1593,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.SgtGravityOriginBridge
   universeFrame: {fileID: 1210988297}
+  activeBehaviours:
+  - {fileID: 288112568}
   floatingCamera: {fileID: 288112566}
 --- !u!114 &1210988296
 MonoBehaviour:
@@ -1631,6 +1635,22 @@ MonoBehaviour:
     localXMeters: 0
     localYMeters: 0
     localZMeters: 0
+--- !u!114 &1210988298
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1210988292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c8941ad8d1e49b6acfb28f9a5a46bd1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseAnchorSwitcher
+  universeFrame: {fileID: 1210988297}
+  sources:
+  - {fileID: 1210988295}
+  - {fileID: 644146785}
 --- !u!1 &1232706815
 GameObject:
   m_ObjectHideFlags: 0
