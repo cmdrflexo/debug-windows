@@ -200,7 +200,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 394366032}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9790099, z: 0, w: 0.20381273}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 13000000}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1377,6 +1377,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1583311631}
   - component: {fileID: 1583311630}
+  - component: {fileID: 1583311632}
   m_Layer: 0
   m_Name: Planet GE Body
   m_TagString: Untagged
@@ -1420,6 +1421,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1583311632
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583311629}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4ea584446214019ac84bbde6ee8180a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.GeSgtBodyView
+  originBridge: {fileID: 1210988295}
+  sourceBody: {fileID: 1583311630}
+  targetVisual: {fileID: 394366033}
 --- !u!1 &1598183691
 GameObject:
   m_ObjectHideFlags: 0
@@ -1671,7 +1687,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1798278914}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.28902373, y: -0.39313024, z: 0.13167879, w: 0.86288744}
+  m_LocalRotation: {x: 0.28902343, y: -0.3931293, z: 0.13167825, w: 0.862888}
   m_LocalPosition: {x: 100000000, y: 100000000, z: -87000000}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
