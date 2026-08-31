@@ -1,0 +1,24 @@
+diff --git a/Assets/MapMagic/Nodes/Editor/GraphTemplates.cs b/Assets/MapMagic/Nodes/Editor/GraphTemplates.cs
+--- a/Assets/MapMagic/Nodes/Editor/GraphTemplates.cs
++++ b/Assets/MapMagic/Nodes/Editor/GraphTemplates.cs
+@@ -33,7 +33,7 @@ namespace MapMagic.Nodes.GUI
+ 					null);
+ 			}
+ 
+-			#if UNITY_6000_5_OR_NEWER
++			#if UNITY_6000_3_OR_NEWER // CHANGED: Unity 6000.3+ uses AssetCreationEndAction.
+ 			class TmpCallbackReciever : UnityEditor.ProjectWindowCallback.AssetCreationEndAction
+ 			{
+ 				public override void Action (EntityId entityId, string pathName, string resourceFile)
+diff --git a/Assets/MapMagic/Brush/Editor/BrushGraphTemplate.cs b/Assets/MapMagic/Brush/Editor/BrushGraphTemplate.cs
+--- a/Assets/MapMagic/Brush/Editor/BrushGraphTemplate.cs
++++ b/Assets/MapMagic/Brush/Editor/BrushGraphTemplate.cs
+@@ -33,7 +33,7 @@ namespace MapMagic.Nodes.GUI
+ 					null);
+ 			}
+ 
+-			#if UNITY_6000_5_OR_NEWER
++			#if UNITY_6000_3_OR_NEWER // CHANGED: Unity 6000.3+ uses AssetCreationEndAction.
+ 			class TmpCallbackRecieverBrush : UnityEditor.ProjectWindowCallback.AssetCreationEndAction
+ 			{
+ 				public override void Action (EntityId entityId, string pathName, string resourceFile)
