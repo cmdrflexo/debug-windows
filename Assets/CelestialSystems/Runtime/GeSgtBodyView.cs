@@ -12,7 +12,7 @@ namespace jcan.CelestialSystems
     public sealed class GeSgtBodyView : MonoBehaviour
     {
         [SerializeField]
-        private SgtGravityOriginBridge originBridge;
+        private UniverseFrameController universeFrame;
 
         [SerializeField]
         private NBody sourceBody;
@@ -33,24 +33,31 @@ namespace jcan.CelestialSystems
 
             if (gravityEngine == null ||
                 !gravityEngine.IsSetup() ||
-                originBridge == null ||
+                universeFrame == null ||
                 sourceBody == null ||
                 targetVisual == null)
             {
                 return;
             }
 
-            var physicsPosition = gravityEngine.GetPositionDoubleV3(sourceBody);
+            var physicsPosition =
+                gravityEngine.GetPositionDoubleV3(sourceBody);
             var sceneScale = gravityEngine.GetPhysicalScale();
-            var frameOrigin = originBridge.FrameOrigin;
+            var frameOrigin = universeFrame.FrameOrigin;
             var visualPosition = new SgtPosition
             {
                 GlobalX = frameOrigin.CellX,
                 GlobalY = frameOrigin.CellY,
                 GlobalZ = frameOrigin.CellZ,
-                LocalX = frameOrigin.LocalXMeters + physicsPosition.x * sceneScale,
-                LocalY = frameOrigin.LocalYMeters + physicsPosition.y * sceneScale,
-                LocalZ = frameOrigin.LocalZMeters + physicsPosition.z * sceneScale
+                LocalX =
+                    frameOrigin.LocalXMeters +
+                    physicsPosition.x * sceneScale,
+                LocalY =
+                    frameOrigin.LocalYMeters +
+                    physicsPosition.y * sceneScale,
+                LocalZ =
+                    frameOrigin.LocalZMeters +
+                    physicsPosition.z * sceneScale
             };
 
             visualPosition.SnapLocal();
