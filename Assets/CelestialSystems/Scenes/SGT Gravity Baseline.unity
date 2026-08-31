@@ -1333,14 +1333,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8838d515d29034ef69c77eaae0a888f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NBody
-  mass: 100
+  mass: 5.9722e+24
   vel: {x: 0, y: 0, z: 0}
   vel_phys: {x: 0, y: 0, z: 0}
   initialPos: {x: 0, y: 0, z: 13000000}
   initialPhysPosition: {x: 0, y: 0, z: 13000000}
   initWithDouble: 0
-  automaticParticleCapture: 1
-  size: 1
+  automaticParticleCapture: 0
+  size: 6371000
   rotateFrame: 0
 --- !u!4 &1583311631
 Transform:
