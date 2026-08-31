@@ -21,6 +21,7 @@ namespace jcan.CelestialSystems
         private SgtFloatingObject targetVisual;
 
         private GravityEngine gravityEngine;
+        private bool coordinateRangeErrorLogged;
 
         private void Start()
         {
@@ -44,23 +45,26 @@ namespace jcan.CelestialSystems
                 gravityEngine.GetPositionDoubleV3(sourceBody);
             var sceneScale = gravityEngine.GetPhysicalScale();
             var frameOrigin = universeFrame.FrameOrigin;
-            var visualPosition = new SgtPosition
-            {
-                GlobalX = frameOrigin.CellX,
-                GlobalY = frameOrigin.CellY,
-                GlobalZ = frameOrigin.CellZ,
-                LocalX =
-                    frameOrigin.LocalXMeters +
-                    physicsPosition.x * sceneScale,
-                LocalY =
-                    frameOrigin.LocalYMeters +
-                    physicsPosition.y * sceneScale,
-                LocalZ =
-                    frameOrigin.LocalZMeters +
-                    physicsPosition.z * sceneScale
-            };
 
-            visualPosition.SnapLocal();
+            if (!SgtUniversePositionConverter.TryToSgtPosition(
+                    frameOrigin,
+                    physicsPosition.x * sceneScale,
+                    physicsPosition.y * sceneScale,
+                    physicsPosition.z * sceneScale,
+                    out var visualPosition))
+            {
+                if (!coordinateRangeErrorLogged)
+                {
+                    Debug.LogError(
+                        "Cannot project the GE body because its universe position is outside SGT's coordinate range.",
+                        this);
+                    coordinateRangeErrorLogged = true;
+                }
+
+                return;
+            }
+
+            coordinateRangeErrorLogged = false;
             targetVisual.SetPosition(visualPosition);
             targetVisual.ApplyPosition();
         }

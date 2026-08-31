@@ -10,8 +10,6 @@ namespace jcan.CelestialSystems
     [DisallowMultipleComponent]
     public sealed class SgtGravityOriginBridge : MonoBehaviour
     {
-        private const long SgtCellsPerUniverseCell = 20;
-
         [SerializeField]
         private UniverseFrameController universeFrame;
 
@@ -49,7 +47,8 @@ namespace jcan.CelestialSystems
                 previousSnappedPoint = floatingCamera.SnappedPoint;
                 previousSnappedPointSet = true;
                 universeFrame.InitializeFrameOrigin(
-                    ToUniversePosition(previousSnappedPoint));
+                    SgtUniversePositionConverter.ToUniversePosition(
+                        previousSnappedPoint));
             }
         }
 
@@ -74,7 +73,8 @@ namespace jcan.CelestialSystems
                 previousSnappedPoint = currentSnappedPoint;
                 previousSnappedPointSet = true;
                 universeFrame?.InitializeFrameOrigin(
-                    ToUniversePosition(currentSnappedPoint));
+                    SgtUniversePositionConverter.ToUniversePosition(
+                        currentSnappedPoint));
                 return;
             }
 
@@ -109,48 +109,6 @@ namespace jcan.CelestialSystems
                 (to.GlobalZ - from.GlobalZ) * SgtPosition.CELL_SIZE +
                 to.LocalZ -
                 from.LocalZ);
-        }
-
-        private static UniversePosition ToUniversePosition(
-            SgtPosition position)
-        {
-            ConvertSgtAxis(
-                position.GlobalX,
-                position.LocalX,
-                out var cellX,
-                out var localXMeters);
-            ConvertSgtAxis(
-                position.GlobalY,
-                position.LocalY,
-                out var cellY,
-                out var localYMeters);
-            ConvertSgtAxis(
-                position.GlobalZ,
-                position.LocalZ,
-                out var cellZ,
-                out var localZMeters);
-
-            return new UniversePosition(
-                cellX,
-                cellY,
-                cellZ,
-                localXMeters,
-                localYMeters,
-                localZMeters);
-        }
-
-        private static void ConvertSgtAxis(
-            long sgtCell,
-            double sgtLocalMeters,
-            out long universeCell,
-            out double universeLocalMeters)
-        {
-            universeCell = sgtCell / SgtCellsPerUniverseCell;
-            var remainingSgtCells =
-                sgtCell % SgtCellsPerUniverseCell;
-            universeLocalMeters =
-                remainingSgtCells * SgtPosition.CELL_SIZE +
-                sgtLocalMeters;
         }
     }
 }
