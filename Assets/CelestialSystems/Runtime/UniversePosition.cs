@@ -10,7 +10,7 @@ namespace jcan.CelestialSystems
     [Serializable]
     public struct UniversePosition
     {
-        public const double CellSizeMeters = 50000000.0;
+        public const double CellSizeMeters = 1000000000.0;
 
         [SerializeField]
         private long cellX;
