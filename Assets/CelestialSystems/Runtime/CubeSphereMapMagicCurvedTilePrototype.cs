@@ -32,6 +32,10 @@ namespace jcan.CelestialSystems
         private int meshResolution = 65;
 
         [SerializeField]
+        [Tooltip("Zero uses the real planet radius. A positive value overrides only this prototype mesh's curvature.")]
+        private double curvatureRadiusOverrideMeters;
+
+        [SerializeField]
         private Material meshMaterial;
 
         [SerializeField]
@@ -47,6 +51,9 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private CubeSphereFace activeFace;
+
+        [SerializeField]
+        private double effectiveMeshRadiusMeters;
 
         [SerializeField]
         private int sourceTileX;
@@ -70,6 +77,7 @@ namespace jcan.CelestialSystems
         private int builtTileX;
         private int builtTileZ;
         private int builtResolution;
+        private double builtMeshRadiusMeters;
         private bool sourceWasReady;
         private Terrain hiddenTerrain;
         private TerrainCollider hiddenTerrainCollider;
@@ -140,6 +148,8 @@ namespace jcan.CelestialSystems
                     meshResolution,
                     3,
                     257);
+            var nextMeshRadiusMeters =
+                ResolveMeshRadiusMeters();
 
             if (hasCurvedTile &&
                 (builtFace != nextFace ||
@@ -177,7 +187,9 @@ namespace jcan.CelestialSystems
                 builtFace != nextFace ||
                 builtTileX != nextTileX ||
                 builtTileZ != nextTileZ ||
-                builtResolution != nextResolution)
+                builtResolution != nextResolution ||
+                builtMeshRadiusMeters !=
+                    nextMeshRadiusMeters)
             {
                 BuildCurvedTile(
                     sourceTerrain,
@@ -185,7 +197,8 @@ namespace jcan.CelestialSystems
                     nextFace,
                     nextTileX,
                     nextTileZ,
-                    nextResolution);
+                    nextResolution,
+                    nextMeshRadiusMeters);
             }
 
             sourceWasReady = true;
@@ -209,13 +222,14 @@ namespace jcan.CelestialSystems
             CubeSphereFace face,
             int tileX,
             int tileZ,
-            int resolution)
+            int resolution,
+            double meshRadiusMeters)
         {
             RestoreSourceTerrain();
             EnsureMeshObjects();
 
             var planetRadiusMeters =
-                surfaceFrame.PlanetRadiusMeters;
+                meshRadiusMeters;
             var rootRadiusMeters =
                 planetRadiusMeters +
                 rootPose.RadialOffsetMeters;
@@ -387,9 +401,13 @@ namespace jcan.CelestialSystems
                 tileZ;
             builtResolution =
                 resolution;
+            builtMeshRadiusMeters =
+                meshRadiusMeters;
             hasCurvedTile = true;
             activeFace =
                 face;
+            effectiveMeshRadiusMeters =
+                meshRadiusMeters;
             sourceTileX =
                 tileX;
             sourceTileZ =
@@ -566,6 +584,13 @@ namespace jcan.CelestialSystems
             hiddenColliderWasEnabled = false;
         }
 
+        private double ResolveMeshRadiusMeters()
+        {
+            return curvatureRadiusOverrideMeters > 0.0
+                ? curvatureRadiusOverrideMeters
+                : surfaceFrame.PlanetRadiusMeters;
+        }
+
         private bool ConfigurationIsValid()
         {
             return
@@ -574,6 +599,9 @@ namespace jcan.CelestialSystems
                 rootPose != null &&
                 mapMagicObject != null &&
                 surfaceFrame.PlanetRadiusMeters > 0.0 &&
+                IsFinite(
+                    curvatureRadiusOverrideMeters) &&
+                curvatureRadiusOverrideMeters >= 0.0 &&
                 IsFinite(
                     rootPose.RadialOffsetMeters);
         }
@@ -603,8 +631,10 @@ namespace jcan.CelestialSystems
             builtTileX = default;
             builtTileZ = default;
             builtResolution = default;
+            builtMeshRadiusMeters = default;
             hasCurvedTile = false;
             activeFace = default;
+            effectiveMeshRadiusMeters = default;
             sourceTileX = default;
             sourceTileZ = default;
             vertexCount = default;
