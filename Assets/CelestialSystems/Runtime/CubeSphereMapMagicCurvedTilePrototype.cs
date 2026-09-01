@@ -28,15 +28,8 @@ namespace jcan.CelestialSystems
         private MapMagicObject mapMagicObject;
 
         [SerializeField]
-        [Range(3, 257)]
-        private int meshResolution = 65;
-
-        [SerializeField]
         [Tooltip("Zero uses the real planet radius. A positive value overrides only this prototype mesh's curvature.")]
         private double curvatureRadiusOverrideMeters;
-
-        [SerializeField]
-        private Material meshMaterial;
 
         [SerializeField]
         private Color fallbackMeshColor =
@@ -47,6 +40,13 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private bool generateMeshCollider = true;
+
+        [Header("Resolved Surface Definition")]
+        [SerializeField]
+        private int resolvedMeshResolution;
+
+        [SerializeField]
+        private Material resolvedMeshMaterial;
 
         [Header("Runtime")]
         [SerializeField]
@@ -135,7 +135,13 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
-            if (!ConfigurationIsValid() ||
+            var surfaceDefinition =
+                ResolveSurfaceDefinition();
+            resolvedMeshResolution = default;
+            resolvedMeshMaterial = null;
+
+            if (!ConfigurationIsValid(
+                    surfaceDefinition) ||
                 !coordinateDriver.HasMapMagicCoordinate ||
                 !rootPose.HasPose)
             {
@@ -150,11 +156,16 @@ namespace jcan.CelestialSystems
                 coordinateDriver.MapMagicTileX;
             var nextTileZ =
                 coordinateDriver.MapMagicTileZ;
-            var nextResolution =
+            resolvedMeshResolution =
                 Mathf.Clamp(
-                    meshResolution,
+                    surfaceDefinition.MeshResolution,
                     3,
                     257);
+            resolvedMeshMaterial =
+                surfaceDefinition.Material;
+
+            var nextResolution =
+                resolvedMeshResolution;
             var nextMeshRadiusMeters =
                 ResolveMeshRadiusMeters();
 
@@ -510,8 +521,8 @@ namespace jcan.CelestialSystems
             }
 
             meshRenderer.sharedMaterial =
-                meshMaterial != null
-                    ? meshMaterial
+                resolvedMeshMaterial != null
+                    ? resolvedMeshMaterial
                     : ResolveFallbackMaterial();
         }
 
@@ -634,6 +645,28 @@ namespace jcan.CelestialSystems
             hiddenColliderWasEnabled = false;
         }
 
+        private RoundMapMagicSurfaceDefinition ResolveSurfaceDefinition()
+        {
+            var bodyContext =
+                surfaceFrame != null
+                    ? surfaceFrame.BodyContext
+                    : null;
+            var definition =
+                bodyContext != null
+                    ? bodyContext.Definition
+                    : null;
+
+            if (definition == null ||
+                definition.ResolvedSurfaceSystem !=
+                    CelestialSurfaceSystem.RoundMapMagic)
+            {
+                return null;
+            }
+
+            return
+                definition.RoundMapMagicSurface;
+        }
+
         private double ResolveMeshRadiusMeters()
         {
             return curvatureRadiusOverrideMeters > 0.0
@@ -641,13 +674,16 @@ namespace jcan.CelestialSystems
                 : surfaceFrame.PlanetRadiusMeters;
         }
 
-        private bool ConfigurationIsValid()
+        private bool ConfigurationIsValid(
+            RoundMapMagicSurfaceDefinition surfaceDefinition)
         {
             return
                 surfaceFrame != null &&
                 coordinateDriver != null &&
                 rootPose != null &&
                 mapMagicObject != null &&
+                surfaceDefinition != null &&
+                surfaceDefinition.HasValidSettings &&
                 surfaceFrame.PlanetRadiusMeters > 0.0 &&
                 IsFinite(
                     curvatureRadiusOverrideMeters) &&
