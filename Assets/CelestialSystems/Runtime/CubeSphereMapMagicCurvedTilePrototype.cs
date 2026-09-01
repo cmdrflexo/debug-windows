@@ -783,16 +783,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (runtime.SourceTerrain !=
-                terrain)
-            {
-                RestoreSourceTerrain(
-                    runtime);
-                runtime.SourceTerrain =
-                    terrain;
-            }
-
-            if (terrain.enabled)
+             if (terrain.enabled)
             {
                 runtime.SourceTerrainWasEnabled =
                     true;
@@ -921,8 +912,10 @@ namespace jcan.CelestialSystems
                     : 0;
             triangleCount =
                 hasCurvedTile
-                    ? primaryTile.CurvedMesh.triangles.Length /
-                        3
+                    ? (int)(
+                        primaryTile.CurvedMesh.GetIndexCount(
+                            0) /
+                        3)
                     : 0;
             hasMeshCollider =
                 hasCurvedTile &&
