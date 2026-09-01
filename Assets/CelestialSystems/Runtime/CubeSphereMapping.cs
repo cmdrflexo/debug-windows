@@ -211,6 +211,44 @@ namespace jcan.CelestialSystems
                 direction.z * distanceMeters);
         }
 
+        public static CubeSphereFaceProximity GetFaceProximity(
+            CubeSphereAddress address,
+            double planetRadiusMeters)
+        {
+            if (!IsFinite(planetRadiusMeters) ||
+                planetRadiusMeters <= 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(planetRadiusMeters),
+                    "Planet radius must be positive.");
+            }
+
+            if (!address.IsInsideFace)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(address),
+                    "A canonical address must be inside its face.");
+            }
+
+            return new CubeSphereFaceProximity(
+                DistanceToFaceEdgeMeters(
+                    address,
+                    CubeSphereEdge.NegativeU,
+                    planetRadiusMeters),
+                DistanceToFaceEdgeMeters(
+                    address,
+                    CubeSphereEdge.PositiveU,
+                    planetRadiusMeters),
+                DistanceToFaceEdgeMeters(
+                    address,
+                    CubeSphereEdge.NegativeV,
+                    planetRadiusMeters),
+                DistanceToFaceEdgeMeters(
+                    address,
+                    CubeSphereEdge.PositiveV,
+                    planetRadiusMeters));
+        }
+
         public static double FaceCoordinateToMeters(
             double faceCoordinate,
             double planetRadiusMeters)
@@ -237,6 +275,50 @@ namespace jcan.CelestialSystems
                 faceMeters /
                 (HalfFaceAngleRadians *
                     planetRadiusMeters);
+        }
+
+        private static double DistanceToFaceEdgeMeters(
+            CubeSphereAddress address,
+            CubeSphereEdge edge,
+            double planetRadiusMeters)
+        {
+            var direction =
+                AddressToDirection(address);
+            var faceNormal =
+                CubeSphereTopology.GetFaceNormal(
+                    address.Face);
+            var adjacentNormal =
+                CubeSphereTopology.GetFaceNormal(
+                    CubeSphereTopology.GetAdjacentFace(
+                        address.Face,
+                        edge));
+            var boundaryPlaneNormal =
+                faceNormal - adjacentNormal;
+            var boundaryPlaneMagnitude =
+                Magnitude(boundaryPlaneNormal);
+            var signedSine =
+                Dot(
+                    direction,
+                    boundaryPlaneNormal) /
+                boundaryPlaneMagnitude;
+            var angularDistance =
+                Math.Asin(
+                    ClampUnit(signedSine));
+
+            return Math.Max(
+                0.0,
+                angularDistance *
+                    planetRadiusMeters);
+        }
+
+        private static double Dot(
+            DoubleVector3 first,
+            DoubleVector3 second)
+        {
+            return
+                first.x * second.x +
+                first.y * second.y +
+                first.z * second.z;
         }
 
         private static double Magnitude(DoubleVector3 vector)
