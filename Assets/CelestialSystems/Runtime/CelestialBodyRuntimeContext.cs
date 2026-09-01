@@ -2,6 +2,7 @@
  * Binds one spawned celestial-body instance to its reusable definition, Gravity Engine body, universe frame, and optional visual.
  */
 
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -11,6 +12,11 @@ namespace jcan.CelestialSystems
     public sealed class CelestialBodyRuntimeContext :
         MonoBehaviour
     {
+        private static readonly HashSet<
+            CelestialBodyRuntimeContext> activeContexts =
+                new HashSet<
+                    CelestialBodyRuntimeContext>();
+
         [Header("Identity")]
         [SerializeField]
         private string instanceId =
@@ -42,6 +48,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double configuredReferenceRadiusMeters;
 
+        public static IReadOnlyCollection<
+            CelestialBodyRuntimeContext> ActiveContexts =>
+                activeContexts;
+
         public string InstanceId =>
             instanceId;
 
@@ -69,6 +79,25 @@ namespace jcan.CelestialSystems
         public double ConfiguredReferenceRadiusMeters =>
             configuredReferenceRadiusMeters;
 
+        [RuntimeInitializeOnLoadMethod(
+            RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetActiveContexts()
+        {
+            activeContexts.Clear();
+        }
+
+        private void OnEnable()
+        {
+            activeContexts.Add(
+                this);
+        }
+
+        private void OnDisable()
+        {
+            activeContexts.Remove(
+                this);
+        }
+
         private void Reset()
         {
             gravityBody =
@@ -77,6 +106,8 @@ namespace jcan.CelestialSystems
 
         private void Start()
         {
+            activeContexts.Add(
+                this);
             RefreshRuntimeState();
 
             if (string.IsNullOrWhiteSpace(
