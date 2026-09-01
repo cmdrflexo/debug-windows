@@ -1,7 +1,9 @@
 /*
- * Converts the active MapMagic main tile into a height-only curved cube-sphere mesh and matching runtime collider.
+ * Converts a neighborhood of ready MapMagic main tiles into curved cube-sphere meshes and matching runtime colliders.
  */
 
+using System;
+using System.Collections.Generic;
 using Den.Tools;
 using MapMagic.Core;
 using UnityEngine;
@@ -14,6 +16,67 @@ namespace jcan.CelestialSystems
     public sealed class CubeSphereMapMagicCurvedTilePrototype :
         MonoBehaviour
     {
+        private sealed class CurvedTileRuntime
+        {
+            public int TileX;
+            public int TileZ;
+            public GameObject MeshObject;
+            public MeshFilter MeshFilter;
+            public MeshRenderer MeshRenderer;
+            public MeshCollider MeshCollider;
+            public Mesh CurvedMesh;
+            public Terrain SourceTerrain;
+            public TerrainData TerrainData;
+            public CubeSphereFace Face;
+            public int Resolution;
+            public double MeshRadiusMeters;
+            public bool SourceTerrainWasEnabled;
+            public TerrainCollider SourceTerrainCollider;
+            public bool SourceColliderWasEnabled;
+        }
+
+        private struct TileKey :
+            IEquatable<TileKey>
+        {
+            public int X;
+            public int Z;
+
+            public TileKey(
+                int x,
+                int z)
+            {
+                X = x;
+                Z = z;
+            }
+
+            public bool Equals(
+                TileKey other)
+            {
+                return
+                    X == other.X &&
+                    Z == other.Z;
+            }
+
+            public override bool Equals(
+                object value)
+            {
+                return
+                    value is TileKey other &&
+                    Equals(
+                        other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return
+                        (X * 397) ^
+                        Z;
+                }
+            }
+        }
+
         [Header("Configuration")]
         [SerializeField]
         private GePlanetSurfaceFrame surfaceFrame;
@@ -28,12 +91,21 @@ namespace jcan.CelestialSystems
         private MapMagicObject mapMagicObject;
 
         [SerializeField]
-        [Tooltip("Zero uses the real planet radius. A positive value overrides only this prototype mesh's curvature.")]
+        [Range(0, 4)]
+        [Tooltip("Number of ready MapMagic tiles converted in each direction around the addressed primary tile.")]
+        private int curvedTileRadius = 2;
+
+        [SerializeField]
+        [Tooltip("Zero uses the real planet radius. A positive value overrides only these prototype meshes' curvature.")]
         private double curvatureRadiusOverrideMeters;
 
         [SerializeField]
         private Color fallbackMeshColor =
-            new Color(0.35f, 0.55f, 0.25f, 1.0f);
+            new Color(
+                0.35f,
+                0.55f,
+                0.25f,
+                1.0f);
 
         [SerializeField]
         private bool hideSourceTerrain = true;
@@ -49,6 +121,18 @@ namespace jcan.CelestialSystems
         private Material resolvedMeshMaterial;
 
         [Header("Runtime")]
+        [SerializeField]
+        private int expectedCurvedTileCount;
+
+        [SerializeField]
+        private int readySourceTileCount;
+
+        [SerializeField]
+        private int activeCurvedTileCount;
+
+        [SerializeField]
+        private int hiddenSourceTerrainCount;
+
         [SerializeField]
         private bool hasCurvedTile;
 
@@ -73,33 +157,34 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool hasMeshCollider;
 
-        private GameObject meshObject;
-        private MeshFilter meshFilter;
-        private MeshRenderer meshRenderer;
-        private MeshCollider meshCollider;
-        private Mesh curvedMesh;
+        private readonly Dictionary<TileKey, CurvedTileRuntime>
+            curvedTiles =
+                new Dictionary<TileKey, CurvedTileRuntime>();
+
+        private readonly HashSet<TileKey>
+            desiredTiles =
+                new HashSet<TileKey>();
+
+        private readonly List<TileKey>
+            removalBuffer =
+                new List<TileKey>();
+
+        private CurvedTileRuntime primaryTile;
         private Material runtimeFallbackMaterial;
-        private TerrainData builtTerrainData;
-        private CubeSphereFace builtFace;
-        private int builtTileX;
-        private int builtTileZ;
-        private int builtResolution;
-        private double builtMeshRadiusMeters;
-        private bool sourceWasReady;
-        private Terrain hiddenTerrain;
-        private TerrainCollider hiddenTerrainCollider;
-        private bool hiddenTerrainWasEnabled;
-        private bool hiddenColliderWasEnabled;
         private bool missingShaderLogged;
 
         public bool HasCurvedTile =>
             hasCurvedTile;
 
         public MeshRenderer CurvedTileRenderer =>
-            meshRenderer;
+            primaryTile != null
+                ? primaryTile.MeshRenderer
+                : null;
 
         public TerrainData SourceTerrainData =>
-            builtTerrainData;
+            primaryTile != null
+                ? primaryTile.TerrainData
+                : null;
 
         public int SourceTileX =>
             sourceTileX;
@@ -163,16 +248,16 @@ namespace jcan.CelestialSystems
                 !coordinateDriver.HasMapMagicCoordinate ||
                 !rootPose.HasPose)
             {
-                ClearCurvedTile();
-                sourceWasReady = false;
+                ClearCurvedTiles();
+                ClearRuntimeState();
                 return;
             }
 
             var nextFace =
                 coordinateDriver.ActiveFace;
-            var nextTileX =
+            var centerTileX =
                 coordinateDriver.MapMagicTileX;
-            var nextTileZ =
+            var centerTileZ =
                 coordinateDriver.MapMagicTileZ;
             resolvedMeshResolution =
                 Mathf.Clamp(
@@ -181,90 +266,171 @@ namespace jcan.CelestialSystems
                     257);
             resolvedMeshMaterial =
                 surfaceDefinition.Material;
-
-            var nextResolution =
-                resolvedMeshResolution;
             var nextMeshRadiusMeters =
                 ResolveMeshRadiusMeters();
+            var clampedTileRadius =
+                Mathf.Clamp(
+                    curvedTileRadius,
+                    0,
+                    4);
+            var tileDiameter =
+                clampedTileRadius *
+                    2 +
+                1;
 
-            if (hasCurvedTile &&
-                (builtFace != nextFace ||
-                builtTileX != nextTileX ||
-                builtTileZ != nextTileZ))
+            expectedCurvedTileCount =
+                tileDiameter *
+                tileDiameter;
+            readySourceTileCount = 0;
+            desiredTiles.Clear();
+
+            for (var offsetZ =
+                -clampedTileRadius;
+                offsetZ <= clampedTileRadius;
+                offsetZ++)
             {
-                ClearCurvedTile();
-                sourceWasReady = false;
+                for (var offsetX =
+                    -clampedTileRadius;
+                    offsetX <= clampedTileRadius;
+                    offsetX++)
+                {
+                    var tileX =
+                        centerTileX +
+                        offsetX;
+                    var tileZ =
+                        centerTileZ +
+                        offsetZ;
+                    var key =
+                        new TileKey(
+                            tileX,
+                            tileZ);
+                    desiredTiles.Add(
+                        key);
+
+                    var mapMagicTile =
+                        mapMagicObject.tiles[
+                            new Coord(
+                                tileX,
+                                tileZ)];
+
+                    if (mapMagicTile == null ||
+                        mapMagicTile.main == null ||
+                        !mapMagicTile.main.applyReady ||
+                        mapMagicTile.main.terrain == null ||
+                        mapMagicTile.main.terrain.terrainData ==
+                            null)
+                    {
+                        continue;
+                    }
+
+                    readySourceTileCount++;
+                    EnsureCurvedTile(
+                        key,
+                        mapMagicTile.main.terrain,
+                        nextFace,
+                        resolvedMeshResolution,
+                        nextMeshRadiusMeters);
+                }
             }
 
-            var tile =
-                mapMagicObject.tiles[
-                    new Coord(
-                        nextTileX,
-                        nextTileZ)];
+            RemoveUndesiredTiles();
 
-            if (tile == null ||
-                tile.main == null ||
-                !tile.main.applyReady ||
-                tile.main.terrain == null ||
-                tile.main.terrain.terrainData == null)
+            hiddenSourceTerrainCount = 0;
+
+            foreach (var runtime in
+                curvedTiles.Values)
             {
-                sourceWasReady = false;
-                return;
+                if (hideSourceTerrain)
+                {
+                    HideSourceTerrain(
+                        runtime);
+
+                    if (runtime.SourceTerrain != null)
+                    {
+                        hiddenSourceTerrainCount++;
+                    }
+                }
+                else
+                {
+                    RestoreSourceTerrain(
+                        runtime);
+                }
+
+                ApplyMaterial(
+                    runtime);
+                ApplyMeshCollider(
+                    runtime,
+                    false);
             }
 
-            var sourceTerrain =
-                tile.main.terrain;
-            var terrainData =
-                sourceTerrain.terrainData;
-
-            if (!sourceWasReady ||
-                curvedMesh == null ||
-                builtTerrainData != terrainData ||
-                builtFace != nextFace ||
-                builtTileX != nextTileX ||
-                builtTileZ != nextTileZ ||
-                builtResolution != nextResolution ||
-                builtMeshRadiusMeters !=
-                    nextMeshRadiusMeters)
-            {
-                BuildCurvedTile(
-                    sourceTerrain,
-                    terrainData,
-                    nextFace,
-                    nextTileX,
-                    nextTileZ,
-                    nextResolution,
-                    nextMeshRadiusMeters);
-            }
-
-            sourceWasReady = true;
-
-            if (hideSourceTerrain)
-            {
-                HideSourceTerrain(
-                    sourceTerrain);
-            }
-            else
-            {
-                RestoreSourceTerrain();
-            }
-
-            ApplyMaterial();
-            ApplyMeshCollider(
-                false);
+            ResolvePrimaryRuntime(
+                nextFace,
+                centerTileX,
+                centerTileZ,
+                nextMeshRadiusMeters);
+            activeCurvedTileCount =
+                curvedTiles.Count;
         }
 
-        private void BuildCurvedTile(
+        private void EnsureCurvedTile(
+            TileKey key,
             Terrain sourceTerrain,
-            TerrainData terrainData,
             CubeSphereFace face,
-            int tileX,
-            int tileZ,
             int resolution,
             double meshRadiusMeters)
         {
-            RestoreSourceTerrain();
-            EnsureMeshObjects();
+            if (!curvedTiles.TryGetValue(
+                    key,
+                    out var runtime))
+            {
+                runtime =
+                    new CurvedTileRuntime
+                    {
+                        TileX =
+                            key.X,
+                        TileZ =
+                            key.Z
+                    };
+                curvedTiles.Add(
+                    key,
+                    runtime);
+            }
+
+            var terrainData =
+                sourceTerrain.terrainData;
+
+            if (runtime.CurvedMesh == null ||
+                runtime.SourceTerrain !=
+                    sourceTerrain ||
+                runtime.TerrainData !=
+                    terrainData ||
+                runtime.Face != face ||
+                runtime.Resolution != resolution ||
+                runtime.MeshRadiusMeters !=
+                    meshRadiusMeters)
+            {
+                BuildCurvedTile(
+                    runtime,
+                    sourceTerrain,
+                    terrainData,
+                    face,
+                    resolution,
+                    meshRadiusMeters);
+            }
+        }
+
+        private void BuildCurvedTile(
+            CurvedTileRuntime runtime,
+            Terrain sourceTerrain,
+            TerrainData terrainData,
+            CubeSphereFace face,
+            int resolution,
+            double meshRadiusMeters)
+        {
+            RestoreSourceTerrain(
+                runtime);
+            EnsureMeshObjects(
+                runtime);
 
             var planetRadiusMeters =
                 meshRadiusMeters;
@@ -303,12 +469,14 @@ namespace jcan.CelestialSystems
             {
                 var normalizedZ =
                     z /
-                    (double)(resolution - 1);
+                    (double)(
+                        resolution -
+                        1);
                 var localZ =
                     tileSizeZ *
                     normalizedZ;
                 var faceVMeters =
-                    -(tileZ *
+                    -(runtime.TileZ *
                     tileSizeZ +
                     localZ);
 
@@ -318,12 +486,14 @@ namespace jcan.CelestialSystems
                 {
                     var normalizedX =
                         x /
-                        (double)(resolution - 1);
+                        (double)(
+                            resolution -
+                            1);
                     var localX =
                         tileSizeX *
                         normalizedX;
                     var faceUMeters =
-                        tileX *
+                        runtime.TileX *
                         tileSizeX +
                         localX;
                     var heightMeters =
@@ -413,133 +583,118 @@ namespace jcan.CelestialSystems
                 }
             }
 
-            curvedMesh.Clear();
-            curvedMesh.indexFormat =
-                vertices.Length > 65535
+            runtime.CurvedMesh.Clear();
+            runtime.CurvedMesh.indexFormat =
+                vertices.Length >
+                    65535
                     ? IndexFormat.UInt32
                     : IndexFormat.UInt16;
-            curvedMesh.vertices =
+            runtime.CurvedMesh.vertices =
                 vertices;
-            curvedMesh.uv =
+            runtime.CurvedMesh.uv =
                 uv;
-            curvedMesh.triangles =
+            runtime.CurvedMesh.triangles =
                 triangles;
-            curvedMesh.RecalculateNormals();
-            curvedMesh.RecalculateTangents();
-            curvedMesh.RecalculateBounds();
+            runtime.CurvedMesh.RecalculateNormals();
+            runtime.CurvedMesh.RecalculateTangents();
+            runtime.CurvedMesh.RecalculateBounds();
             ApplyMeshCollider(
+                runtime,
                 true);
 
-            meshObject.name =
-                $"Curved Tile {tileX},{tileZ}";
-            builtTerrainData =
+            runtime.MeshObject.name =
+                $"Curved Tile {runtime.TileX},{runtime.TileZ}";
+            runtime.SourceTerrain =
+                sourceTerrain;
+            runtime.TerrainData =
                 terrainData;
-            builtFace =
+            runtime.Face =
                 face;
-            builtTileX =
-                tileX;
-            builtTileZ =
-                tileZ;
-            builtResolution =
+            runtime.Resolution =
                 resolution;
-            builtMeshRadiusMeters =
+            runtime.MeshRadiusMeters =
                 meshRadiusMeters;
-            hasCurvedTile = true;
-            activeFace =
-                face;
-            effectiveMeshRadiusMeters =
-                meshRadiusMeters;
-            sourceTileX =
-                tileX;
-            sourceTileZ =
-                tileZ;
-            vertexCount =
-                vertices.Length;
-            triangleCount =
-                triangles.Length /
-                3;
         }
 
-        private void EnsureMeshObjects()
+        private void EnsureMeshObjects(
+            CurvedTileRuntime runtime)
         {
-            if (meshObject == null)
+            if (runtime.MeshObject == null)
             {
-                meshObject =
+                runtime.MeshObject =
                     new GameObject(
                         "Curved Tile");
-                meshObject.transform.SetParent(
+                runtime.MeshObject.transform.SetParent(
                     transform,
                     false);
-                meshFilter =
-                    meshObject.AddComponent<MeshFilter>();
-                meshRenderer =
-                    meshObject.AddComponent<MeshRenderer>();
-                meshRenderer.shadowCastingMode =
+                runtime.MeshFilter =
+                    runtime.MeshObject.AddComponent<MeshFilter>();
+                runtime.MeshRenderer =
+                    runtime.MeshObject.AddComponent<MeshRenderer>();
+                runtime.MeshRenderer.shadowCastingMode =
                     ShadowCastingMode.Off;
-                meshRenderer.receiveShadows =
+                runtime.MeshRenderer.receiveShadows =
                     false;
             }
 
-            if (curvedMesh == null)
+            if (runtime.CurvedMesh == null)
             {
-                curvedMesh =
+                runtime.CurvedMesh =
                     new Mesh
                     {
                         name =
-                            "Curved MapMagic Tile Prototype"
+                            $"Curved MapMagic Tile {runtime.TileX},{runtime.TileZ}"
                     };
-                meshFilter.sharedMesh =
-                    curvedMesh;
+                runtime.MeshFilter.sharedMesh =
+                    runtime.CurvedMesh;
             }
         }
 
         private void ApplyMeshCollider(
+            CurvedTileRuntime runtime,
             bool forceRefresh)
         {
             if (!generateMeshCollider ||
-                meshObject == null ||
-                curvedMesh == null)
+                runtime.MeshObject == null ||
+                runtime.CurvedMesh == null)
             {
-                if (meshCollider != null)
+                if (runtime.MeshCollider != null)
                 {
                     DestroyUnityObject(
-                        meshCollider);
+                        runtime.MeshCollider);
                 }
 
-                meshCollider = null;
-                hasMeshCollider = false;
+                runtime.MeshCollider = null;
                 return;
             }
 
-            if (meshCollider == null)
+            if (runtime.MeshCollider == null)
             {
-                meshCollider =
-                    meshObject.AddComponent<MeshCollider>();
+                runtime.MeshCollider =
+                    runtime.MeshObject.AddComponent<MeshCollider>();
                 forceRefresh = true;
             }
 
             if (forceRefresh ||
-                meshCollider.sharedMesh !=
-                    curvedMesh)
+                runtime.MeshCollider.sharedMesh !=
+                    runtime.CurvedMesh)
             {
-                meshCollider.sharedMesh = null;
-                meshCollider.sharedMesh =
-                    curvedMesh;
+                runtime.MeshCollider.sharedMesh =
+                    null;
+                runtime.MeshCollider.sharedMesh =
+                    runtime.CurvedMesh;
             }
-
-            hasMeshCollider =
-                meshCollider.sharedMesh ==
-                    curvedMesh;
         }
 
-        private void ApplyMaterial()
+        private void ApplyMaterial(
+            CurvedTileRuntime runtime)
         {
-            if (meshRenderer == null)
+            if (runtime.MeshRenderer == null)
             {
                 return;
             }
 
-            meshRenderer.sharedMaterial =
+            runtime.MeshRenderer.sharedMaterial =
                 resolvedMeshMaterial != null
                     ? resolvedMeshMaterial
                     : ResolveFallbackMaterial();
@@ -552,7 +707,8 @@ namespace jcan.CelestialSystems
                 SetMaterialColor(
                     runtimeFallbackMaterial,
                     fallbackMeshColor);
-                return runtimeFallbackMaterial;
+                return
+                    runtimeFallbackMaterial;
             }
 
             var shader =
@@ -579,7 +735,8 @@ namespace jcan.CelestialSystems
             }
 
             runtimeFallbackMaterial =
-                new Material(shader)
+                new Material(
+                    shader)
                 {
                     name =
                         "Curved Tile Prototype Material",
@@ -590,7 +747,8 @@ namespace jcan.CelestialSystems
                 runtimeFallbackMaterial,
                 fallbackMeshColor);
             missingShaderLogged = false;
-            return runtimeFallbackMaterial;
+            return
+                runtimeFallbackMaterial;
         }
 
         private static void SetMaterialColor(
@@ -615,53 +773,162 @@ namespace jcan.CelestialSystems
         }
 
         private void HideSourceTerrain(
-            Terrain terrain)
+            CurvedTileRuntime runtime)
         {
-            if (hiddenTerrain != terrain)
+            var terrain =
+                runtime.SourceTerrain;
+
+            if (terrain == null)
             {
-                RestoreSourceTerrain();
-                hiddenTerrain =
+                return;
+            }
+
+            if (runtime.SourceTerrain !=
+                terrain)
+            {
+                RestoreSourceTerrain(
+                    runtime);
+                runtime.SourceTerrain =
                     terrain;
-                hiddenTerrainWasEnabled =
-                    terrain.enabled;
-                hiddenTerrainCollider =
+            }
+
+            if (terrain.enabled)
+            {
+                runtime.SourceTerrainWasEnabled =
+                    true;
+            }
+
+            if (runtime.SourceTerrainCollider == null)
+            {
+                runtime.SourceTerrainCollider =
                     terrain.GetComponent<TerrainCollider>();
 
-                if (hiddenTerrainCollider != null)
+                if (runtime.SourceTerrainCollider != null)
                 {
-                    hiddenColliderWasEnabled =
-                        hiddenTerrainCollider.enabled;
+                    runtime.SourceColliderWasEnabled =
+                        runtime.SourceTerrainCollider.enabled;
                 }
             }
 
-            hiddenTerrain.enabled =
+            terrain.enabled =
                 false;
 
-            if (hiddenTerrainCollider != null)
+            if (runtime.SourceTerrainCollider != null)
             {
-                hiddenTerrainCollider.enabled =
+                runtime.SourceTerrainCollider.enabled =
                     false;
             }
         }
 
-        private void RestoreSourceTerrain()
+        private static void RestoreSourceTerrain(
+            CurvedTileRuntime runtime)
         {
-            if (hiddenTerrain != null)
+            if (runtime.SourceTerrain != null)
             {
-                hiddenTerrain.enabled =
-                    hiddenTerrainWasEnabled;
+                runtime.SourceTerrain.enabled =
+                    runtime.SourceTerrainWasEnabled;
             }
 
-            if (hiddenTerrainCollider != null)
+            if (runtime.SourceTerrainCollider != null)
             {
-                hiddenTerrainCollider.enabled =
-                    hiddenColliderWasEnabled;
+                runtime.SourceTerrainCollider.enabled =
+                    runtime.SourceColliderWasEnabled;
             }
 
-            hiddenTerrain = null;
-            hiddenTerrainCollider = null;
-            hiddenTerrainWasEnabled = false;
-            hiddenColliderWasEnabled = false;
+            runtime.SourceTerrainCollider = null;
+            runtime.SourceTerrainWasEnabled = false;
+            runtime.SourceColliderWasEnabled = false;
+        }
+
+        private void RemoveUndesiredTiles()
+        {
+            removalBuffer.Clear();
+
+            foreach (var entry in
+                curvedTiles)
+            {
+                if (!desiredTiles.Contains(
+                        entry.Key))
+                {
+                    removalBuffer.Add(
+                        entry.Key);
+                }
+            }
+
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
+            {
+                RemoveCurvedTile(
+                    removalBuffer[index]);
+            }
+        }
+
+        private void RemoveCurvedTile(
+            TileKey key)
+        {
+            if (!curvedTiles.TryGetValue(
+                    key,
+                    out var runtime))
+            {
+                return;
+            }
+
+            RestoreSourceTerrain(
+                runtime);
+
+            if (runtime.MeshObject != null)
+            {
+                DestroyUnityObject(
+                    runtime.MeshObject);
+            }
+
+            if (runtime.CurvedMesh != null)
+            {
+                DestroyUnityObject(
+                    runtime.CurvedMesh);
+            }
+
+            curvedTiles.Remove(
+                key);
+        }
+
+        private void ResolvePrimaryRuntime(
+            CubeSphereFace face,
+            int tileX,
+            int tileZ,
+            double meshRadiusMeters)
+        {
+            curvedTiles.TryGetValue(
+                new TileKey(
+                    tileX,
+                    tileZ),
+                out primaryTile);
+            hasCurvedTile =
+                primaryTile != null &&
+                primaryTile.CurvedMesh != null;
+            activeFace =
+                face;
+            effectiveMeshRadiusMeters =
+                meshRadiusMeters;
+            sourceTileX =
+                tileX;
+            sourceTileZ =
+                tileZ;
+            vertexCount =
+                hasCurvedTile
+                    ? primaryTile.CurvedMesh.vertexCount
+                    : 0;
+            triangleCount =
+                hasCurvedTile
+                    ? primaryTile.CurvedMesh.triangles.Length /
+                        3
+                    : 0;
+            hasMeshCollider =
+                hasCurvedTile &&
+                primaryTile.MeshCollider != null &&
+                primaryTile.MeshCollider.sharedMesh ==
+                    primaryTile.CurvedMesh;
         }
 
         private RoundMapMagicSurfaceDefinition ResolveSurfaceDefinition()
@@ -688,9 +955,11 @@ namespace jcan.CelestialSystems
 
         private double ResolveMeshRadiusMeters()
         {
-            return curvatureRadiusOverrideMeters > 0.0
-                ? curvatureRadiusOverrideMeters
-                : surfaceFrame.PlanetRadiusMeters;
+            return
+                curvatureRadiusOverrideMeters >
+                    0.0
+                    ? curvatureRadiusOverrideMeters
+                    : surfaceFrame.PlanetRadiusMeters;
         }
 
         private bool ConfigurationIsValid(
@@ -703,41 +972,45 @@ namespace jcan.CelestialSystems
                 mapMagicObject != null &&
                 surfaceDefinition != null &&
                 surfaceDefinition.HasValidSettings &&
-                surfaceFrame.PlanetRadiusMeters > 0.0 &&
+                surfaceFrame.PlanetRadiusMeters >
+                    0.0 &&
                 IsFinite(
                     curvatureRadiusOverrideMeters) &&
-                curvatureRadiusOverrideMeters >= 0.0 &&
+                curvatureRadiusOverrideMeters >=
+                    0.0 &&
                 IsFinite(
                     rootPose.RadialOffsetMeters);
         }
 
-        private void ClearCurvedTile()
+        private void ClearCurvedTiles()
         {
-            RestoreSourceTerrain();
+            removalBuffer.Clear();
 
-            if (meshObject != null)
+            foreach (var key in
+                curvedTiles.Keys)
             {
-                DestroyUnityObject(
-                    meshObject);
+                removalBuffer.Add(
+                    key);
             }
 
-            if (curvedMesh != null)
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
             {
-                DestroyUnityObject(
-                    curvedMesh);
+                RemoveCurvedTile(
+                    removalBuffer[index]);
             }
 
-            meshObject = null;
-            meshFilter = null;
-            meshRenderer = null;
-            meshCollider = null;
-            curvedMesh = null;
-            builtTerrainData = null;
-            builtFace = default;
-            builtTileX = default;
-            builtTileZ = default;
-            builtResolution = default;
-            builtMeshRadiusMeters = default;
+            desiredTiles.Clear();
+            primaryTile = null;
+        }
+
+        private void ClearRuntimeState()
+        {
+            expectedCurvedTileCount = default;
+            readySourceTileCount = default;
+            activeCurvedTileCount = default;
+            hiddenSourceTerrainCount = default;
             hasCurvedTile = false;
             activeFace = default;
             effectiveMeshRadiusMeters = default;
@@ -750,12 +1023,14 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
-            ClearCurvedTile();
-            sourceWasReady = false;
+            ClearCurvedTiles();
+            ClearRuntimeState();
         }
 
         private void OnDestroy()
         {
+            ClearCurvedTiles();
+
             if (runtimeFallbackMaterial != null)
             {
                 DestroyUnityObject(
@@ -769,9 +1044,12 @@ namespace jcan.CelestialSystems
             DoubleVector3 second)
         {
             return
-                first.x * second.x +
-                first.y * second.y +
-                first.z * second.z;
+                first.x *
+                    second.x +
+                first.y *
+                    second.y +
+                first.z *
+                    second.z;
         }
 
         private static bool IsFinite(
@@ -783,7 +1061,7 @@ namespace jcan.CelestialSystems
         }
 
         private static void DestroyUnityObject(
-            Object value)
+            UnityEngine.Object value)
         {
             if (value == null)
             {
@@ -792,11 +1070,13 @@ namespace jcan.CelestialSystems
 
             if (Application.isPlaying)
             {
-                Destroy(value);
+                Destroy(
+                    value);
             }
             else
             {
-                DestroyImmediate(value);
+                DestroyImmediate(
+                    value);
             }
         }
     }
