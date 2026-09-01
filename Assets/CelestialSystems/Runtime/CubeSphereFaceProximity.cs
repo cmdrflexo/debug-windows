@@ -99,6 +99,31 @@ namespace jcan.CelestialSystems
                 positiveVEdgeMeters;
         }
 
+        public double GetEdgeDistanceMeters(
+            CubeSphereEdge edge)
+        {
+            switch (edge)
+            {
+                case CubeSphereEdge.NegativeU:
+                    return negativeUEdgeMeters;
+
+                case CubeSphereEdge.PositiveU:
+                    return positiveUEdgeMeters;
+
+                case CubeSphereEdge.NegativeV:
+                    return negativeVEdgeMeters;
+
+                case CubeSphereEdge.PositiveV:
+                    return positiveVEdgeMeters;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(edge),
+                        edge,
+                        "Unknown cube-sphere edge.");
+            }
+        }
+
         public bool IsNearEdge(double thresholdMeters)
         {
             ValidateThreshold(thresholdMeters);
