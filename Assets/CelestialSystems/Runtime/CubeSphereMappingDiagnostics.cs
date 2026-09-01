@@ -28,6 +28,9 @@ namespace jcan.CelestialSystems
         private double planetRadiusMeters = 6371000.0;
 
         [SerializeField]
+        private double tileSizeMeters = 1000.0;
+
+        [SerializeField]
         private double maximumDirectionError = 0.000000000001;
 
         [SerializeField]
@@ -44,10 +47,11 @@ namespace jcan.CelestialSystems
         [ContextMenu("Run Cube-Sphere Diagnostics")]
         public void RunDiagnostics()
         {
-            if (planetRadiusMeters <= 0.0)
+            if (planetRadiusMeters <= 0.0 ||
+                tileSizeMeters <= 0.0)
             {
                 Debug.LogError(
-                    "Cube-sphere diagnostics require a positive planet radius.",
+                    "Cube-sphere diagnostics require a positive planet radius and tile size.",
                     this);
                 return;
             }
@@ -114,13 +118,42 @@ namespace jcan.CelestialSystems
                                 position,
                                 restoredPosition);
 
+                        if (!CubeSphereMapping.TryAddressToTileAddress(
+                                address,
+                                planetRadiusMeters,
+                                tileSizeMeters,
+                                out var tileAddress) ||
+                            !tileAddress.IsLocalPositionInsideTile(
+                                tileSizeMeters) ||
+                            !CubeSphereMapping.TryTileAddressToAddress(
+                                tileAddress,
+                                planetRadiusMeters,
+                                tileSizeMeters,
+                                out var tileRestoredAddress))
+                        {
+                            LogFailure(
+                                $"Tile conversion failed for {address}.");
+                            return;
+                        }
+
+                        var tileRestoredPosition =
+                            CubeSphereMapping.AddressToPlanetRelativePosition(
+                                tileRestoredAddress,
+                                planetRadiusMeters);
+                        var tilePositionErrorMeters =
+                            Distance(
+                                position,
+                                tileRestoredPosition);
+
                         largestDirectionError = Math.Max(
                             largestDirectionError,
                             directionError);
                         largestPositionErrorMeters = Math.Max(
                             largestPositionErrorMeters,
-                            positionErrorMeters);
-                        sampleCount++;
+                            Math.Max(
+                                positionErrorMeters,
+                                tilePositionErrorMeters));
+                        sampleCount += 2;
                     }
                 }
             }
