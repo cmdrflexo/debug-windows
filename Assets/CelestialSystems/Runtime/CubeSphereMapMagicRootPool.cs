@@ -93,6 +93,39 @@ namespace jcan.CelestialSystems
         public int ActiveRootCount =>
             activeRootCount;
 
+        public void ReleaseAllRoots()
+        {
+            ClearRuntimeState();
+
+            if (rootSlots == null ||
+                rootSlots.Length != 3)
+            {
+                BuildRootSlots();
+            }
+
+            for (var slotIndex = 0;
+                slotIndex < rootSlots.Length;
+                slotIndex++)
+            {
+                var slot =
+                    rootSlots[slotIndex];
+
+                slot.InUse = false;
+                slot.HasAssignedFace = false;
+                slot.AssignedFace = default;
+                DeactivateRoot(
+                    slot.Driver);
+            }
+
+            for (var desiredIndex = 0;
+                desiredIndex < desiredRoots.Length;
+                desiredIndex++)
+            {
+                desiredRoots[desiredIndex] =
+                    default;
+            }
+        }
+
         private void Awake()
         {
             BuildRootSlots();
