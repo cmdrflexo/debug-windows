@@ -279,6 +279,7 @@ namespace jcan.CelestialSystems
                 }
 
                 var slot =
+                    FindAvailableUnassignedActiveSlot() ??
                     FindAvailableSlot(
                         true) ??
                     FindAvailableSlot(
@@ -293,6 +294,29 @@ namespace jcan.CelestialSystems
                     desiredIndex,
                     slot);
             }
+        }
+
+        private RootSlot FindAvailableUnassignedActiveSlot()
+        {
+            for (var slotIndex = 0;
+                slotIndex < rootSlots.Length;
+                slotIndex++)
+            {
+                var slot =
+                    rootSlots[slotIndex];
+
+                if (slot.InUse ||
+                    slot.Driver == null ||
+                    slot.HasAssignedFace ||
+                    !slot.Driver.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                return slot;
+            }
+
+            return null;
         }
 
         private RootSlot FindAvailableSlot(
