@@ -2378,6 +2378,7 @@ GameObject:
   - component: {fileID: 1367265698}
   - component: {fileID: 1367265700}
   - component: {fileID: 1367265701}
+  - component: {fileID: 1367265702}
   m_Layer: 0
   m_Name: MapMagic Face Root A
   m_TagString: Untagged
@@ -2599,12 +2600,12 @@ MonoBehaviour:
   coordinateDriver: {fileID: 1367265698}
   rootPose: {fileID: 1367265700}
   mapMagicObject: {fileID: 1367265699}
-  meshResolution: 65
   curvatureRadiusOverrideMeters: 0
-  meshMaterial: {fileID: 0}
   fallbackMeshColor: {r: 0.35, g: 0.55, b: 0.25, a: 1}
   hideSourceTerrain: 1
   generateMeshCollider: 1
+  resolvedMeshResolution: 0
+  resolvedMeshMaterial: {fileID: 0}
   hasCurvedTile: 0
   activeFace: 0
   effectiveMeshRadiusMeters: 0
@@ -2613,6 +2614,29 @@ MonoBehaviour:
   vertexCount: 0
   triangleCount: 0
   hasMeshCollider: 0
+--- !u!114 &1367265702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1367265694}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f403f7c1a1945679d683741df5940fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CubeSphereMapMagicTerrainLayerMaterialAdapter
+  curvedTile: {fileID: 1367265701}
+  hasAdaptedMaterial: 0
+  terrainLayerCount: 0
+  activeTerrainLayer: {fileID: 0}
+  diffuseTexture: {fileID: 0}
+  normalTexture: {fileID: 0}
+  maskTexture: {fileID: 0}
+  layerTileSizeMeters: {x: 0, y: 0}
+  materialTextureScale: {x: 0, y: 0}
+  materialTextureOffset: {x: 0, y: 0}
+  generatedMaterial: {fileID: 0}
 --- !u!1 &1557184261
 GameObject:
   m_ObjectHideFlags: 0
