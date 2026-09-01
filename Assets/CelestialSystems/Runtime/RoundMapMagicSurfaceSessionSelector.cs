@@ -147,6 +147,7 @@ namespace jcan.CelestialSystems
                     null ||
                 !SelectionDistancesAreValid())
             {
+                ClearSelection();
                 return;
             }
 
@@ -227,12 +228,13 @@ namespace jcan.CelestialSystems
                 selectedSurfaceDistanceMeters =
                     currentSelectedDistanceMeters;
 
-                if (!surfaceSession.HasActiveSession ||
+                if ((!surfaceSession.HasActiveSession ||
                     surfaceSession.ActiveBodyContext !=
-                        selectedBodyContext)
+                        selectedBodyContext) &&
+                    !surfaceSession.RequestSession(
+                        selectedBodyContext))
                 {
-                    surfaceSession.RequestSession(
-                        selectedBodyContext);
+                    ClearSelection();
                 }
 
                 return;
