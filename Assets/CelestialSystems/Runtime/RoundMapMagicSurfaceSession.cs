@@ -21,6 +21,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicSurfaceDefinition configuredSurfaceDefinition;
 
+        [SerializeField]
+        private RoundMapMagicSurfaceQualityProfile configuredQualityProfile;
+
         [Header("Session Request")]
         [SerializeField]
         private bool requestedActive = true;
@@ -57,6 +60,9 @@ namespace jcan.CelestialSystems
 
         public RoundMapMagicSurfaceDefinition ConfiguredSurfaceDefinition =>
             configuredSurfaceDefinition;
+
+        public RoundMapMagicSurfaceQualityProfile ConfiguredQualityProfile =>
+            configuredQualityProfile;
 
         private void Reset()
         {
