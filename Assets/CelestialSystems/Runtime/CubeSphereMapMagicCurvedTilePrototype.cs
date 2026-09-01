@@ -120,7 +120,7 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         [Range(0, 4)]
-        [Tooltip("Number of ready MapMagic tiles converted in each direction around the addressed primary tile.")]
+        [Tooltip("Fallback tile radius used only when the surface session has no valid quality profile.")]
         private int curvedTileRadius = 2;
 
         [SerializeField]
@@ -147,6 +147,16 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private Material resolvedMeshMaterial;
+
+        [Header("Resolved Quality Profile")]
+        [SerializeField]
+        private bool usingQualityProfile;
+
+        [SerializeField]
+        private double resolvedLocalCoverageRadiusMeters;
+
+        [SerializeField]
+        private int resolvedLocalTileRadius;
 
         [Header("Runtime")]
         [SerializeField]
@@ -200,6 +210,7 @@ namespace jcan.CelestialSystems
         private CurvedTileRuntime primaryTile;
         private Material runtimeFallbackMaterial;
         private bool missingShaderLogged;
+        private RoundMapMagicSurfaceSession surfaceSession;
 
         public bool HasCurvedTile =>
             hasCurvedTile;
@@ -261,6 +272,7 @@ namespace jcan.CelestialSystems
                 GetComponent<CubeSphereMapMagicRootPose>();
             mapMagicObject =
                 GetComponent<MapMagicObject>();
+            ResolveSurfaceSession();
         }
 
         private void Start()
@@ -298,8 +310,13 @@ namespace jcan.CelestialSystems
         {
             var surfaceDefinition =
                 ResolveSurfaceDefinition();
+            var qualityProfile =
+                ResolveQualityProfile();
             resolvedMeshResolution = default;
             resolvedMeshMaterial = null;
+            usingQualityProfile = false;
+            resolvedLocalCoverageRadiusMeters = default;
+            resolvedLocalTileRadius = default;
 
             if (!ConfigurationIsValid(
                     surfaceDefinition) ||
@@ -317,9 +334,13 @@ namespace jcan.CelestialSystems
                 coordinateDriver.MapMagicTileX;
             var centerTileZ =
                 coordinateDriver.MapMagicTileZ;
+            usingQualityProfile =
+                qualityProfile != null;
             resolvedMeshResolution =
                 Mathf.Clamp(
-                    surfaceDefinition.MeshResolution,
+                    usingQualityProfile
+                        ? qualityProfile.LocalMeshResolution
+                        : surfaceDefinition.MeshResolution,
                     3,
                     257);
             resolvedMeshMaterial =
@@ -327,10 +348,16 @@ namespace jcan.CelestialSystems
             var nextMeshRadiusMeters =
                 ResolveMeshRadiusMeters();
             var clampedTileRadius =
-                Mathf.Clamp(
-                    curvedTileRadius,
-                    0,
-                    4);
+                ResolveLocalTileRadius(
+                    surfaceDefinition,
+                    qualityProfile);
+            resolvedLocalCoverageRadiusMeters =
+                usingQualityProfile
+                    ? qualityProfile.LocalCoverageRadiusMeters
+                    : (clampedTileRadius + 0.5) *
+                        surfaceDefinition.TileSizeMeters;
+            resolvedLocalTileRadius =
+                clampedTileRadius;
             var tileDiameter =
                 clampedTileRadius *
                     2 +
@@ -1113,6 +1140,66 @@ namespace jcan.CelestialSystems
                 definition.RoundMapMagicSurface;
         }
 
+        private RoundMapMagicSurfaceQualityProfile ResolveQualityProfile()
+        {
+            ResolveSurfaceSession();
+
+            var qualityProfile =
+                surfaceSession != null
+                    ? surfaceSession.ConfiguredQualityProfile
+                    : null;
+
+            return
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? qualityProfile
+                    : null;
+        }
+
+        private void ResolveSurfaceSession()
+        {
+            if (surfaceSession == null &&
+                surfaceFrame != null)
+            {
+                surfaceSession =
+                    surfaceFrame.GetComponent<RoundMapMagicSurfaceSession>();
+            }
+        }
+
+        private int ResolveLocalTileRadius(
+            RoundMapMagicSurfaceDefinition surfaceDefinition,
+            RoundMapMagicSurfaceQualityProfile qualityProfile)
+        {
+            if (qualityProfile == null)
+            {
+                return
+                    Mathf.Clamp(
+                        curvedTileRadius,
+                        0,
+                        4);
+            }
+
+            var tileSizeMeters =
+                surfaceDefinition.TileSizeMeters;
+            var fullyCoveredCenterRadiusMeters =
+                qualityProfile.LocalCoverageRadiusMeters -
+                tileSizeMeters *
+                    0.5;
+            var tileRadius =
+                fullyCoveredCenterRadiusMeters >
+                    0.0
+                    ? (int)Math.Floor(
+                        fullyCoveredCenterRadiusMeters /
+                        tileSizeMeters)
+                    : 0;
+
+            return
+                Mathf.Clamp(
+                    tileRadius,
+                    0,
+                    4);
+        }
+
         private double ResolveMeshRadiusMeters()
         {
             return
@@ -1167,6 +1254,9 @@ namespace jcan.CelestialSystems
 
         private void ClearRuntimeState()
         {
+            usingQualityProfile = false;
+            resolvedLocalCoverageRadiusMeters = default;
+            resolvedLocalTileRadius = default;
             expectedCurvedTileCount = default;
             readySourceTileCount = default;
             activeCurvedTileCount = default;
