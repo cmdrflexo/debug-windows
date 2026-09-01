@@ -2,6 +2,7 @@
  * Converts a tracked or pool-assigned cube-sphere tile address into MapMagic's bounded coordinate-generation input.
  */
 
+using System;
 using Den.Tools;
 using MapMagic.Core;
 using UnityEngine;
@@ -103,6 +104,20 @@ namespace jcan.CelestialSystems
             {
                 Debug.LogError(
                     "The MapMagic coordinate driver requires a MapMagic object.",
+                    this);
+            }
+
+            if (addressTracker != null &&
+                mapMagicObject != null &&
+                (!Approximately(
+                    addressTracker.TileSizeMeters,
+                    mapMagicObject.tileSize.x) ||
+                !Approximately(
+                    addressTracker.TileSizeMeters,
+                    mapMagicObject.tileSize.z)))
+            {
+                Debug.LogError(
+                    "The cube-sphere tracker and MapMagic root must use the same tile size.",
                     this);
             }
         }
@@ -306,8 +321,24 @@ namespace jcan.CelestialSystems
             }
 
             tileX = (int)tileU;
-            tileZ = (int)tileV;
+            tileZ =
+                (int)(-tileV - 1L);
             return true;
+        }
+
+        private static bool Approximately(
+            double first,
+            double second)
+        {
+            var scale =
+                Math.Max(
+                    1.0,
+                    Math.Max(
+                        Math.Abs(first),
+                        Math.Abs(second)));
+
+            return Math.Abs(first - second) <=
+                scale * 0.000000001;
         }
     }
 }
