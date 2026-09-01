@@ -50,6 +50,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CubeSphereTileAddress vAdjacentTileAddress;
 
+        public double TileSizeMeters =>
+            tileSizeMeters;
+
         public bool HasPrimaryTileAddress =>
             hasPrimaryTileAddress;
 
