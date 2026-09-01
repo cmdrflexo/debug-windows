@@ -76,6 +76,14 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (!PoolOwnerIsSeparate())
+            {
+                Debug.LogError(
+                    "The MapMagic root pool must not be placed on one of the pooled root GameObjects.",
+                    this);
+                return;
+            }
+
             DeactivateRoot(uAdjacentRoot);
             DeactivateRoot(vAdjacentRoot);
         }
@@ -84,8 +92,12 @@ namespace jcan.CelestialSystems
         {
             ClearRuntimeState();
 
+            if (!RootSlotsAreValid())
+            {
+                return;
+            }
+
             if (addressTracker == null ||
-                !RootSlotsAreValid() ||
                 !addressTracker.HasPrimaryTileAddress)
             {
                 DeactivateAllRoots();
@@ -182,7 +194,16 @@ namespace jcan.CelestialSystems
                 primaryRoot != null &&
                 uAdjacentRoot != null &&
                 vAdjacentRoot != null &&
-                RootSlotsAreDistinct();
+                RootSlotsAreDistinct() &&
+                PoolOwnerIsSeparate();
+        }
+
+        private bool PoolOwnerIsSeparate()
+        {
+            return
+                primaryRoot.gameObject != gameObject &&
+                uAdjacentRoot.gameObject != gameObject &&
+                vAdjacentRoot.gameObject != gameObject;
         }
 
         private bool RootSlotsAreDistinct()
