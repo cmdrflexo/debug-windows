@@ -1,0 +1,66 @@
+/*
+ * Stores reusable MapMagic generation and streaming settings for round celestial-body surfaces.
+ */
+
+using MapMagic.Nodes;
+using UnityEngine;
+
+namespace jcan.CelestialSystems
+{
+    [CreateAssetMenu(
+        fileName = "Round MapMagic Surface",
+        menuName = "Celestial Systems/Surface Profiles/Round MapMagic")]
+    public sealed class RoundMapMagicSurfaceDefinition :
+        ScriptableObject
+    {
+        [SerializeField]
+        private Graph graph;
+
+        [SerializeField]
+        private double tileSizeMeters =
+            1000.0;
+
+        [SerializeField]
+        private double adjacentPreloadDistanceMeters =
+            3000.0;
+
+        [SerializeField]
+        [Range(3, 257)]
+        private int meshResolution = 65;
+
+        [SerializeField]
+        private Material material;
+
+        public Graph Graph =>
+            graph;
+
+        public double TileSizeMeters =>
+            tileSizeMeters;
+
+        public double AdjacentPreloadDistanceMeters =>
+            adjacentPreloadDistanceMeters;
+
+        public int MeshResolution =>
+            meshResolution;
+
+        public Material Material =>
+            material;
+
+        public bool HasValidSettings =>
+            graph != null &&
+            IsFinite(tileSizeMeters) &&
+            tileSizeMeters > 0.0 &&
+            IsFinite(
+                adjacentPreloadDistanceMeters) &&
+            adjacentPreloadDistanceMeters >= 0.0 &&
+            meshResolution >= 3;
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
+        }
+    }
+}
