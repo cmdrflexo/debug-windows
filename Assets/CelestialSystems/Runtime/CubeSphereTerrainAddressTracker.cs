@@ -1,5 +1,5 @@
 /*
- * Tracks the active anchor's primary cube-sphere terrain tile and the adjacent face tiles needed near edges and corners.
+ * Tracks a round body's primary cube-sphere terrain tile and the adjacent face tiles needed near edges and corners.
  */
 
 using UnityEngine;
@@ -15,15 +15,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private GePlanetSurfaceFrame surfaceFrame;
 
+        [Header("Resolved Definition Settings")]
         [SerializeField]
-        private double planetRadiusMeters = 6371000.0;
+        private double planetRadiusMeters;
 
         [SerializeField]
-        private double tileSizeMeters = 1000.0;
+        private double tileSizeMeters;
 
         [SerializeField]
-        private double adjacentPreloadDistanceMeters =
-            3000.0;
+        private double adjacentPreloadDistanceMeters;
 
         [Header("Runtime")]
         [SerializeField]
@@ -91,31 +91,15 @@ namespace jcan.CelestialSystems
             if (surfaceFrame == null)
             {
                 Debug.LogError(
-                    "The terrain address tracker requires a planet surface frame.",
+                    "The terrain address tracker requires a round-body surface frame.",
                     this);
+                return;
             }
 
-            if (!IsFinite(planetRadiusMeters) ||
-                planetRadiusMeters <= 0.0)
+            if (!RefreshDefinitionSettings())
             {
                 Debug.LogError(
-                    "The terrain address tracker requires a positive planet radius.",
-                    this);
-            }
-
-            if (!IsFinite(tileSizeMeters) ||
-                tileSizeMeters <= 0.0)
-            {
-                Debug.LogError(
-                    "The terrain address tracker requires a positive tile size.",
-                    this);
-            }
-
-            if (!IsFinite(adjacentPreloadDistanceMeters) ||
-                adjacentPreloadDistanceMeters < 0.0)
-            {
-                Debug.LogError(
-                    "The terrain address tracker requires a non-negative adjacent preload distance.",
+                    "The terrain address tracker requires valid Round MapMagic settings from the surface frame's body definition.",
                     this);
             }
         }
@@ -124,7 +108,7 @@ namespace jcan.CelestialSystems
         {
             ClearRuntimeAddresses();
 
-            if (!ConfigurationIsValid() ||
+            if (!RefreshDefinitionSettings() ||
                 !surfaceFrame.HasAnchorAddress)
             {
                 return;
@@ -172,6 +156,37 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private bool RefreshDefinitionSettings()
+        {
+            if (surfaceFrame == null ||
+                surfaceFrame.BodyContext == null ||
+                surfaceFrame.BodyContext.Definition == null ||
+                surfaceFrame.BodyContext.ResolvedSurfaceSystem !=
+                    CelestialSurfaceSystem.RoundMapMagic)
+            {
+                return false;
+            }
+
+            var definition =
+                surfaceFrame.BodyContext.Definition;
+            var roundSurface =
+                definition.RoundMapMagicSurface;
+
+            if (roundSurface == null)
+            {
+                return false;
+            }
+
+            planetRadiusMeters =
+                definition.ReferenceRadiusMeters;
+            tileSizeMeters =
+                roundSurface.TileSizeMeters;
+            adjacentPreloadDistanceMeters =
+                roundSurface.AdjacentPreloadDistanceMeters;
+
+            return ConfigurationIsValid();
+        }
+
         private bool TryCreateAdjacentTileAddress(
             CubeSphereAddress sourceAddress,
             CubeSphereEdge edge,
@@ -202,11 +217,14 @@ namespace jcan.CelestialSystems
         {
             return
                 surfaceFrame != null &&
-                IsFinite(planetRadiusMeters) &&
+                IsFinite(
+                    planetRadiusMeters) &&
                 planetRadiusMeters > 0.0 &&
-                IsFinite(tileSizeMeters) &&
+                IsFinite(
+                    tileSizeMeters) &&
                 tileSizeMeters > 0.0 &&
-                IsFinite(adjacentPreloadDistanceMeters) &&
+                IsFinite(
+                    adjacentPreloadDistanceMeters) &&
                 adjacentPreloadDistanceMeters >= 0.0;
         }
 
@@ -222,7 +240,8 @@ namespace jcan.CelestialSystems
             vAdjacentTileAddress = default;
         }
 
-        private static bool IsFinite(double value)
+        private static bool IsFinite(
+            double value)
         {
             return
                 !double.IsNaN(value) &&
