@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
+    [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
     public sealed class CelestialBodyRuntimeContext :
         MonoBehaviour
