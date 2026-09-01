@@ -200,6 +200,8 @@ namespace jcan.CelestialSystems
             int tileX,
             int tileZ)
         {
+            activeTerrainLayer =
+                terrainLayer;
             diffuseTexture =
                 terrainLayer.diffuseTexture;
             normalTexture =
