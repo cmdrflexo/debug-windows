@@ -92,6 +92,24 @@ namespace jcan.CelestialSystems
         private bool hiddenColliderWasEnabled;
         private bool missingShaderLogged;
 
+        public bool HasCurvedTile =>
+            hasCurvedTile;
+
+        public MeshRenderer CurvedTileRenderer =>
+            meshRenderer;
+
+        public TerrainData SourceTerrainData =>
+            builtTerrainData;
+
+        public int SourceTileX =>
+            sourceTileX;
+
+        public int SourceTileZ =>
+            sourceTileZ;
+
+        public Material ResolvedMeshMaterial =>
+            resolvedMeshMaterial;
+
         private void Reset()
         {
             coordinateDriver =
