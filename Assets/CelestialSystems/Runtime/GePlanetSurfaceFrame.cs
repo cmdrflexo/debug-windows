@@ -290,6 +290,18 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            var visualRoot =
+                bodyContext != null
+                    ? bodyContext.VisualRoot
+                    : null;
+
+            if (visualRoot != null)
+            {
+                planetCenter =
+                    visualRoot.position;
+                return true;
+            }
+
             planetCenter =
                 transform.position -
                 transform.up *
