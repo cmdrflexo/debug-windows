@@ -560,8 +560,8 @@ namespace jcan.CelestialSystems
                             resolution,
                             margins,
                             new Vector2D(
-                                tileSizeX,
-                                tileSizeZ)),
+                                (float)tileSizeX,
+                                (float)tileSizeZ)),
                     globals =
                         mapMagicObject.globals,
                     random =
