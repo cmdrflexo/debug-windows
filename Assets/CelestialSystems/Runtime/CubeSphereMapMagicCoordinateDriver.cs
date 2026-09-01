@@ -147,6 +147,7 @@ namespace jcan.CelestialSystems
             if (!TryConvertCoordinate(
                     sourceTileU,
                     sourceTileV,
+                    sourceLocalVMeters,
                     out mapMagicTileX,
                     out mapMagicTileZ))
             {
@@ -307,13 +308,33 @@ namespace jcan.CelestialSystems
         private static bool TryConvertCoordinate(
             long tileU,
             long tileV,
+            double localVMeters,
             out int tileX,
             out int tileZ)
         {
+            const double boundaryToleranceMeters =
+                0.000001;
+
+            if (tileV == long.MinValue)
+            {
+                tileX = default;
+                tileZ = default;
+                return false;
+            }
+
+            var reflectedTileV =
+                -tileV;
+
+            if (localVMeters >
+                boundaryToleranceMeters)
+            {
+                reflectedTileV--;
+            }
+
             if (tileU < int.MinValue ||
                 tileU > int.MaxValue ||
-                tileV < int.MinValue ||
-                tileV > int.MaxValue)
+                reflectedTileV < int.MinValue ||
+                reflectedTileV > int.MaxValue)
             {
                 tileX = default;
                 tileZ = default;
@@ -321,8 +342,7 @@ namespace jcan.CelestialSystems
             }
 
             tileX = (int)tileU;
-            tileZ =
-                (int)(-tileV - 1L);
+            tileZ = (int)reflectedTileV;
             return true;
         }
 
