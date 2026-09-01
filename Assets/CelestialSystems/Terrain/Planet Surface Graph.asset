@@ -386,7 +386,7 @@ MonoBehaviour:
       - t: 11
         v: 1539431727607316483
       - t: 11
-        v: 40
+        v: 41
       - t: 255
         v: 21
       - t: 255
@@ -451,7 +451,7 @@ MonoBehaviour:
       fields: []
       values: []
       special: 
-      uniObj: {fileID: 8574412962073106934, guid: dbd5cac43e2888e42b956cba46f3d44f, type: 2}
+      uniObj: {fileID: 8574412962073106934, guid: 6c255ab215cb1a84a9546a6660dc5648, type: 2}
     - refId: 19
       type: UnityEngine.Color, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral,
         PublicKeyToken=null
