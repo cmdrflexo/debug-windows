@@ -318,6 +318,104 @@ namespace jcan.CelestialSystems
                     planetRadiusMeters));
         }
 
+        public static bool TryAddressToTileAddress(
+            CubeSphereAddress address,
+            double planetRadiusMeters,
+            double tileSizeMeters,
+            out CubeSphereTileAddress tileAddress)
+        {
+            if (!IsFinite(planetRadiusMeters) ||
+                planetRadiusMeters <= 0.0 ||
+                !IsFinite(tileSizeMeters) ||
+                tileSizeMeters <= 0.0 ||
+                !IsFinite(address.FaceU) ||
+                !IsFinite(address.FaceV) ||
+                !IsFinite(address.AltitudeMeters))
+            {
+                tileAddress = default;
+                return false;
+            }
+
+            var faceUMeters =
+                FaceCoordinateToMeters(
+                    address.FaceU,
+                    planetRadiusMeters);
+            var faceVMeters =
+                FaceCoordinateToMeters(
+                    address.FaceV,
+                    planetRadiusMeters);
+
+            if (!TrySplitTileCoordinate(
+                    faceUMeters,
+                    tileSizeMeters,
+                    out var tileU,
+                    out var localUMeters) ||
+                !TrySplitTileCoordinate(
+                    faceVMeters,
+                    tileSizeMeters,
+                    out var tileV,
+                    out var localVMeters))
+            {
+                tileAddress = default;
+                return false;
+            }
+
+            tileAddress = new CubeSphereTileAddress(
+                address.Face,
+                tileU,
+                tileV,
+                localUMeters,
+                localVMeters,
+                address.AltitudeMeters);
+            return true;
+        }
+
+        public static bool TryTileAddressToAddress(
+            CubeSphereTileAddress tileAddress,
+            double planetRadiusMeters,
+            double tileSizeMeters,
+            out CubeSphereAddress address)
+        {
+            if (!IsFinite(planetRadiusMeters) ||
+                planetRadiusMeters <= 0.0 ||
+                !IsFinite(tileSizeMeters) ||
+                tileSizeMeters <= 0.0 ||
+                !IsFinite(tileAddress.AltitudeMeters) ||
+                !tileAddress.IsLocalPositionInsideTile(
+                    tileSizeMeters))
+            {
+                address = default;
+                return false;
+            }
+
+            var faceUMeters =
+                tileAddress.GetFaceUMeters(
+                    tileSizeMeters);
+            var faceVMeters =
+                tileAddress.GetFaceVMeters(
+                    tileSizeMeters);
+
+            if (!IsFinite(faceUMeters) ||
+                !IsFinite(faceVMeters))
+            {
+                address = default;
+                return false;
+            }
+
+            address = new CubeSphereAddress(
+                tileAddress.Face,
+                SnapFaceBoundary(
+                    MetersToFaceCoordinate(
+                        faceUMeters,
+                        planetRadiusMeters)),
+                SnapFaceBoundary(
+                    MetersToFaceCoordinate(
+                        faceVMeters,
+                        planetRadiusMeters)),
+                tileAddress.AltitudeMeters);
+            return true;
+        }
+
         public static double FaceCoordinateToMeters(
             double faceCoordinate,
             double planetRadiusMeters)
@@ -344,6 +442,66 @@ namespace jcan.CelestialSystems
                 faceMeters /
                 (HalfFaceAngleRadians *
                     planetRadiusMeters);
+        }
+
+        private static bool TrySplitTileCoordinate(
+            double faceMeters,
+            double tileSizeMeters,
+            out long tileCoordinate,
+            out double localMeters)
+        {
+            var tileCoordinateValue =
+                Math.Floor(
+                    faceMeters /
+                    tileSizeMeters);
+
+            if (!IsFinite(tileCoordinateValue) ||
+                tileCoordinateValue <
+                    long.MinValue ||
+                tileCoordinateValue >
+                    long.MaxValue)
+            {
+                tileCoordinate = default;
+                localMeters = default;
+                return false;
+            }
+
+            tileCoordinate =
+                (long)tileCoordinateValue;
+            localMeters =
+                faceMeters -
+                tileCoordinate * tileSizeMeters;
+
+            if (localMeters < 0.0)
+            {
+                if (tileCoordinate ==
+                    long.MinValue)
+                {
+                    return false;
+                }
+
+                tileCoordinate--;
+                localMeters +=
+                    tileSizeMeters;
+            }
+            else if (localMeters >=
+                tileSizeMeters)
+            {
+                if (tileCoordinate ==
+                    long.MaxValue)
+                {
+                    return false;
+                }
+
+                tileCoordinate++;
+                localMeters -=
+                    tileSizeMeters;
+            }
+
+            return
+                IsFinite(localMeters) &&
+                localMeters >= 0.0 &&
+                localMeters < tileSizeMeters;
         }
 
         private static double DistanceToFaceEdgeMeters(
