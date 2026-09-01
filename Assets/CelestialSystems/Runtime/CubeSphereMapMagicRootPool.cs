@@ -94,6 +94,9 @@ namespace jcan.CelestialSystems
         public int ActiveRootCount =>
             activeRootCount;
 
+        public CubeSphereMapMagicCoordinateDriver PrimaryAssignedRoot =>
+            primaryAssignedRoot;
+
         public void ReleaseAllRoots()
         {
             ClearRuntimeState();
