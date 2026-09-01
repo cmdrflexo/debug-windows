@@ -34,6 +34,18 @@ namespace jcan.CelestialSystems
         public double PositiveVEdgeMeters =>
             positiveVEdgeMeters;
 
+        public CubeSphereEdge ClosestUEdge =>
+            negativeUEdgeMeters <=
+                positiveUEdgeMeters
+                ? CubeSphereEdge.NegativeU
+                : CubeSphereEdge.PositiveU;
+
+        public CubeSphereEdge ClosestVEdge =>
+            negativeVEdgeMeters <=
+                positiveVEdgeMeters
+                ? CubeSphereEdge.NegativeV
+                : CubeSphereEdge.PositiveV;
+
         public double ClosestUEdgeMeters =>
             Math.Min(
                 negativeUEdgeMeters,
