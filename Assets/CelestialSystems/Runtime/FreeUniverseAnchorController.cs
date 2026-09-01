@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
+    [DefaultExecutionOrder(400)]
     [DisallowMultipleComponent]
     public sealed class FreeUniverseAnchorController : MonoBehaviour
     {
@@ -115,7 +116,6 @@ namespace jcan.CelestialSystems
             if (listen)
             {
                 AddToDelta(GetDelta(Time.deltaTime));
-                DampenDelta();
             }
 
             if (CwInput.GetMouseExists())
@@ -124,6 +124,14 @@ namespace jcan.CelestialSystems
                     1.0f -
                     Mathf.Clamp(CwInput.GetMouseWheelDelta(), -1.0f, 1.0f) *
                     speedWheel;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (listen)
+            {
+                DampenDelta();
             }
         }
 
@@ -177,6 +185,8 @@ namespace jcan.CelestialSystems
             {
                 return requestedMovement;
             }
+
+            Physics.SyncTransforms();
 
             if (!TrySweep(
                     transform.position,
