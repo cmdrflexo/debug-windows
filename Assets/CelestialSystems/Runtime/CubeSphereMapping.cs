@@ -126,6 +126,75 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        public static bool TryDirectionToFaceAddress(
+            DoubleVector3 direction,
+            CubeSphereFace face,
+            double altitudeMeters,
+            out CubeSphereAddress address)
+        {
+            var faceComponent =
+                Dot(
+                    direction,
+                    CubeSphereTopology.GetFaceNormal(
+                        face));
+
+            if (!IsFinite(faceComponent) ||
+                faceComponent <= 0.0 ||
+                !IsFinite(altitudeMeters))
+            {
+                address = default;
+                return false;
+            }
+
+            var tangentU =
+                Dot(
+                    direction,
+                    CubeSphereTopology.GetFaceUAxis(
+                        face)) /
+                faceComponent;
+            var tangentV =
+                Dot(
+                    direction,
+                    CubeSphereTopology.GetFaceVAxis(
+                        face)) /
+                faceComponent;
+
+            if (!IsFinite(tangentU) ||
+                !IsFinite(tangentV))
+            {
+                address = default;
+                return false;
+            }
+
+            var faceU =
+                SnapFaceBoundary(
+                    Math.Atan(tangentU) /
+                    HalfFaceAngleRadians);
+            var faceV =
+                SnapFaceBoundary(
+                    Math.Atan(tangentV) /
+                    HalfFaceAngleRadians);
+
+            address = new CubeSphereAddress(
+                face,
+                faceU,
+                faceV,
+                altitudeMeters);
+            return true;
+        }
+
+        public static bool TryAddressToFaceAddress(
+            CubeSphereAddress sourceAddress,
+            CubeSphereFace targetFace,
+            out CubeSphereAddress targetAddress)
+        {
+            return TryDirectionToFaceAddress(
+                AddressToDirection(sourceAddress),
+                targetFace,
+                sourceAddress.AltitudeMeters,
+                out targetAddress);
+        }
+
         public static DoubleVector3 AddressToDirection(
             CubeSphereAddress address)
         {
@@ -332,6 +401,27 @@ namespace jcan.CelestialSystems
         private static double ClampUnit(double value)
         {
             return Math.Max(-1.0, Math.Min(1.0, value));
+        }
+
+        private static double SnapFaceBoundary(
+            double faceCoordinate)
+        {
+            const double boundaryTolerance =
+                0.000000000001;
+
+            if (Math.Abs(faceCoordinate - 1.0) <=
+                boundaryTolerance)
+            {
+                return 1.0;
+            }
+
+            if (Math.Abs(faceCoordinate + 1.0) <=
+                boundaryTolerance)
+            {
+                return -1.0;
+            }
+
+            return faceCoordinate;
         }
 
         private static bool IsFinite(double value)
