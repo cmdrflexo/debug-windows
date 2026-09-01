@@ -324,8 +324,7 @@ namespace jcan.CelestialSystems
                     deltaZ);
 
             surfaceDistanceMeters =
-                Math.Max(
-                    0.0,
+                Math.Abs(
                     radialDistanceMeters -
                     bodyContext.ConfiguredReferenceRadiusMeters);
             return
