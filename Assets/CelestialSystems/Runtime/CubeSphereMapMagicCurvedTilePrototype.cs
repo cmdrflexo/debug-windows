@@ -16,6 +16,33 @@ namespace jcan.CelestialSystems
     public sealed class CubeSphereMapMagicCurvedTilePrototype :
         MonoBehaviour
     {
+        public struct CurvedTileData
+        {
+            public int TileX { get; }
+
+            public int TileZ { get; }
+
+            public MeshRenderer Renderer { get; }
+
+            public TerrainData TerrainData { get; }
+
+            internal CurvedTileData(
+                int tileX,
+                int tileZ,
+                MeshRenderer renderer,
+                TerrainData terrainData)
+            {
+                TileX =
+                    tileX;
+                TileZ =
+                    tileZ;
+                Renderer =
+                    renderer;
+                TerrainData =
+                    terrainData;
+            }
+        }
+
         private sealed class CurvedTileRuntime
         {
             public int TileX;
@@ -194,6 +221,36 @@ namespace jcan.CelestialSystems
 
         public Material ResolvedMeshMaterial =>
             resolvedMeshMaterial;
+
+        public void CopyCurvedTilesTo(
+            List<CurvedTileData> destination)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(
+                        destination));
+            }
+
+            destination.Clear();
+
+            foreach (var runtime in
+                curvedTiles.Values)
+            {
+                if (runtime.MeshRenderer == null ||
+                    runtime.TerrainData == null)
+                {
+                    continue;
+                }
+
+                destination.Add(
+                    new CurvedTileData(
+                        runtime.TileX,
+                        runtime.TileZ,
+                        runtime.MeshRenderer,
+                        runtime.TerrainData));
+            }
+        }
 
         private void Reset()
         {
