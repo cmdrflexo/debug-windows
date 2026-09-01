@@ -783,7 +783,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-             if (terrain.enabled)
+            if (terrain.enabled)
             {
                 runtime.SourceTerrainWasEnabled =
                     true;
