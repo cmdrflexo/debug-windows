@@ -2,6 +2,7 @@
  * Converts a tracked or pool-assigned cube-sphere tile address into MapMagic's bounded coordinate-generation input.
  */
 
+using System;
 using Den.Tools;
 using MapMagic.Core;
 using UnityEngine;
@@ -105,6 +106,20 @@ namespace jcan.CelestialSystems
                     "The MapMagic coordinate driver requires a MapMagic object.",
                     this);
             }
+
+            if (addressTracker != null &&
+                mapMagicObject != null &&
+                (!Approximately(
+                    addressTracker.TileSizeMeters,
+                    mapMagicObject.tileSize.x) ||
+                !Approximately(
+                    addressTracker.TileSizeMeters,
+                    mapMagicObject.tileSize.z)))
+            {
+                Debug.LogError(
+                    "The cube-sphere tracker and MapMagic root must use the same tile size.",
+                    this);
+            }
         }
 
         private void LateUpdate()
@@ -132,6 +147,7 @@ namespace jcan.CelestialSystems
             if (!TryConvertCoordinate(
                     sourceTileU,
                     sourceTileV,
+                    sourceLocalVMeters,
                     out mapMagicTileX,
                     out mapMagicTileZ))
             {
@@ -292,13 +308,33 @@ namespace jcan.CelestialSystems
         private static bool TryConvertCoordinate(
             long tileU,
             long tileV,
+            double localVMeters,
             out int tileX,
             out int tileZ)
         {
+            const double boundaryToleranceMeters =
+                0.000001;
+
+            if (tileV == long.MinValue)
+            {
+                tileX = default;
+                tileZ = default;
+                return false;
+            }
+
+            var reflectedTileV =
+                -tileV;
+
+            if (localVMeters >
+                boundaryToleranceMeters)
+            {
+                reflectedTileV--;
+            }
+
             if (tileU < int.MinValue ||
                 tileU > int.MaxValue ||
-                tileV < int.MinValue ||
-                tileV > int.MaxValue)
+                reflectedTileV < int.MinValue ||
+                reflectedTileV > int.MaxValue)
             {
                 tileX = default;
                 tileZ = default;
@@ -306,8 +342,23 @@ namespace jcan.CelestialSystems
             }
 
             tileX = (int)tileU;
-            tileZ = (int)tileV;
+            tileZ = (int)reflectedTileV;
             return true;
+        }
+
+        private static bool Approximately(
+            double first,
+            double second)
+        {
+            var scale =
+                Math.Max(
+                    1.0,
+                    Math.Max(
+                        Math.Abs(first),
+                        Math.Abs(second)));
+
+            return Math.Abs(first - second) <=
+                scale * 0.000000001;
         }
     }
 }
