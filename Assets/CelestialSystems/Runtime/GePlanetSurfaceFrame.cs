@@ -51,8 +51,32 @@ namespace jcan.CelestialSystems
         private Vector3 previousTangentForward;
         private bool previousTangentForwardSet;
 
+        public double PlanetRadiusMeters =>
+            planetRadiusMeters;
+
         public double AnchorAltitudeMeters =>
             anchorAltitudeMeters;
+
+
+        public bool TryGetPlanetCenterScenePosition(
+            out Vector3 planetCenter)
+        {
+            if (!hasAnchorAddress ||
+                double.IsNaN(planetRadiusMeters) ||
+                double.IsInfinity(planetRadiusMeters) ||
+                planetRadiusMeters <= 0.0 ||
+                planetRadiusMeters > float.MaxValue)
+            {
+                planetCenter = default;
+                return false;
+            }
+
+            planetCenter =
+                transform.position -
+                transform.up *
+                    (float)planetRadiusMeters;
+            return true;
+        }
 
         public bool HasAnchorAddress =>
             hasAnchorAddress;
