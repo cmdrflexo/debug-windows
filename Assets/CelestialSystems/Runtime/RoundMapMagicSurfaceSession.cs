@@ -139,7 +139,8 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            DeactivateSession();
+            DeactivateSession(
+                true);
         }
 
         public bool RequestSession(
@@ -165,7 +166,8 @@ namespace jcan.CelestialSystems
 
             if (Application.isPlaying)
             {
-                DeactivateSession();
+                DeactivateSession(
+                    false);
             }
         }
 
@@ -173,11 +175,10 @@ namespace jcan.CelestialSystems
         {
             if (!requestedActive)
             {
-                if (hasActiveSession ||
-                    surfaceFrame != null &&
-                    surfaceFrame.BodyContext != null)
+                if (hasActiveSession)
                 {
-                    DeactivateSession();
+                    DeactivateSession(
+                        false);
                 }
 
                 return true;
@@ -189,7 +190,8 @@ namespace jcan.CelestialSystems
                     "An active Round MapMagic surface-session request requires a body context.",
                     this);
                 requestedActive = false;
-                DeactivateSession();
+                DeactivateSession(
+                    true);
                 return false;
             }
 
@@ -204,7 +206,8 @@ namespace jcan.CelestialSystems
                     requestedBodyContext))
             {
                 requestedActive = false;
-                DeactivateSession();
+                DeactivateSession(
+                    true);
                 return false;
             }
 
@@ -255,7 +258,8 @@ namespace jcan.CelestialSystems
                 activeBodyContext !=
                     bodyContext)
             {
-                DeactivateSession();
+                DeactivateSession(
+                    false);
             }
 
             if (!surfaceFrame.TrySetBodyContext(
@@ -272,9 +276,11 @@ namespace jcan.CelestialSystems
             return true;
         }
 
-        private void DeactivateSession()
+        private void DeactivateSession(
+            bool clearTrackedBodyContext)
         {
-            if (surfaceFrame != null)
+            if (clearTrackedBodyContext &&
+                surfaceFrame != null)
             {
                 surfaceFrame.ClearBodyContext();
             }
