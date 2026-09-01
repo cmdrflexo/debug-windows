@@ -425,6 +425,7 @@ namespace jcan.CelestialSystems
             curvedMesh.triangles =
                 triangles;
             curvedMesh.RecalculateNormals();
+            curvedMesh.RecalculateTangents();
             curvedMesh.RecalculateBounds();
             ApplyMeshCollider(
                 true);
