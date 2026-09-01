@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9bc43e142692db4e92eef81e1903ca4, type: 3}
-  m_Name: Planet Surface Graph
+  m_Name: Planet Surface Graph X Pos
   m_EditorClassIdentifier: MapMagic::MapMagic.Nodes.Graph
   serializedVersion: 0
   guiShowDependent: 0
@@ -386,7 +386,7 @@ MonoBehaviour:
       - t: 11
         v: 1539431727607316483
       - t: 11
-        v: 41
+        v: 46
       - t: 255
         v: 21
       - t: 255
@@ -441,7 +441,7 @@ MonoBehaviour:
       - t: 255
         v: 15
       - t: 11
-        v: 1853477537267580936
+        v: -7253559572298727421
       special: 
       uniObj: {fileID: 0}
     - refId: 18
@@ -477,7 +477,7 @@ MonoBehaviour:
       altType: 
       fields: []
       values: []
-      special: GrassYellow
+      special: CubeSphereXPos
       uniObj: {fileID: 0}
     - refId: 21
       type: UnityEngine.Vector2, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral,
