@@ -1,8 +1,9 @@
 /*
- * Renders one curved mid-detail cube-sphere tile directly from the current cached MapMagic virtual height sample.
+ * Renders the cached mid-detail MapMagic height samples as curved cube-sphere meshes without creating Unity Terrains.
  */
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -13,6 +14,62 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicVirtualHeightTileRenderer :
         MonoBehaviour
     {
+        private struct TileKey :
+            IEquatable<TileKey>
+        {
+            public CubeSphereFace Face;
+            public int TileX;
+            public int TileZ;
+
+            public TileKey(
+                CubeSphereFace face,
+                int tileX,
+                int tileZ)
+            {
+                Face = face;
+                TileX = tileX;
+                TileZ = tileZ;
+            }
+
+            public bool Equals(TileKey other)
+            {
+                return
+                    Face == other.Face &&
+                    TileX == other.TileX &&
+                    TileZ == other.TileZ;
+            }
+
+            public override bool Equals(object value)
+            {
+                return
+                    value is TileKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = (int)Face;
+                    hash = (hash * 397) ^ TileX;
+                    hash = (hash * 397) ^ TileZ;
+                    return hash;
+                }
+            }
+        }
+
+        private sealed class TileRuntime
+        {
+            public GameObject MeshObject;
+            public MeshFilter MeshFilter;
+            public MeshRenderer MeshRenderer;
+            public Mesh CurvedMesh;
+            public RoundMapMagicVirtualHeightSample Sample;
+            public DoubleVector3 TileCenterDirection;
+            public double PlanetRadiusMeters;
+            public double SurfaceOffsetMeters;
+        }
+
         [Header("Configuration")]
         [SerializeField]
         private GePlanetSurfaceFrame surfaceFrame;
@@ -35,12 +92,18 @@ namespace jcan.CelestialSystems
                 1.0f);
 
         [SerializeField]
-        [Tooltip("Moves this validation mesh radially without changing its sampled heights. Zero places it on the generated surface.")]
+        [Tooltip("Moves these validation meshes radially without changing their sampled heights. Zero places them on the generated surface.")]
         private double surfaceOffsetMeters;
 
         [Header("Runtime")]
         [SerializeField]
         private bool hasRenderedTile;
+
+        [SerializeField]
+        private int expectedRenderedTileCount;
+
+        [SerializeField]
+        private int activeRenderedTileCount;
 
         [SerializeField]
         private CubeSphereFace renderedFace;
@@ -63,12 +126,20 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private int triangleCount;
 
-        private GameObject meshObject;
-        private MeshFilter meshFilter;
-        private MeshRenderer meshRenderer;
-        private Mesh curvedMesh;
+        private readonly Dictionary<TileKey, TileRuntime>
+            tiles =
+                new Dictionary<TileKey, TileRuntime>();
+        private readonly HashSet<TileKey>
+            desiredKeys =
+                new HashSet<TileKey>();
+        private readonly List<TileKey>
+            removalBuffer =
+                new List<TileKey>();
+        private readonly List<RoundMapMagicVirtualHeightSample>
+            sampleBuffer =
+                new List<RoundMapMagicVirtualHeightSample>();
+
         private Material runtimeFallbackMaterial;
-        private RoundMapMagicVirtualHeightSample renderedSample;
         private bool missingShaderLogged;
 
         public bool HasRenderedTile =>
@@ -112,46 +183,95 @@ namespace jcan.CelestialSystems
         {
             if (!ConfigurationIsValid() ||
                 !surfaceSession.HasActiveSession ||
-                !heightSampler.HasSample ||
                 !surfaceFrame.TryGetPlanetCenterScenePosition(
                     out var planetCenterScenePosition))
             {
-                ClearRenderedTile();
+                ClearRenderedTiles();
+                ClearRuntimeState();
                 return;
             }
 
-            var sample =
-                heightSampler.CurrentSample;
+            heightSampler.CopyCurrentSamplesTo(
+                sampleBuffer);
+            desiredKeys.Clear();
 
-            if (sample == null)
+            for (var index = 0;
+                index < sampleBuffer.Count;
+                index++)
             {
-                ClearRenderedTile();
-                return;
-            }
+                var sample =
+                    sampleBuffer[index];
+                var key =
+                    new TileKey(
+                        sample.Face,
+                        sample.TileX,
+                        sample.TileZ);
 
-            if (!ReferenceEquals(
-                    renderedSample,
-                    sample))
-            {
-                BuildCurvedTile(
+                desiredKeys.Add(key);
+                EnsureTile(
+                    key,
                     sample);
             }
 
-            UpdateTilePose(
-                sample,
-                planetCenterScenePosition);
-            ApplyMaterial();
+            RemoveUndesiredTiles();
+
+            foreach (var runtime in
+                tiles.Values)
+            {
+                UpdateTilePose(
+                    runtime,
+                    planetCenterScenePosition);
+                ApplyMaterial(
+                    runtime);
+            }
+
+            RefreshRuntimeState();
+        }
+
+        private void EnsureTile(
+            TileKey key,
+            RoundMapMagicVirtualHeightSample sample)
+        {
+            if (!tiles.TryGetValue(
+                    key,
+                    out var runtime))
+            {
+                runtime =
+                    new TileRuntime();
+                tiles.Add(
+                    key,
+                    runtime);
+            }
+
+            var planetRadiusMeters =
+                surfaceFrame.PlanetRadiusMeters;
+
+            if (runtime.CurvedMesh == null ||
+                !ReferenceEquals(
+                    runtime.Sample,
+                    sample) ||
+                runtime.PlanetRadiusMeters !=
+                    planetRadiusMeters ||
+                runtime.SurfaceOffsetMeters !=
+                    surfaceOffsetMeters)
+            {
+                BuildCurvedTile(
+                    runtime,
+                    sample,
+                    planetRadiusMeters);
+            }
         }
 
         private void BuildCurvedTile(
-            RoundMapMagicVirtualHeightSample sample)
+            TileRuntime runtime,
+            RoundMapMagicVirtualHeightSample sample,
+            double planetRadiusMeters)
         {
-            EnsureMeshObjects();
+            EnsureMeshObjects(
+                runtime);
 
             var resolution =
                 sample.Resolution;
-            var planetRadiusMeters =
-                surfaceFrame.PlanetRadiusMeters;
             var drawingRadiusMeters =
                 planetRadiusMeters +
                 surfaceOffsetMeters;
@@ -215,7 +335,7 @@ namespace jcan.CelestialSystems
                 var worldZ =
                     sample.WorldOriginZMeters +
                     sample.WorldSizeZMeters *
-                        normalizedZ;
+                    normalizedZ;
                 var faceVMeters =
                     -worldZ;
 
@@ -256,12 +376,12 @@ namespace jcan.CelestialSystems
                         direction *
                             surfaceRadiusMeters -
                         meshReferencePosition;
-                    var index =
+                    var vertexIndex =
                         z *
                         resolution +
                         x;
 
-                    vertices[index] =
+                    vertices[vertexIndex] =
                         new Vector3(
                             (float)Dot(
                                 delta,
@@ -272,7 +392,7 @@ namespace jcan.CelestialSystems
                             (float)-Dot(
                                 delta,
                                 faceVAxis));
-                    uv[index] =
+                    uv[vertexIndex] =
                         new Vector2(
                             (float)normalizedX,
                             (float)normalizedZ);
@@ -318,117 +438,88 @@ namespace jcan.CelestialSystems
                 }
             }
 
-            curvedMesh.Clear();
-            curvedMesh.indexFormat =
+            runtime.CurvedMesh.Clear();
+            runtime.CurvedMesh.indexFormat =
                 vertices.Length >
                     65535
                     ? IndexFormat.UInt32
                     : IndexFormat.UInt16;
-            curvedMesh.vertices =
+            runtime.CurvedMesh.vertices =
                 vertices;
-            curvedMesh.uv =
+            runtime.CurvedMesh.uv =
                 uv;
-            curvedMesh.triangles =
+            runtime.CurvedMesh.triangles =
                 triangles;
-            curvedMesh.RecalculateNormals();
-            curvedMesh.RecalculateTangents();
-            curvedMesh.RecalculateBounds();
+            runtime.CurvedMesh.RecalculateNormals();
+            runtime.CurvedMesh.RecalculateTangents();
+            runtime.CurvedMesh.RecalculateBounds();
 
-            meshObject.name =
+            runtime.MeshObject.name =
                 $"Mid Curved Tile {sample.TileX},{sample.TileZ}";
-            renderedSample =
+            runtime.Sample =
                 sample;
-            hasRenderedTile = true;
-            renderedFace =
-                sample.Face;
-            renderedVirtualTileX =
-                sample.TileX;
-            renderedVirtualTileZ =
-                sample.TileZ;
-            renderedTileSizeMeters =
-                sample.WorldSizeXMeters;
-            renderedResolution =
-                resolution;
-            vertexCount =
-                vertices.Length;
-            triangleCount =
-                triangles.Length /
-                3;
+            runtime.TileCenterDirection =
+                tileCenterDirection;
+            runtime.PlanetRadiusMeters =
+                planetRadiusMeters;
+            runtime.SurfaceOffsetMeters =
+                surfaceOffsetMeters;
         }
 
-        private void EnsureMeshObjects()
+        private void EnsureMeshObjects(
+            TileRuntime runtime)
         {
-            if (meshObject == null)
+            if (runtime.MeshObject == null)
             {
-                meshObject =
+                runtime.MeshObject =
                     new GameObject(
                         "Mid Curved Tile");
-                meshObject.transform.SetParent(
+                runtime.MeshObject.transform.SetParent(
                     surfaceFrame.transform,
                     false);
-                meshObject.transform.localScale =
+                runtime.MeshObject.transform.localScale =
                     Vector3.one;
-                meshFilter =
-                    meshObject.AddComponent<MeshFilter>();
-                meshRenderer =
-                    meshObject.AddComponent<MeshRenderer>();
-                meshRenderer.shadowCastingMode =
+                runtime.MeshFilter =
+                    runtime.MeshObject.AddComponent<MeshFilter>();
+                runtime.MeshRenderer =
+                    runtime.MeshObject.AddComponent<MeshRenderer>();
+                runtime.MeshRenderer.shadowCastingMode =
                     ShadowCastingMode.Off;
-                meshRenderer.receiveShadows =
+                runtime.MeshRenderer.receiveShadows =
                     false;
             }
 
-            if (curvedMesh == null)
+            if (runtime.CurvedMesh == null)
             {
-                curvedMesh =
+                runtime.CurvedMesh =
                     new Mesh
                     {
                         name =
                             "Virtual MapMagic Mid Curved Tile"
                     };
-                meshFilter.sharedMesh =
-                    curvedMesh;
+                runtime.MeshFilter.sharedMesh =
+                    runtime.CurvedMesh;
             }
         }
 
         private void UpdateTilePose(
-            RoundMapMagicVirtualHeightSample sample,
+            TileRuntime runtime,
             Vector3 planetCenterScenePosition)
         {
-            if (meshObject == null)
+            if (runtime.MeshObject == null ||
+                runtime.Sample == null)
             {
                 return;
             }
 
-            var planetRadiusMeters =
-                surfaceFrame.PlanetRadiusMeters;
+            var sample =
+                runtime.Sample;
             var drawingRadiusMeters =
-                planetRadiusMeters +
+                surfaceFrame.PlanetRadiusMeters +
                 surfaceOffsetMeters;
-            var tileCenterUMeters =
-                sample.WorldOriginXMeters +
-                sample.WorldSizeXMeters *
-                    0.5;
-            var tileCenterVMeters =
-                -(sample.WorldOriginZMeters +
-                    sample.WorldSizeZMeters *
-                        0.5);
-            var tileCenterAddress =
-                new CubeSphereAddress(
-                    sample.Face,
-                    CubeSphereMapping.MetersToFaceCoordinate(
-                        tileCenterUMeters,
-                        planetRadiusMeters),
-                    CubeSphereMapping.MetersToFaceCoordinate(
-                        tileCenterVMeters,
-                        planetRadiusMeters),
-                    0.0);
-            var tileCenterDirection =
-                CubeSphereMapping.AddressToDirection(
-                    tileCenterAddress);
             var centerDirection =
                 ToVector3(
-                    tileCenterDirection).normalized;
+                    runtime.TileCenterDirection).normalized;
             var faceNormal =
                 ToVector3(
                     CubeSphereTopology.GetFaceNormal(
@@ -438,7 +529,7 @@ namespace jcan.CelestialSystems
                     CubeSphereTopology.GetFaceVAxis(
                         sample.Face)).normalized;
 
-            meshObject.transform.SetPositionAndRotation(
+            runtime.MeshObject.transform.SetPositionAndRotation(
                 planetCenterScenePosition +
                     centerDirection *
                         (float)drawingRadiusMeters,
@@ -447,9 +538,10 @@ namespace jcan.CelestialSystems
                     faceNormal));
         }
 
-        private void ApplyMaterial()
+        private void ApplyMaterial(
+            TileRuntime runtime)
         {
-            if (meshRenderer == null)
+            if (runtime.MeshRenderer == null)
             {
                 return;
             }
@@ -463,7 +555,7 @@ namespace jcan.CelestialSystems
                         ? surfaceDefinition.Material
                         : null;
 
-            meshRenderer.sharedMaterial =
+            runtime.MeshRenderer.sharedMaterial =
                 resolvedMaterial != null
                     ? resolvedMaterial
                     : ResolveFallbackMaterial();
@@ -576,6 +668,105 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private void RemoveUndesiredTiles()
+        {
+            removalBuffer.Clear();
+
+            foreach (var entry in
+                tiles)
+            {
+                if (!desiredKeys.Contains(
+                        entry.Key))
+                {
+                    removalBuffer.Add(
+                        entry.Key);
+                }
+            }
+
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
+            {
+                RemoveTile(
+                    removalBuffer[index]);
+            }
+        }
+
+        private void RemoveTile(
+            TileKey key)
+        {
+            if (!tiles.TryGetValue(
+                    key,
+                    out var runtime))
+            {
+                return;
+            }
+
+            if (runtime.MeshObject != null)
+            {
+                DestroyUnityObject(
+                    runtime.MeshObject);
+            }
+
+            if (runtime.CurvedMesh != null)
+            {
+                DestroyUnityObject(
+                    runtime.CurvedMesh);
+            }
+
+            tiles.Remove(key);
+        }
+
+        private void RefreshRuntimeState()
+        {
+            expectedRenderedTileCount =
+                heightSampler.ExpectedSampleCount;
+            activeRenderedTileCount =
+                tiles.Count;
+            hasRenderedTile =
+                tiles.Count > 0;
+            var primarySample =
+                heightSampler.CurrentSample;
+
+            if (primarySample == null &&
+                sampleBuffer.Count > 0)
+            {
+                primarySample =
+                    sampleBuffer[0];
+            }
+
+            renderedFace =
+                primarySample != null
+                    ? primarySample.Face
+                    : default;
+            renderedVirtualTileX =
+                primarySample != null
+                    ? primarySample.TileX
+                    : default;
+            renderedVirtualTileZ =
+                primarySample != null
+                    ? primarySample.TileZ
+                    : default;
+            renderedTileSizeMeters =
+                primarySample != null
+                    ? primarySample.WorldSizeXMeters
+                    : default;
+            renderedResolution =
+                primarySample != null
+                    ? primarySample.Resolution
+                    : default;
+            vertexCount =
+                primarySample != null
+                    ? primarySample.VertexCount
+                    : default;
+            triangleCount =
+                primarySample != null
+                    ? (primarySample.Resolution - 1) *
+                        (primarySample.Resolution - 1) *
+                        2
+                    : default;
+        }
+
         private bool ConfigurationIsValid()
         {
             return
@@ -593,26 +784,33 @@ namespace jcan.CelestialSystems
                     0.0;
         }
 
-        private void ClearRenderedTile()
+        private void ClearRenderedTiles()
         {
-            if (meshObject != null)
+            removalBuffer.Clear();
+
+            foreach (var key in
+                tiles.Keys)
             {
-                DestroyUnityObject(
-                    meshObject);
+                removalBuffer.Add(key);
             }
 
-            if (curvedMesh != null)
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
             {
-                DestroyUnityObject(
-                    curvedMesh);
+                RemoveTile(
+                    removalBuffer[index]);
             }
 
-            meshObject = null;
-            meshFilter = null;
-            meshRenderer = null;
-            curvedMesh = null;
-            renderedSample = null;
+            desiredKeys.Clear();
+            sampleBuffer.Clear();
+        }
+
+        private void ClearRuntimeState()
+        {
             hasRenderedTile = false;
+            expectedRenderedTileCount = default;
+            activeRenderedTileCount = default;
             renderedFace = default;
             renderedVirtualTileX = default;
             renderedVirtualTileZ = default;
@@ -624,12 +822,13 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
-            ClearRenderedTile();
+            ClearRenderedTiles();
+            ClearRuntimeState();
         }
 
         private void OnDestroy()
         {
-            ClearRenderedTile();
+            ClearRenderedTiles();
 
             if (runtimeFallbackMaterial != null)
             {
@@ -679,13 +878,11 @@ namespace jcan.CelestialSystems
 
             if (Application.isPlaying)
             {
-                Destroy(
-                    value);
+                Destroy(value);
             }
             else
             {
-                DestroyImmediate(
-                    value);
+                DestroyImmediate(value);
             }
         }
     }

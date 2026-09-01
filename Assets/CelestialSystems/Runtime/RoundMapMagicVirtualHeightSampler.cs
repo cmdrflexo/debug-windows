@@ -1,8 +1,10 @@
 /*
- * Generates and caches a larger low-resolution height sample directly from the active MapMagic graph without creating a Unity Terrain.
+ * Incrementally generates and caches low-resolution height samples directly from the active MapMagic graph without creating Unity Terrains.
  */
 
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Den.Tools;
 using Den.Tools.Matrices;
 using MapMagic.Core;
@@ -24,14 +26,40 @@ namespace jcan.CelestialSystems
             public int TileX;
             public int TileZ;
 
-            public bool Equals(
-                SampleKey other)
+            public bool Equals(SampleKey other)
             {
                 return
                     Face == other.Face &&
                     TileX == other.TileX &&
                     TileZ == other.TileZ;
             }
+
+            public override bool Equals(object value)
+            {
+                return
+                    value is SampleKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = (int)Face;
+                    hash = (hash * 397) ^ TileX;
+                    hash = (hash * 397) ^ TileZ;
+                    return hash;
+                }
+            }
+        }
+
+        private sealed class GenerationResult
+        {
+            public int Version;
+            public SampleKey Key;
+            public RoundMapMagicVirtualHeightSample Sample;
+            public string Error;
+            public double Milliseconds;
         }
 
         [Header("Configuration")]
@@ -44,12 +72,26 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool generateAutomatically = true;
 
+        [SerializeField]
+        [Range(0, 4)]
+        [Tooltip("Temporary streamed radius for validating the incremental mid-detail cache. One creates a 3 by 3 virtual-tile grid.")]
+        private int streamedTileRadius = 1;
+
         [Header("Runtime Request")]
         [SerializeField]
         private bool isGenerating;
 
         [SerializeField]
         private int generationRequestCount;
+
+        [SerializeField]
+        private int expectedSampleCount;
+
+        [SerializeField]
+        private int cachedSampleCount;
+
+        [SerializeField]
+        private int queuedSampleCount;
 
         [SerializeField]
         private CubeSphereFace sampleFace;
@@ -94,15 +136,43 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private string lastError;
 
+        private readonly Dictionary<SampleKey, RoundMapMagicVirtualHeightSample>
+            samples =
+                new Dictionary<SampleKey, RoundMapMagicVirtualHeightSample>();
+        private readonly HashSet<SampleKey>
+            desiredKeys =
+                new HashSet<SampleKey>();
+        private readonly Queue<SampleKey>
+            generationQueue =
+                new Queue<SampleKey>();
+        private readonly List<SampleKey>
+            removalBuffer =
+                new List<SampleKey>();
+
         private RoundMapMagicVirtualHeightSample currentSample;
-        private bool hasAttemptedKey;
-        private SampleKey attemptedKey;
+        private Task<GenerationResult> generationTask;
+        private StopToken generationStop;
+        private MapMagicObject generationSource;
+        private SampleKey centerKey;
+        private bool hasCenterKey;
+        private int generationVersion;
+        private int desiredRadius = -1;
+        private int desiredResolution;
+        private double desiredTileSizeX;
+        private double desiredTileSizeZ;
+        private int desiredMargins;
 
         public bool HasSample =>
             hasSample;
 
         public RoundMapMagicVirtualHeightSample CurrentSample =>
             currentSample;
+
+        public int CachedSampleCount =>
+            samples.Count;
+
+        public int ExpectedSampleCount =>
+            expectedSampleCount;
 
         private void Reset()
         {
@@ -131,12 +201,14 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            CompleteGeneration();
+
             if (!generateAutomatically ||
                 surfaceSession == null ||
                 rootPool == null ||
                 !surfaceSession.HasActiveSession)
             {
-                ClearCurrentSample();
+                ClearStreamingState();
                 return;
             }
 
@@ -151,12 +223,15 @@ namespace jcan.CelestialSystems
                 !primaryRoot.HasMapMagicCoordinate ||
                 primaryRoot.MapMagicObject == null)
             {
+                ClearStreamingState();
                 return;
             }
 
+            var mapMagicObject =
+                primaryRoot.MapMagicObject;
             var tileSizeMultiplier =
                 qualityProfile.MidTileSizeMultiplier;
-            var nextKey =
+            var nextCenterKey =
                 new SampleKey
                 {
                     Face =
@@ -170,21 +245,83 @@ namespace jcan.CelestialSystems
                             primaryRoot.MapMagicTileZ,
                             tileSizeMultiplier)
                 };
+            var nextResolution =
+                qualityProfile.MidMeshResolution;
+            var nextTileSizeX =
+                mapMagicObject.tileSize.x *
+                tileSizeMultiplier;
+            var nextTileSizeZ =
+                mapMagicObject.tileSize.z *
+                tileSizeMultiplier;
+            var nextMargins =
+                Math.Max(
+                    0,
+                    mapMagicObject.draftMargins);
+            var nextRadius =
+                Mathf.Clamp(
+                    streamedTileRadius,
+                    0,
+                    4);
 
-            if (hasAttemptedKey &&
-                attemptedKey.Equals(
-                    nextKey))
+            if (DesiredGridChanged(
+                    mapMagicObject,
+                    nextCenterKey,
+                    nextRadius,
+                    nextResolution,
+                    nextTileSizeX,
+                    nextTileSizeZ,
+                    nextMargins))
             {
-                return;
+                RebuildDesiredGrid(
+                    mapMagicObject,
+                    nextCenterKey,
+                    nextRadius,
+                    nextResolution,
+                    nextTileSizeX,
+                    nextTileSizeZ,
+                    nextMargins);
             }
 
-            attemptedKey =
-                nextKey;
-            hasAttemptedKey = true;
-            GenerateSample(
-                primaryRoot,
-                qualityProfile,
-                nextKey);
+            sampleFace =
+                nextCenterKey.Face;
+            sourceTileX =
+                primaryRoot.MapMagicTileX;
+            sourceTileZ =
+                primaryRoot.MapMagicTileZ;
+            virtualTileX =
+                nextCenterKey.TileX;
+            virtualTileZ =
+                nextCenterKey.TileZ;
+            virtualTileSizeMeters =
+                nextTileSizeX;
+            resolvedMidResolution =
+                nextResolution;
+
+            RefreshSampleDiagnostics();
+            StartNextGeneration(
+                mapMagicObject,
+                nextResolution,
+                nextTileSizeX,
+                nextTileSizeZ,
+                nextMargins);
+        }
+
+        public void CopyCurrentSamplesTo(
+            List<RoundMapMagicVirtualHeightSample> destination)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(destination));
+            }
+
+            destination.Clear();
+
+            foreach (var sample in
+                samples.Values)
+            {
+                destination.Add(sample);
+            }
         }
 
         public bool TryGetCurrentSample(
@@ -193,23 +330,213 @@ namespace jcan.CelestialSystems
             int tileZ,
             out RoundMapMagicVirtualHeightSample sample)
         {
-            sample =
-                currentSample;
-
-            return
-                sample != null &&
-                sample.Face == face &&
-                sample.TileX == tileX &&
-                sample.TileZ == tileZ;
+            return samples.TryGetValue(
+                new SampleKey
+                {
+                    Face = face,
+                    TileX = tileX,
+                    TileZ = tileZ
+                },
+                out sample);
         }
 
-        private void GenerateSample(
-            CubeSphereMapMagicCoordinateDriver primaryRoot,
-            RoundMapMagicSurfaceQualityProfile qualityProfile,
-            SampleKey key)
+        private bool DesiredGridChanged(
+            MapMagicObject mapMagicObject,
+            SampleKey nextCenterKey,
+            int nextRadius,
+            int nextResolution,
+            double nextTileSizeX,
+            double nextTileSizeZ,
+            int nextMargins)
         {
-            var mapMagicObject =
-                primaryRoot.MapMagicObject;
+            return
+                !hasCenterKey ||
+                !centerKey.Equals(nextCenterKey) ||
+                generationSource != mapMagicObject ||
+                desiredRadius != nextRadius ||
+                desiredResolution != nextResolution ||
+                desiredTileSizeX != nextTileSizeX ||
+                desiredTileSizeZ != nextTileSizeZ ||
+                desiredMargins != nextMargins;
+        }
+
+        private void RebuildDesiredGrid(
+            MapMagicObject mapMagicObject,
+            SampleKey nextCenterKey,
+            int nextRadius,
+            int nextResolution,
+            double nextTileSizeX,
+            double nextTileSizeZ,
+            int nextMargins)
+        {
+            var sourceSettingsChanged =
+                generationSource != mapMagicObject ||
+                desiredResolution != nextResolution ||
+                desiredTileSizeX != nextTileSizeX ||
+                desiredTileSizeZ != nextTileSizeZ ||
+                desiredMargins != nextMargins;
+
+            generationVersion++;
+
+            if (generationStop != null)
+            {
+                generationStop.stop = true;
+            }
+
+            generationSource =
+                mapMagicObject;
+            centerKey =
+                nextCenterKey;
+            hasCenterKey = true;
+            desiredRadius =
+                nextRadius;
+            desiredResolution =
+                nextResolution;
+            desiredTileSizeX =
+                nextTileSizeX;
+            desiredTileSizeZ =
+                nextTileSizeZ;
+            desiredMargins =
+                nextMargins;
+            desiredKeys.Clear();
+            generationQueue.Clear();
+
+            for (var offsetZ = -nextRadius;
+                offsetZ <= nextRadius;
+                offsetZ++)
+            {
+                for (var offsetX = -nextRadius;
+                    offsetX <= nextRadius;
+                    offsetX++)
+                {
+                    desiredKeys.Add(
+                        new SampleKey
+                        {
+                            Face =
+                                nextCenterKey.Face,
+                            TileX =
+                                nextCenterKey.TileX +
+                                offsetX,
+                            TileZ =
+                                nextCenterKey.TileZ +
+                                offsetZ
+                        });
+                }
+            }
+
+            if (sourceSettingsChanged)
+            {
+                samples.Clear();
+            }
+            else
+            {
+                removalBuffer.Clear();
+
+                foreach (var entry in
+                    samples)
+                {
+                    if (!desiredKeys.Contains(
+                            entry.Key))
+                    {
+                        removalBuffer.Add(
+                            entry.Key);
+                    }
+                }
+
+                for (var index = 0;
+                    index < removalBuffer.Count;
+                    index++)
+                {
+                    samples.Remove(
+                        removalBuffer[index]);
+                }
+            }
+
+            EnqueueMissingSamplesByRing(
+                nextCenterKey,
+                nextRadius);
+            expectedSampleCount =
+                desiredKeys.Count;
+            cachedSampleCount =
+                samples.Count;
+            queuedSampleCount =
+                generationQueue.Count;
+        }
+
+        private void EnqueueMissingSamplesByRing(
+            SampleKey center,
+            int radius)
+        {
+            for (var ring = 0;
+                ring <= radius;
+                ring++)
+            {
+                for (var offsetZ = -ring;
+                    offsetZ <= ring;
+                    offsetZ++)
+                {
+                    for (var offsetX = -ring;
+                        offsetX <= ring;
+                        offsetX++)
+                    {
+                        if (Math.Max(
+                                Math.Abs(offsetX),
+                                Math.Abs(offsetZ)) !=
+                            ring)
+                        {
+                            continue;
+                        }
+
+                        var key =
+                            new SampleKey
+                            {
+                                Face =
+                                    center.Face,
+                                TileX =
+                                    center.TileX +
+                                    offsetX,
+                                TileZ =
+                                    center.TileZ +
+                                    offsetZ
+                            };
+
+                        if (!samples.ContainsKey(key))
+                        {
+                            generationQueue.Enqueue(key);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void StartNextGeneration(
+            MapMagicObject mapMagicObject,
+            int resolution,
+            double tileSizeX,
+            double tileSizeZ,
+            int margins)
+        {
+            if (generationTask != null)
+            {
+                return;
+            }
+
+            SampleKey key;
+
+            do
+            {
+                if (generationQueue.Count == 0)
+                {
+                    queuedSampleCount = 0;
+                    return;
+                }
+
+                key =
+                    generationQueue.Dequeue();
+            }
+            while (!desiredKeys.Contains(key) ||
+                samples.ContainsKey(key));
+
             var graph =
                 mapMagicObject.graph;
 
@@ -217,58 +544,98 @@ namespace jcan.CelestialSystems
             {
                 lastError =
                     "The active MapMagic root has no graph.";
+                generationQueue.Clear();
+                queuedSampleCount = 0;
                 return;
             }
 
-            var stopwatch =
-                System.Diagnostics.Stopwatch.StartNew();
-            isGenerating = true;
-            generationRequestCount++;
+            var data =
+                new TileData
+                {
+                    area =
+                        new Area(
+                            new Coord(
+                                key.TileX,
+                                key.TileZ),
+                            resolution,
+                            margins,
+                            new Vector2D(
+                                tileSizeX,
+                                tileSizeZ)),
+                    globals =
+                        mapMagicObject.globals,
+                    random =
+                        graph.random,
+                    isPreview =
+                        false,
+                    isDraft =
+                        true
+                };
 
             try
             {
-                var resolution =
-                    qualityProfile.MidMeshResolution;
-                var tileSizeMultiplier =
-                    qualityProfile.MidTileSizeMultiplier;
-                var virtualTileSize =
-                    new Vector2D(
-                        mapMagicObject.tileSize.x *
-                            tileSizeMultiplier,
-                        mapMagicObject.tileSize.z *
-                            tileSizeMultiplier);
-                var area =
-                    new Area(
-                        new Coord(
-                            key.TileX,
-                            key.TileZ),
-                        resolution,
-                        Math.Max(
-                            0,
-                            mapMagicObject.draftMargins),
-                        virtualTileSize);
-                var data =
-                    new TileData
-                    {
-                        area =
-                            area,
-                        globals =
-                            mapMagicObject.globals,
-                        random =
-                            graph.random,
-                        isPreview =
-                            false,
-                        isDraft =
-                            true
-                    };
-                var stop =
-                    new StopToken();
+                graph.Prepare(
+                    data,
+                    null);
+            }
+            catch (Exception exception)
+            {
+                data.Clear(
+                    clearApply: true,
+                    inSubs: true);
+                lastError =
+                    exception.GetBaseException().Message;
+                Debug.LogError(
+                    $"Virtual MapMagic height preparation failed: {lastError}",
+                    this);
+                return;
+            }
 
+            var requestVersion =
+                generationVersion;
+            var stop =
+                new StopToken();
+
+            isGenerating = true;
+            generationRequestCount++;
+            queuedSampleCount =
+                generationQueue.Count;
+            generationStop =
+                stop;
+            generationTask =
+                Task.Run(
+                    () => GenerateSample(
+                        graph,
+                        data,
+                        stop,
+                        key,
+                        resolution,
+                        requestVersion));
+        }
+
+        private static GenerationResult GenerateSample(
+            MapMagic.Nodes.Graph graph,
+            TileData data,
+            StopToken stop,
+            SampleKey key,
+            int resolution,
+            int requestVersion)
+        {
+            var result =
+                new GenerationResult
+                {
+                    Version =
+                        requestVersion,
+                    Key =
+                        key
+                };
+            var stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
                 try
                 {
-                    graph.Prepare(
-                        data,
-                        null);
                     graph.Generate(
                         data,
                         stop);
@@ -288,10 +655,10 @@ namespace jcan.CelestialSystems
                             "The MapMagic graph did not produce a finalized Height output for the virtual request.");
                     }
 
-                    currentSample =
+                    result.Sample =
                         CreateSample(
                             key,
-                            area,
+                            data.area,
                             data.heights,
                             resolution);
                 }
@@ -301,51 +668,79 @@ namespace jcan.CelestialSystems
                         clearApply: true,
                         inSubs: true);
                 }
-
-                sampleFace =
-                    key.Face;
-                sourceTileX =
-                    primaryRoot.MapMagicTileX;
-                sourceTileZ =
-                    primaryRoot.MapMagicTileZ;
-                virtualTileX =
-                    key.TileX;
-                virtualTileZ =
-                    key.TileZ;
-                virtualTileSizeMeters =
-                    currentSample.WorldSizeXMeters;
-                resolvedMidResolution =
-                    currentSample.Resolution;
-                sampleVertexCount =
-                    currentSample.VertexCount;
-                minimumHeightMeters =
-                    currentSample.MinimumHeightMeters;
-                maximumHeightMeters =
-                    currentSample.MaximumHeightMeters;
-                centerHeightMeters =
-                    currentSample.CenterHeightMeters;
-                hasSample = true;
-                lastError =
-                    string.Empty;
             }
             catch (Exception exception)
             {
-                currentSample = null;
-                hasSample = false;
-                lastError =
+                result.Error =
                     exception.GetBaseException().Message;
-
-                Debug.LogError(
-                    $"Virtual MapMagic height generation failed: {lastError}",
-                    this);
             }
             finally
             {
                 stopwatch.Stop();
-                generationMilliseconds =
+                result.Milliseconds =
                     stopwatch.Elapsed.TotalMilliseconds;
-                isGenerating = false;
             }
+
+            return result;
+        }
+
+        private void CompleteGeneration()
+        {
+            if (generationTask == null ||
+                !generationTask.IsCompleted)
+            {
+                return;
+            }
+
+            GenerationResult result;
+
+            try
+            {
+                result =
+                    generationTask.GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                result =
+                    new GenerationResult
+                    {
+                        Version =
+                            generationVersion,
+                        Error =
+                            exception.GetBaseException().Message
+                    };
+            }
+
+            generationTask = null;
+            generationStop = null;
+            isGenerating = false;
+            generationMilliseconds =
+                result.Milliseconds;
+
+            if (result.Version != generationVersion ||
+                !desiredKeys.Contains(result.Key))
+            {
+                RefreshSampleDiagnostics();
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(
+                    result.Error))
+            {
+                lastError =
+                    result.Error;
+                Debug.LogError(
+                    $"Virtual MapMagic height generation failed: {lastError}",
+                    this);
+                RefreshSampleDiagnostics();
+                return;
+            }
+
+            samples[result.Key] =
+                result.Sample;
+            lastError =
+                string.Empty;
+            RefreshSampleDiagnostics();
         }
 
         private static RoundMapMagicVirtualHeightSample CreateSample(
@@ -385,7 +780,7 @@ namespace jcan.CelestialSystems
                 var worldZ =
                     worldOriginZ +
                     worldSizeZ *
-                        normalizedZ;
+                    normalizedZ;
 
                 for (var x = 0;
                     x < resolution;
@@ -399,7 +794,7 @@ namespace jcan.CelestialSystems
                     var worldX =
                         worldOriginX +
                         worldSizeX *
-                            normalizedX;
+                        normalizedX;
                     var heightMeters =
                         heightMatrix.GetWorldInterpolatedValue(
                             (float)worldX,
@@ -438,21 +833,106 @@ namespace jcan.CelestialSystems
                     maximumHeight);
         }
 
-        private void ClearCurrentSample()
+        private void RefreshSampleDiagnostics()
         {
+            cachedSampleCount =
+                samples.Count;
+            queuedSampleCount =
+                generationQueue.Count;
             currentSample = null;
+
+            if (hasCenterKey)
+            {
+                samples.TryGetValue(
+                    centerKey,
+                    out currentSample);
+            }
+
+            hasSample =
+                samples.Count > 0;
+            var diagnosticSample =
+                currentSample;
+
+            if (diagnosticSample == null)
+            {
+                foreach (var sample in
+                    samples.Values)
+                {
+                    diagnosticSample =
+                        sample;
+                    break;
+                }
+            }
+
+            sampleVertexCount =
+                diagnosticSample != null
+                    ? diagnosticSample.VertexCount
+                    : 0;
+            minimumHeightMeters =
+                diagnosticSample != null
+                    ? diagnosticSample.MinimumHeightMeters
+                    : 0.0f;
+            maximumHeightMeters =
+                diagnosticSample != null
+                    ? diagnosticSample.MaximumHeightMeters
+                    : 0.0f;
+            centerHeightMeters =
+                diagnosticSample != null
+                    ? diagnosticSample.CenterHeightMeters
+                    : 0.0f;
+        }
+
+        private void ClearStreamingState()
+        {
+            if (hasCenterKey ||
+                desiredKeys.Count > 0 ||
+                generationQueue.Count > 0 ||
+                samples.Count > 0)
+            {
+                generationVersion++;
+
+                if (generationStop != null)
+                {
+                    generationStop.stop = true;
+                }
+            }
+
+            generationSource = null;
+            hasCenterKey = false;
+            desiredRadius = -1;
+            desiredResolution = default;
+            desiredTileSizeX = default;
+            desiredTileSizeZ = default;
+            desiredMargins = default;
+            desiredKeys.Clear();
+            generationQueue.Clear();
+            samples.Clear();
+            currentSample = null;
+            expectedSampleCount = default;
+            cachedSampleCount = default;
+            queuedSampleCount = default;
             hasSample = false;
-            isGenerating = false;
             sampleVertexCount = default;
             minimumHeightMeters = default;
             maximumHeightMeters = default;
             centerHeightMeters = default;
-            hasAttemptedKey = false;
+
+            if (generationTask == null)
+            {
+                isGenerating = false;
+            }
         }
 
         private void OnDisable()
         {
-            ClearCurrentSample();
+            generationVersion++;
+
+            if (generationStop != null)
+            {
+                generationStop.stop = true;
+            }
+
+            ClearStreamingState();
         }
 
         private static int FloorDivide(
@@ -648,8 +1128,7 @@ namespace jcan.CelestialSystems
             if (destination == null)
             {
                 throw new ArgumentNullException(
-                    nameof(
-                        destination));
+                    nameof(destination));
             }
 
             if (destination.Length <
@@ -657,8 +1136,7 @@ namespace jcan.CelestialSystems
             {
                 throw new ArgumentException(
                     "The destination array is too small for this height sample.",
-                    nameof(
-                        destination));
+                    nameof(destination));
             }
 
             Array.Copy(
