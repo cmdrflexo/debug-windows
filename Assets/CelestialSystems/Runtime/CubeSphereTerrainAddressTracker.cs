@@ -53,6 +53,9 @@ namespace jcan.CelestialSystems
         public double TileSizeMeters =>
             tileSizeMeters;
 
+        public double AdjacentPreloadDistanceMeters =>
+            adjacentPreloadDistanceMeters;
+
         public bool HasPrimaryTileAddress =>
             hasPrimaryTileAddress;
 
