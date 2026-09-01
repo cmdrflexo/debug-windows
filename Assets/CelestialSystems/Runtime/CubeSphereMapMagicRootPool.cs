@@ -89,6 +89,7 @@ namespace jcan.CelestialSystems
 
         private RootSlot[] rootSlots;
         private DesiredRoot[] desiredRoots;
+        private RoundMapMagicSurfaceSession surfaceSession;
 
         public int ActiveRootCount =>
             activeRootCount;
@@ -128,6 +129,8 @@ namespace jcan.CelestialSystems
 
         private void Awake()
         {
+            surfaceSession =
+                GetComponent<RoundMapMagicSurfaceSession>();
             BuildRootSlots();
         }
 
@@ -137,6 +140,13 @@ namespace jcan.CelestialSystems
             {
                 Debug.LogError(
                     "The MapMagic root pool requires a cube-sphere terrain address tracker.",
+                    this);
+            }
+
+            if (surfaceSession == null)
+            {
+                Debug.LogError(
+                    "The MapMagic root pool requires a Round MapMagic surface session on the same GameObject.",
                     this);
             }
 
@@ -166,8 +176,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            DeactivateRoot(rootB);
-            DeactivateRoot(rootC);
+            ReleaseAllRoots();
         }
 
         private void LateUpdate()
@@ -185,7 +194,9 @@ namespace jcan.CelestialSystems
                 BuildRootSlots();
             }
 
-            if (addressTracker == null ||
+            if (surfaceSession == null ||
+                !surfaceSession.HasActiveSession ||
+                addressTracker == null ||
                 !addressTracker.HasPrimaryTileAddress)
             {
                 DeactivateAllRoots();
