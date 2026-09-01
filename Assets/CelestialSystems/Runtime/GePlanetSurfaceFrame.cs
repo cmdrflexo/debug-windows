@@ -1,5 +1,5 @@
 /*
- * Positions and orients a local tangent frame and tracks the active anchor's canonical cube-sphere address.
+ * Positions and orients a round body's local tangent frame and tracks the active anchor's canonical cube-sphere address.
  */
 
 using System;
@@ -12,20 +12,21 @@ namespace jcan.CelestialSystems
     {
         private const float MinimumAxisSquared = 0.000001f;
 
+        [Header("Configuration")]
         [SerializeField]
-        private UniverseFrameController universeFrame;
+        private CelestialBodyRuntimeContext bodyContext;
+
+        [Header("Resolved Body Configuration")]
+        [SerializeField]
+        private double planetRadiusMeters;
 
         [SerializeField]
-        private NBody planetBody;
+        private Vector3 planetNorthAxis =
+            Vector3.up;
 
         [SerializeField]
-        private double planetRadiusMeters = 6371000.0;
-
-        [SerializeField]
-        private Vector3 planetNorthAxis = Vector3.up;
-
-        [SerializeField]
-        private Vector3 poleReferenceAxis = Vector3.forward;
+        private Vector3 poleReferenceAxis =
+            Vector3.forward;
 
         [Header("Runtime")]
         [SerializeField]
@@ -51,32 +52,14 @@ namespace jcan.CelestialSystems
         private Vector3 previousTangentForward;
         private bool previousTangentForwardSet;
 
+        public CelestialBodyRuntimeContext BodyContext =>
+            bodyContext;
+
         public double PlanetRadiusMeters =>
             planetRadiusMeters;
 
         public double AnchorAltitudeMeters =>
             anchorAltitudeMeters;
-
-
-        public bool TryGetPlanetCenterScenePosition(
-            out Vector3 planetCenter)
-        {
-            if (!hasAnchorAddress ||
-                double.IsNaN(planetRadiusMeters) ||
-                double.IsInfinity(planetRadiusMeters) ||
-                planetRadiusMeters <= 0.0 ||
-                planetRadiusMeters > float.MaxValue)
-            {
-                planetCenter = default;
-                return false;
-            }
-
-            planetCenter =
-                transform.position -
-                transform.up *
-                    (float)planetRadiusMeters;
-            return true;
-        }
 
         public bool HasAnchorAddress =>
             hasAnchorAddress;
@@ -89,28 +72,36 @@ namespace jcan.CelestialSystems
 
         private void Start()
         {
-            gravityEngine = GravityEngine.Instance();
+            gravityEngine =
+                GravityEngine.Instance();
 
-            if (universeFrame == null)
+            if (bodyContext == null)
             {
                 Debug.LogError(
-                    "The planet surface frame requires a universe frame controller.",
+                    "The round-body surface frame requires a celestial body runtime context.",
+                    this);
+                return;
+            }
+
+            if (bodyContext.Definition == null)
+            {
+                Debug.LogError(
+                    "The round-body surface frame requires a body context with a definition.",
+                    this);
+                return;
+            }
+
+            if (bodyContext.ResolvedSurfaceSystem !=
+                CelestialSurfaceSystem.RoundMapMagic)
+            {
+                Debug.LogError(
+                    "The round-body surface frame requires a body definition resolved to Round MapMagic.",
                     this);
             }
 
-            if (planetBody == null)
-            {
-                Debug.LogError(
-                    "The planet surface frame requires a planet NBody.",
-                    this);
-            }
-
-            if (planetRadiusMeters <= 0.0)
-            {
-                Debug.LogError(
-                    "The planet surface frame requires a positive radius.",
-                    this);
-            }
+            ResolveBodyConfiguration(
+                out _,
+                out _);
         }
 
         private void LateUpdate()
@@ -118,71 +109,107 @@ namespace jcan.CelestialSystems
             hasAnchorAddress = false;
             anchorFaceProximity = default;
 
-            if (universeFrame == null ||
-                planetBody == null ||
-                planetRadiusMeters <= 0.0 ||
+            if (!ResolveBodyConfiguration(
+                    out var universeFrame,
+                    out var gravityBody) ||
                 !universeFrame.TryGetActiveAnchorOffsetMeters(
                     out var anchorOffsetMeters))
             {
                 return;
             }
 
-            gravityEngine ??= GravityEngine.Instance();
+            gravityEngine ??=
+                GravityEngine.Instance();
 
-            if (gravityEngine == null || !gravityEngine.IsSetup())
+            if (gravityEngine == null ||
+                !gravityEngine.IsSetup())
             {
                 return;
             }
 
-            var physicalScale = gravityEngine.GetPhysicalScale();
+            var physicalScale =
+                gravityEngine.GetPhysicalScale();
 
-            if (Mathf.Approximately(physicalScale, 0.0f))
+            if (Mathf.Approximately(
+                    physicalScale,
+                    0.0f))
             {
                 return;
             }
 
             var physicsPosition =
-                gravityEngine.GetPositionDoubleV3(planetBody);
+                gravityEngine.GetPositionDoubleV3(
+                    gravityBody);
             var planetCenterX =
-                physicsPosition.x * physicalScale;
+                physicsPosition.x *
+                physicalScale;
             var planetCenterY =
-                physicsPosition.y * physicalScale;
+                physicsPosition.y *
+                physicalScale;
             var planetCenterZ =
-                physicsPosition.z * physicalScale;
+                physicsPosition.z *
+                physicalScale;
             var radialX =
-                anchorOffsetMeters.x - planetCenterX;
+                anchorOffsetMeters.x -
+                planetCenterX;
             var radialY =
-                anchorOffsetMeters.y - planetCenterY;
+                anchorOffsetMeters.y -
+                planetCenterY;
             var radialZ =
-                anchorOffsetMeters.z - planetCenterZ;
+                anchorOffsetMeters.z -
+                planetCenterZ;
             var radialDistanceSquared =
-                radialX * radialX +
-                radialY * radialY +
-                radialZ * radialZ;
+                radialX *
+                radialX +
+                radialY *
+                radialY +
+                radialZ *
+                radialZ;
 
-            if (radialDistanceSquared <= double.Epsilon)
+            if (radialDistanceSquared <=
+                double.Epsilon)
             {
                 return;
             }
 
             var radialDistance =
-                Math.Sqrt(radialDistanceSquared);
-            var upX = radialX / radialDistance;
-            var upY = radialY / radialDistance;
-            var upZ = radialZ / radialDistance;
-            var surfacePosition = new Vector3(
-                (float)(planetCenterX + upX * planetRadiusMeters),
-                (float)(planetCenterY + upY * planetRadiusMeters),
-                (float)(planetCenterZ + upZ * planetRadiusMeters));
-            var surfaceUp = new Vector3(
-                (float)upX,
-                (float)upY,
-                (float)upZ).normalized;
+                Math.Sqrt(
+                    radialDistanceSquared);
+            var upX =
+                radialX /
+                radialDistance;
+            var upY =
+                radialY /
+                radialDistance;
+            var upZ =
+                radialZ /
+                radialDistance;
+            var surfacePosition =
+                new Vector3(
+                    (float)(
+                        planetCenterX +
+                        upX *
+                        planetRadiusMeters),
+                    (float)(
+                        planetCenterY +
+                        upY *
+                        planetRadiusMeters),
+                    (float)(
+                        planetCenterZ +
+                        upZ *
+                        planetRadiusMeters));
+            var surfaceUp =
+                new Vector3(
+                    (float)upX,
+                    (float)upY,
+                    (float)upZ).normalized;
             var tangentForward =
-                ResolveTangentForward(surfaceUp);
+                ResolveTangentForward(
+                    surfaceUp);
 
             anchorAltitudeMeters =
-                radialDistance - planetRadiusMeters;
+                radialDistance -
+                planetRadiusMeters;
             hasAnchorAddress =
                 CubeSphereMapping.TryDirectionToAddress(
                     new DoubleVector3(
@@ -206,11 +233,73 @@ namespace jcan.CelestialSystems
                     tangentForward,
                     surfaceUp));
 
-            previousTangentForward = tangentForward;
-            previousTangentForwardSet = true;
+            previousTangentForward =
+                tangentForward;
+            previousTangentForwardSet =
+                true;
         }
 
-        private Vector3 ResolveTangentForward(Vector3 surfaceUp)
+        public bool TryGetPlanetCenterScenePosition(
+            out Vector3 planetCenter)
+        {
+            if (!hasAnchorAddress ||
+                !IsFinite(
+                    planetRadiusMeters) ||
+                planetRadiusMeters <= 0.0 ||
+                planetRadiusMeters >
+                    float.MaxValue)
+            {
+                planetCenter = default;
+                return false;
+            }
+
+            planetCenter =
+                transform.position -
+                transform.up *
+                    (float)planetRadiusMeters;
+            return true;
+        }
+
+        private bool ResolveBodyConfiguration(
+            out UniverseFrameController universeFrame,
+            out NBody gravityBody)
+        {
+            universeFrame = null;
+            gravityBody = null;
+
+            if (bodyContext == null ||
+                bodyContext.Definition == null ||
+                bodyContext.ResolvedSurfaceSystem !=
+                    CelestialSurfaceSystem.RoundMapMagic)
+            {
+                return false;
+            }
+
+            var definition =
+                bodyContext.Definition;
+
+            planetRadiusMeters =
+                definition.ReferenceRadiusMeters;
+            planetNorthAxis =
+                definition.NorthAxis;
+            poleReferenceAxis =
+                definition.PoleReferenceAxis;
+            universeFrame =
+                bodyContext.UniverseFrame;
+            gravityBody =
+                bodyContext.GravityBody;
+
+            return
+                definition.HasValidPhysicalSettings &&
+                IsFinite(
+                    planetRadiusMeters) &&
+                planetRadiusMeters > 0.0 &&
+                universeFrame != null &&
+                gravityBody != null;
+        }
+
+        private Vector3 ResolveTangentForward(
+            Vector3 surfaceUp)
         {
             var tangentForward =
                 ProjectOntoTangent(
@@ -240,9 +329,11 @@ namespace jcan.CelestialSystems
                 MinimumAxisSquared)
             {
                 var fallbackAxis =
-                    Mathf.Abs(Vector3.Dot(
-                        surfaceUp,
-                        Vector3.forward)) < 0.99f
+                    Mathf.Abs(
+                        Vector3.Dot(
+                            surfaceUp,
+                            Vector3.forward)) <
+                        0.99f
                         ? Vector3.forward
                         : Vector3.right;
 
@@ -266,7 +357,8 @@ namespace jcan.CelestialSystems
 
         private void OnDrawGizmos()
         {
-            if (gizmoDrawMode == GizmoDrawMode.Always)
+            if (gizmoDrawMode ==
+                GizmoDrawMode.Always)
             {
                 DrawGizmos();
             }
@@ -274,7 +366,8 @@ namespace jcan.CelestialSystems
 
         private void OnDrawGizmosSelected()
         {
-            if (gizmoDrawMode == GizmoDrawMode.Selected)
+            if (gizmoDrawMode ==
+                GizmoDrawMode.Selected)
             {
                 DrawGizmos();
             }
@@ -287,20 +380,34 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            Gizmos.color = Color.red;
+            Gizmos.color =
+                Color.red;
             Gizmos.DrawRay(
                 transform.position,
-                transform.right * gizmoSize);
+                transform.right *
+                    gizmoSize);
 
-            Gizmos.color = Color.green;
+            Gizmos.color =
+                Color.green;
             Gizmos.DrawRay(
                 transform.position,
-                transform.up * gizmoSize);
+                transform.up *
+                    gizmoSize);
 
-            Gizmos.color = Color.blue;
+            Gizmos.color =
+                Color.blue;
             Gizmos.DrawRay(
                 transform.position,
-                transform.forward * gizmoSize);
+                transform.forward *
+                    gizmoSize);
+        }
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
         }
     }
 }
