@@ -38,6 +38,9 @@ namespace jcan.CelestialSystems
         public CubeSphereFace ActiveFace =>
             activeFace;
 
+        public double RadialOffsetMeters =>
+            radialOffsetMeters;
+
         private void Reset()
         {
             coordinateDriver =
