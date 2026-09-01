@@ -81,6 +81,9 @@ namespace jcan.CelestialSystems
         public int MapMagicTileZ =>
             mapMagicTileZ;
 
+        public MapMagicObject MapMagicObject =>
+            mapMagicObject;
+
         public bool FollowTrackerPrimaryAddress =>
             followTrackerPrimaryAddress;
 
