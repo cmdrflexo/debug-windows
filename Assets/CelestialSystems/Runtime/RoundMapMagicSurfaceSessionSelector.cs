@@ -115,8 +115,9 @@ namespace jcan.CelestialSystems
             var currentTime =
                 Time.unscaledTimeAsDouble;
 
-            if (currentTime <
-                nextEvaluationTime)
+            if (hasSelectedBody &&
+                currentTime <
+                    nextEvaluationTime)
             {
                 return;
             }
@@ -323,7 +324,8 @@ namespace jcan.CelestialSystems
                     deltaZ);
 
             surfaceDistanceMeters =
-                Math.Abs(
+                Math.Max(
+                    0.0,
                     radialDistanceMeters -
                     bodyContext.ConfiguredReferenceRadiusMeters);
             return
