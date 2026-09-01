@@ -1,5 +1,5 @@
 /*
- * Converts the tracked primary cube-sphere tile address into MapMagic's bounded coordinate-generation input.
+ * Converts a tracked or pool-assigned cube-sphere tile address into MapMagic's bounded coordinate-generation input.
  */
 
 using Den.Tools;
@@ -18,12 +18,22 @@ namespace jcan.CelestialSystems
         private CubeSphereTerrainAddressTracker addressTracker;
 
         [SerializeField]
+        private bool followTrackerPrimaryAddress = true;
+
+        [SerializeField]
         private MapMagicObject mapMagicObject;
 
         [SerializeField]
         private bool takeGenerationControl = true;
 
-        [Header("Runtime")]
+        [Header("Runtime Source")]
+        [SerializeField]
+        private bool hasExternalAddress;
+
+        [SerializeField]
+        private CubeSphereTileAddress externalAddress;
+
+        [Header("Runtime Coordinate")]
         [SerializeField]
         private bool hasMapMagicCoordinate;
 
@@ -70,6 +80,9 @@ namespace jcan.CelestialSystems
         public int MapMagicTileZ =>
             mapMagicTileZ;
 
+        public bool FollowTrackerPrimaryAddress =>
+            followTrackerPrimaryAddress;
+
         private void Reset()
         {
             mapMagicObject =
@@ -78,10 +91,11 @@ namespace jcan.CelestialSystems
 
         private void Start()
         {
-            if (addressTracker == null)
+            if (followTrackerPrimaryAddress &&
+                addressTracker == null)
             {
                 Debug.LogError(
-                    "The MapMagic coordinate driver requires a cube-sphere terrain address tracker.",
+                    "A MapMagic coordinate driver following the primary address requires a cube-sphere terrain address tracker.",
                     this);
             }
 
@@ -97,15 +111,12 @@ namespace jcan.CelestialSystems
         {
             hasMapMagicCoordinate = false;
 
-            if (addressTracker == null ||
-                mapMagicObject == null ||
-                !addressTracker.HasPrimaryTileAddress)
+            if (mapMagicObject == null ||
+                !TryGetSourceAddress(
+                    out var address))
             {
                 return;
             }
-
-            var address =
-                addressTracker.PrimaryTileAddress;
 
             activeFace =
                 address.Face;
@@ -171,9 +182,57 @@ namespace jcan.CelestialSystems
             }
         }
 
+        public void FollowPrimaryTrackerAddress()
+        {
+            followTrackerPrimaryAddress = true;
+            hasExternalAddress = false;
+        }
+
+        public void SetExternalAddress(
+            CubeSphereTileAddress address)
+        {
+            followTrackerPrimaryAddress = false;
+            externalAddress = address;
+            hasExternalAddress = true;
+        }
+
+        public void ClearExternalAddress()
+        {
+            followTrackerPrimaryAddress = false;
+            hasExternalAddress = false;
+            hasMapMagicCoordinate = false;
+        }
+
         private void OnDisable()
         {
             RestoreGenerationControl();
+        }
+
+        private bool TryGetSourceAddress(
+            out CubeSphereTileAddress address)
+        {
+            if (followTrackerPrimaryAddress)
+            {
+                if (addressTracker == null ||
+                    !addressTracker.HasPrimaryTileAddress)
+                {
+                    address = default;
+                    return false;
+                }
+
+                address =
+                    addressTracker.PrimaryTileAddress;
+                return true;
+            }
+
+            if (!hasExternalAddress)
+            {
+                address = default;
+                return false;
+            }
+
+            address = externalAddress;
+            return true;
         }
 
         private void ApplyGenerationControl()
