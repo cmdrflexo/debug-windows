@@ -125,6 +125,88 @@ namespace jcan.CelestialSystems
                 }
             }
 
+            var expectedCenterEdgeDistanceMeters =
+                CubeSphereMapping.FaceCoordinateToMeters(
+                    1.0,
+                    planetRadiusMeters);
+
+            foreach (CubeSphereFace face in
+                Enum.GetValues(typeof(CubeSphereFace)))
+            {
+                var centerProximity =
+                    CubeSphereMapping.GetFaceProximity(
+                        new CubeSphereAddress(
+                            face,
+                            0.0,
+                            0.0,
+                            0.0),
+                        planetRadiusMeters);
+
+                foreach (CubeSphereEdge edge in
+                    Enum.GetValues(typeof(CubeSphereEdge)))
+                {
+                    if (Math.Abs(
+                            centerProximity.GetEdgeDistanceMeters(
+                                edge) -
+                            expectedCenterEdgeDistanceMeters) >
+                        maximumPositionErrorMeters)
+                    {
+                        LogFailure(
+                            $"Face-center edge distance was incorrect for {face}, {edge}.");
+                        return;
+                    }
+
+                    var edgeAddress =
+                        CreateEdgeAddress(
+                            face,
+                            edge);
+                    var edgeProximity =
+                        CubeSphereMapping.GetFaceProximity(
+                            edgeAddress,
+                            planetRadiusMeters);
+
+                    if (edgeProximity.GetEdgeDistanceMeters(
+                            edge) >
+                            maximumPositionErrorMeters ||
+                        edgeProximity.ClosestEdge != edge)
+                    {
+                        LogFailure(
+                            $"Edge proximity was incorrect for {face}, {edge}.");
+                        return;
+                    }
+
+                    if (CubeSphereTopology.GetAdjacentFace(
+                            face,
+                            edge) == face)
+                    {
+                        LogFailure(
+                            $"Edge topology returned the same face for {face}, {edge}.");
+                        return;
+                    }
+
+                    sampleCount++;
+                }
+
+                var cornerProximity =
+                    CubeSphereMapping.GetFaceProximity(
+                        new CubeSphereAddress(
+                            face,
+                            -1.0,
+                            -1.0,
+                            0.0),
+                        planetRadiusMeters);
+
+                if (!cornerProximity.IsNearCorner(
+                        maximumPositionErrorMeters))
+                {
+                    LogFailure(
+                        $"Corner proximity was incorrect for {face}.");
+                    return;
+                }
+
+                sampleCount++;
+            }
+
             if (CubeSphereMapping.TryDirectionToAddress(
                     default,
                     0.0,
@@ -148,6 +230,48 @@ namespace jcan.CelestialSystems
             Debug.Log(
                 $"Cube-sphere diagnostics passed | Samples: {sampleCount} | Direction error: {largestDirectionError:E6} | Position error: {largestPositionErrorMeters:E6} m.",
                 this);
+        }
+
+        private static CubeSphereAddress CreateEdgeAddress(
+            CubeSphereFace face,
+            CubeSphereEdge edge)
+        {
+            switch (edge)
+            {
+                case CubeSphereEdge.NegativeU:
+                    return new CubeSphereAddress(
+                        face,
+                        -1.0,
+                        0.0,
+                        0.0);
+
+                case CubeSphereEdge.PositiveU:
+                    return new CubeSphereAddress(
+                        face,
+                        1.0,
+                        0.0,
+                        0.0);
+
+                case CubeSphereEdge.NegativeV:
+                    return new CubeSphereAddress(
+                        face,
+                        0.0,
+                        -1.0,
+                        0.0);
+
+                case CubeSphereEdge.PositiveV:
+                    return new CubeSphereAddress(
+                        face,
+                        0.0,
+                        1.0,
+                        0.0);
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(edge),
+                        edge,
+                        "Unknown cube-sphere edge.");
+            }
         }
 
         private void LogFailure(string message)
