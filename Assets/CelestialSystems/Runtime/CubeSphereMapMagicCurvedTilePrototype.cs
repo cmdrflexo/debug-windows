@@ -1,5 +1,5 @@
 /*
- * Converts the active MapMagic main tile into a height-only curved cube-sphere mesh for prototype validation.
+ * Converts the active MapMagic main tile into a height-only curved cube-sphere mesh and matching runtime collider.
  */
 
 using Den.Tools;
@@ -45,6 +45,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool hideSourceTerrain = true;
 
+        [SerializeField]
+        private bool generateMeshCollider = true;
+
         [Header("Runtime")]
         [SerializeField]
         private bool hasCurvedTile;
@@ -67,9 +70,13 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private int triangleCount;
 
+        [SerializeField]
+        private bool hasMeshCollider;
+
         private GameObject meshObject;
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
+        private MeshCollider meshCollider;
         private Mesh curvedMesh;
         private Material runtimeFallbackMaterial;
         private TerrainData builtTerrainData;
@@ -214,6 +221,8 @@ namespace jcan.CelestialSystems
             }
 
             ApplyMaterial();
+            ApplyMeshCollider(
+                false);
         }
 
         private void BuildCurvedTile(
@@ -388,6 +397,8 @@ namespace jcan.CelestialSystems
                 triangles;
             curvedMesh.RecalculateNormals();
             curvedMesh.RecalculateBounds();
+            ApplyMeshCollider(
+                true);
 
             meshObject.name =
                 $"Curved Tile {tileX},{tileZ}";
@@ -450,6 +461,45 @@ namespace jcan.CelestialSystems
                 meshFilter.sharedMesh =
                     curvedMesh;
             }
+        }
+
+        private void ApplyMeshCollider(
+            bool forceRefresh)
+        {
+            if (!generateMeshCollider ||
+                meshObject == null ||
+                curvedMesh == null)
+            {
+                if (meshCollider != null)
+                {
+                    DestroyUnityObject(
+                        meshCollider);
+                }
+
+                meshCollider = null;
+                hasMeshCollider = false;
+                return;
+            }
+
+            if (meshCollider == null)
+            {
+                meshCollider =
+                    meshObject.AddComponent<MeshCollider>();
+                forceRefresh = true;
+            }
+
+            if (forceRefresh ||
+                meshCollider.sharedMesh !=
+                    curvedMesh)
+            {
+                meshCollider.sharedMesh = null;
+                meshCollider.sharedMesh =
+                    curvedMesh;
+            }
+
+            hasMeshCollider =
+                meshCollider.sharedMesh ==
+                    curvedMesh;
         }
 
         private void ApplyMaterial()
@@ -625,6 +675,7 @@ namespace jcan.CelestialSystems
             meshObject = null;
             meshFilter = null;
             meshRenderer = null;
+            meshCollider = null;
             curvedMesh = null;
             builtTerrainData = null;
             builtFace = default;
@@ -639,6 +690,7 @@ namespace jcan.CelestialSystems
             sourceTileZ = default;
             vertexCount = default;
             triangleCount = default;
+            hasMeshCollider = false;
         }
 
         private void OnDisable()
