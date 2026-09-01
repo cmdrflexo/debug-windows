@@ -55,6 +55,9 @@ namespace jcan.CelestialSystems
         public RoundMapMagicSurfaceDefinition ActiveSurfaceDefinition =>
             activeSurfaceDefinition;
 
+        public RoundMapMagicSurfaceDefinition ConfiguredSurfaceDefinition =>
+            configuredSurfaceDefinition;
+
         private void Reset()
         {
             surfaceFrame =
