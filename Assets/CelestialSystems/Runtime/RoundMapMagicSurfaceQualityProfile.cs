@@ -1,0 +1,103 @@
+/*
+ * Stores reusable rendering-quality limits for the custom meshes built from a Round MapMagic surface.
+ */
+
+using UnityEngine;
+
+namespace jcan.CelestialSystems
+{
+    [CreateAssetMenu(
+        fileName = "Round MapMagic Surface Quality",
+        menuName = "Celestial Systems/Quality Profiles/Round MapMagic Surface")]
+    public sealed class RoundMapMagicSurfaceQualityProfile :
+        ScriptableObject
+    {
+        [Header("Local Detail")]
+        [SerializeField]
+        [Range(3, 257)]
+        private int localMeshResolution = 65;
+
+        [SerializeField]
+        private double localCoverageRadiusMeters =
+            3000.0;
+
+        [Header("Mid Detail")]
+        [SerializeField]
+        [Range(3, 257)]
+        private int midMeshResolution = 17;
+
+        [SerializeField]
+        [Range(1, 64)]
+        private int midTileSizeMultiplier = 8;
+
+        [SerializeField]
+        private double midCoverageRadiusMeters =
+            60000.0;
+
+        [Header("Transitions")]
+        [SerializeField]
+        private double transitionOverlapMeters =
+            2000.0;
+
+        public int LocalMeshResolution =>
+            localMeshResolution;
+
+        public double LocalCoverageRadiusMeters =>
+            localCoverageRadiusMeters;
+
+        public int MidMeshResolution =>
+            midMeshResolution;
+
+        public int MidTileSizeMultiplier =>
+            midTileSizeMultiplier;
+
+        public double MidCoverageRadiusMeters =>
+            midCoverageRadiusMeters;
+
+        public double TransitionOverlapMeters =>
+            transitionOverlapMeters;
+
+        public bool HasValidSettings =>
+            HasPowerOfTwoIntervals(
+                localMeshResolution) &&
+            IsFinite(
+                localCoverageRadiusMeters) &&
+            localCoverageRadiusMeters >
+                0.0 &&
+            HasPowerOfTwoIntervals(
+                midMeshResolution) &&
+            midTileSizeMultiplier >=
+                1 &&
+            IsFinite(
+                midCoverageRadiusMeters) &&
+            midCoverageRadiusMeters >=
+                localCoverageRadiusMeters &&
+            IsFinite(
+                transitionOverlapMeters) &&
+            transitionOverlapMeters >=
+                0.0;
+
+        private static bool HasPowerOfTwoIntervals(
+            int resolution)
+        {
+            var intervalCount =
+                resolution -
+                1;
+
+            return
+                intervalCount >=
+                    2 &&
+                (intervalCount &
+                    (intervalCount - 1)) ==
+                    0;
+        }
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
+        }
+    }
+}
