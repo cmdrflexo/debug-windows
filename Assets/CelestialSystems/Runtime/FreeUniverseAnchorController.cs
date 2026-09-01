@@ -1,5 +1,5 @@
 /*
- * Moves a nonphysical universe anchor using camera-relative free-flight controls without giving the camera origin authority.
+ * Moves a nonphysical universe anchor using camera-relative free-flight controls, with optional scene collision, without giving the camera origin authority.
  */
 
 using CW.Common;
@@ -34,6 +34,21 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Range(0.0f, 0.5f)]
         private float speedWheel = 0.1f;
+
+        [Header("Collision")]
+        [SerializeField]
+        private bool collideWithScene;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float collisionRadiusMeters = 1.0f;
+
+        [SerializeField]
+        [Min(0.0f)]
+        private float collisionSkinMeters = 0.05f;
+
+        [SerializeField]
+        private LayerMask collisionLayers = ~0;
 
         [Header("Controls")]
         [SerializeField]
@@ -74,6 +89,19 @@ namespace jcan.CelestialSystems
                 KeyCode.None,
                 KeyCode.None,
                 100.0f);
+
+        [Header("Runtime Collision")]
+        [SerializeField]
+        private bool hasCollision;
+
+        [SerializeField]
+        private string lastCollisionObject;
+
+        [SerializeField]
+        private float lastCollisionDistanceMeters;
+
+        [SerializeField]
+        private Vector3 lastCollisionNormal;
 
         private Vector3 remainingDelta;
 
@@ -126,9 +154,119 @@ namespace jcan.CelestialSystems
         {
             var factor = CwHelper.DampenFactor(damping, Time.deltaTime);
             var newDelta = Vector3.Lerp(remainingDelta, Vector3.zero, factor);
+            var requestedMovement = remainingDelta - newDelta;
+            var appliedMovement = ResolveCollisionMovement(requestedMovement);
 
-            transform.position += remainingDelta - newDelta;
+            transform.position += appliedMovement;
+
+            if (hasCollision)
+            {
+                newDelta = Vector3.ProjectOnPlane(newDelta, lastCollisionNormal);
+            }
+
             remainingDelta = newDelta;
+        }
+
+        private Vector3 ResolveCollisionMovement(Vector3 requestedMovement)
+        {
+            ClearCollisionRuntime();
+
+            if (!collideWithScene ||
+                collisionRadiusMeters <= 0.0f ||
+                requestedMovement.sqrMagnitude <= Mathf.Epsilon)
+            {
+                return requestedMovement;
+            }
+
+            if (!TrySweep(
+                    transform.position,
+                    requestedMovement,
+                    out var firstMovement,
+                    out var firstHit))
+            {
+                return requestedMovement;
+            }
+
+            RecordCollision(firstHit);
+
+            var remainingMovement = requestedMovement - firstMovement;
+            var slideMovement =
+                Vector3.ProjectOnPlane(remainingMovement, firstHit.normal);
+
+            if (slideMovement.sqrMagnitude <= Mathf.Epsilon)
+            {
+                return firstMovement;
+            }
+
+            var slideOrigin = transform.position + firstMovement;
+
+            if (TrySweep(
+                    slideOrigin,
+                    slideMovement,
+                    out var allowedSlideMovement,
+                    out var slideHit))
+            {
+                RecordCollision(slideHit);
+                slideMovement = allowedSlideMovement;
+            }
+
+            return firstMovement + slideMovement;
+        }
+
+        private bool TrySweep(
+            Vector3 origin,
+            Vector3 requestedMovement,
+            out Vector3 allowedMovement,
+            out RaycastHit hit)
+        {
+            var requestedDistance = requestedMovement.magnitude;
+
+            if (requestedDistance <= Mathf.Epsilon)
+            {
+                allowedMovement = Vector3.zero;
+                hit = default;
+                return false;
+            }
+
+            var direction = requestedMovement / requestedDistance;
+            var radius = Mathf.Max(0.01f, collisionRadiusMeters);
+            var skin = Mathf.Max(0.0f, collisionSkinMeters);
+
+            if (!Physics.SphereCast(
+                    origin,
+                    radius,
+                    direction,
+                    out hit,
+                    requestedDistance + skin,
+                    collisionLayers,
+                    QueryTriggerInteraction.Ignore))
+            {
+                allowedMovement = requestedMovement;
+                return false;
+            }
+
+            var allowedDistance =
+                Mathf.Clamp(hit.distance - skin, 0.0f, requestedDistance);
+
+            allowedMovement = direction * allowedDistance;
+            return true;
+        }
+
+        private void RecordCollision(RaycastHit hit)
+        {
+            hasCollision = true;
+            lastCollisionObject =
+                hit.collider != null ? hit.collider.name : string.Empty;
+            lastCollisionDistanceMeters = hit.distance;
+            lastCollisionNormal = hit.normal;
+        }
+
+        private void ClearCollisionRuntime()
+        {
+            hasCollision = false;
+            lastCollisionObject = string.Empty;
+            lastCollisionDistanceMeters = 0.0f;
+            lastCollisionNormal = Vector3.zero;
         }
 
         private float GetSpeedMultiplier()
