@@ -1,5 +1,5 @@
 /*
- * Converts a neighborhood of ready MapMagic main tiles into curved cube-sphere meshes and matching runtime colliders.
+ * Converts ready MapMagic tiles into tile-centered curved cube-sphere meshes and matching runtime colliders.
  */
 
 using System;
@@ -55,6 +55,7 @@ namespace jcan.CelestialSystems
             public Terrain SourceTerrain;
             public TerrainData TerrainData;
             public CubeSphereFace Face;
+            public DoubleVector3 TileCenterDirection;
             public int Resolution;
             public double MeshRadiusMeters;
             public bool SourceTerrainWasEnabled;
@@ -393,10 +394,19 @@ namespace jcan.CelestialSystems
             RemoveUndesiredTiles();
 
             hiddenSourceTerrainCount = 0;
+            surfaceFrame.TryGetPlanetCenterScenePosition(
+                out var planetCenterScenePosition);
+            var tileRotation =
+                rootPose.transform.rotation;
 
             foreach (var runtime in
                 curvedTiles.Values)
             {
+                UpdateCurvedTilePose(
+                    runtime,
+                    planetCenterScenePosition,
+                    tileRotation);
+
                 if (hideSourceTerrain)
                 {
                     HideSourceTerrain(
@@ -519,6 +529,28 @@ namespace jcan.CelestialSystems
             var faceVAxis =
                 CubeSphereTopology.GetFaceVAxis(
                     face);
+            var tileCenterUMeters =
+                ((double)runtime.TileX + 0.5) *
+                tileSizeX;
+            var tileCenterVMeters =
+                -((double)runtime.TileZ + 0.5) *
+                tileSizeZ;
+            var tileCenterAddress =
+                new CubeSphereAddress(
+                    face,
+                    CubeSphereMapping.MetersToFaceCoordinate(
+                        tileCenterUMeters,
+                        planetRadiusMeters),
+                    CubeSphereMapping.MetersToFaceCoordinate(
+                        tileCenterVMeters,
+                        planetRadiusMeters),
+                    0.0);
+            var tileCenterDirection =
+                CubeSphereMapping.AddressToDirection(
+                    tileCenterAddress);
+            var meshReferencePosition =
+                tileCenterDirection *
+                rootRadiusMeters;
 
             for (var z = 0;
                 z < resolution;
@@ -576,8 +608,7 @@ namespace jcan.CelestialSystems
                     var delta =
                         direction *
                             surfaceRadiusMeters -
-                        faceNormal *
-                            rootRadiusMeters;
+                        meshReferencePosition;
                     var vertexIndex =
                         z *
                         resolution +
@@ -667,6 +698,8 @@ namespace jcan.CelestialSystems
                 terrainData;
             runtime.Face =
                 face;
+            runtime.TileCenterDirection =
+                tileCenterDirection;
             runtime.Resolution =
                 resolution;
             runtime.MeshRadiusMeters =
@@ -682,8 +715,10 @@ namespace jcan.CelestialSystems
                     new GameObject(
                         "Curved Tile");
                 runtime.MeshObject.transform.SetParent(
-                    transform,
+                    surfaceFrame.transform,
                     false);
+                runtime.MeshObject.transform.localScale =
+                    Vector3.one;
                 runtime.MeshFilter =
                     runtime.MeshObject.AddComponent<MeshFilter>();
                 runtime.MeshRenderer =
@@ -705,6 +740,44 @@ namespace jcan.CelestialSystems
                 runtime.MeshFilter.sharedMesh =
                     runtime.CurvedMesh;
             }
+        }
+
+        private void UpdateCurvedTilePose(
+            CurvedTileRuntime runtime,
+            Vector3 planetCenterScenePosition,
+            Quaternion tileRotation)
+        {
+            if (runtime.MeshObject == null)
+            {
+                return;
+            }
+
+            var drawingRadiusMeters =
+                surfaceFrame.PlanetRadiusMeters +
+                rootPose.RadialOffsetMeters;
+
+            if (!IsFinite(
+                    drawingRadiusMeters) ||
+                drawingRadiusMeters <= 0.0 ||
+                drawingRadiusMeters >
+                    float.MaxValue)
+            {
+                return;
+            }
+
+            var tileCenterDirection =
+                new Vector3(
+                    (float)runtime.TileCenterDirection.x,
+                    (float)runtime.TileCenterDirection.y,
+                    (float)runtime.TileCenterDirection.z).normalized;
+            var tileCenterScenePosition =
+                planetCenterScenePosition +
+                tileCenterDirection *
+                    (float)drawingRadiusMeters;
+
+            runtime.MeshObject.transform.SetPositionAndRotation(
+                tileCenterScenePosition,
+                tileRotation);
         }
 
         private void ApplyMeshCollider(
