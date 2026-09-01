@@ -31,6 +31,14 @@ namespace jcan.CelestialSystems
         private int generationSeed;
 
         [SerializeField]
+        private Vector3 northAxis =
+            Vector3.up;
+
+        [SerializeField]
+        private Vector3 poleReferenceAxis =
+            Vector3.forward;
+
+        [SerializeField]
         private CelestialSurfaceSystem surfaceSystem =
             CelestialSurfaceSystem.AutomaticByDiameter;
 
@@ -52,6 +60,12 @@ namespace jcan.CelestialSystems
 
         public int GenerationSeed =>
             generationSeed;
+
+        public Vector3 NorthAxis =>
+            northAxis;
+
+        public Vector3 PoleReferenceAxis =>
+            poleReferenceAxis;
 
         public CelestialSurfaceSystem SurfaceSystem =>
             surfaceSystem;
@@ -82,7 +96,11 @@ namespace jcan.CelestialSystems
             IsFinite(massKilograms) &&
             massKilograms > 0.0 &&
             IsFinite(referenceRadiusMeters) &&
-            referenceRadiusMeters > 0.0;
+            referenceRadiusMeters > 0.0 &&
+            northAxis.sqrMagnitude >
+                0.000001f &&
+            poleReferenceAxis.sqrMagnitude >
+                0.000001f;
 
         public bool HasValidResolvedSurfaceSettings
         {
@@ -96,7 +114,7 @@ namespace jcan.CelestialSystems
                             roundMapMagicSurface.HasValidSettings;
 
                     case CelestialSurfaceSystem.Irregular:
-                        return true;
+                        return false;
 
                     default:
                         return false;
