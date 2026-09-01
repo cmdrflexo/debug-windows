@@ -1,8 +1,9 @@
 /*
- * Adapts up to four active MapMagic TerrainLayers and their first control map into a curved-tile runtime material.
+ * Adapts up to four MapMagic TerrainLayers and their first control map across the active curved-tile pool.
  */
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -12,6 +13,59 @@ namespace jcan.CelestialSystems
     public sealed class CubeSphereMapMagicTerrainLayerMaterialAdapter :
         MonoBehaviour
     {
+        private sealed class TileMaterialRuntime
+        {
+            public Material Material;
+            public Material TemplateMaterial;
+            public TerrainData TerrainData;
+            public MeshRenderer Renderer;
+            public bool UsesDefinitionMaterial;
+        }
+
+        private struct TileKey :
+            IEquatable<TileKey>
+        {
+            public int X;
+            public int Z;
+
+            public TileKey(
+                int x,
+                int z)
+            {
+                X =
+                    x;
+                Z =
+                    z;
+            }
+
+            public bool Equals(
+                TileKey other)
+            {
+                return
+                    X == other.X &&
+                    Z == other.Z;
+            }
+
+            public override bool Equals(
+                object value)
+            {
+                return
+                    value is TileKey other &&
+                    Equals(
+                        other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return
+                        (X * 397) ^
+                        Z;
+                }
+            }
+        }
+
         private const int MaximumAdaptedLayerCount =
             4;
 
@@ -22,7 +76,14 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CubeSphereMapMagicCurvedTilePrototype curvedTile;
 
-        [Header("Runtime")]
+        [Header("Pool Runtime")]
+        [SerializeField]
+        private int sourceCurvedTileCount;
+
+        [SerializeField]
+        private int adaptedCurvedTileCount;
+
+        [Header("Primary Tile Runtime")]
         [SerializeField]
         private bool hasAdaptedMaterial;
 
@@ -65,10 +126,24 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Material generatedMaterial;
 
-        private TerrainData builtTerrainData;
-        private Material builtTemplateMaterial;
-        private int builtTileX;
-        private int builtTileZ;
+        private readonly List<
+            CubeSphereMapMagicCurvedTilePrototype.CurvedTileData>
+                sourceTiles =
+                    new List<
+                        CubeSphereMapMagicCurvedTilePrototype.CurvedTileData>();
+
+        private readonly Dictionary<TileKey, TileMaterialRuntime>
+            tileMaterials =
+                new Dictionary<TileKey, TileMaterialRuntime>();
+
+        private readonly HashSet<TileKey>
+            desiredMaterialTiles =
+                new HashSet<TileKey>();
+
+        private readonly List<TileKey>
+            removalBuffer =
+                new List<TileKey>();
+
         private bool missingShaderLogged;
 
         private void Reset()
@@ -89,74 +164,182 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
-            if (curvedTile == null ||
-                !curvedTile.HasCurvedTile ||
-                curvedTile.CurvedTileRenderer == null ||
-                curvedTile.SourceTerrainData == null)
+            if (curvedTile == null)
             {
-                ReleaseGeneratedMaterial();
+                ReleaseAllGeneratedMaterials();
                 ClearRuntimeState();
                 return;
             }
 
-            var terrainData =
-                curvedTile.SourceTerrainData;
-            var terrainLayers =
-                terrainData.terrainLayers;
-            var controlTextures =
-                terrainData.alphamapTextures;
-            terrainLayerCount =
-                terrainLayers != null
-                    ? terrainLayers.Length
-                    : 0;
-            controlTextureCount =
-                controlTextures != null
-                    ? controlTextures.Length
-                    : 0;
+            curvedTile.CopyCurvedTilesTo(
+                sourceTiles);
+            sourceCurvedTileCount =
+                sourceTiles.Count;
+            adaptedCurvedTileCount = 0;
+            desiredMaterialTiles.Clear();
+            ClearPrimaryRuntimeState();
 
-            if (!CanAdapt(
-                    terrainLayers,
-                    controlTextures))
-            {
-                ReleaseGeneratedMaterial();
-                ClearLayerRuntimeState();
-                return;
-            }
-
+            var primaryTileX =
+                curvedTile.SourceTileX;
+            var primaryTileZ =
+                curvedTile.SourceTileZ;
             var templateMaterial =
                 curvedTile.ResolvedMeshMaterial;
-            var tileX =
-                curvedTile.SourceTileX;
-            var tileZ =
-                curvedTile.SourceTileZ;
 
-            if (generatedMaterial == null ||
-                builtTerrainData != terrainData ||
-                builtTemplateMaterial != templateMaterial ||
-                builtTileX != tileX ||
-                builtTileZ != tileZ)
+            for (var index = 0;
+                index < sourceTiles.Count;
+                index++)
             {
-                BuildGeneratedMaterial(
+                var sourceTile =
+                    sourceTiles[index];
+                var key =
+                    new TileKey(
+                        sourceTile.TileX,
+                        sourceTile.TileZ);
+                desiredMaterialTiles.Add(
+                    key);
+
+                var terrainData =
+                    sourceTile.TerrainData;
+                var terrainLayers =
+                    terrainData != null
+                        ? terrainData.terrainLayers
+                        : null;
+                var controlTextures =
+                    terrainData != null
+                        ? terrainData.alphamapTextures
+                        : null;
+
+                if (!CanAdapt(
+                        terrainLayers,
+                        controlTextures))
+                {
+                    RemoveGeneratedMaterial(
+                        key);
+                    continue;
+                }
+
+                var runtime =
+                    ResolveMaterialRuntime(
+                        key,
+                        sourceTile.Renderer,
+                        terrainData,
+                        templateMaterial);
+
+                if (runtime == null ||
+                    runtime.Material == null)
+                {
+                    continue;
+                }
+
+                ConfigureGeneratedMaterial(
+                    runtime.Material,
                     terrainData,
-                    templateMaterial,
-                    tileX,
-                    tileZ);
+                    terrainLayers,
+                    controlTextures,
+                    sourceTile.TileX,
+                    sourceTile.TileZ);
+                sourceTile.Renderer.sharedMaterial =
+                    runtime.Material;
+                adaptedCurvedTileCount++;
+
+                if (sourceTile.TileX ==
+                        primaryTileX &&
+                    sourceTile.TileZ ==
+                        primaryTileZ)
+                {
+                    ReportPrimaryRuntime(
+                        runtime,
+                        terrainData,
+                        terrainLayers,
+                        controlTextures,
+                        sourceTile.TileX,
+                        sourceTile.TileZ);
+                }
             }
 
-            if (generatedMaterial == null)
+            RemoveUndesiredMaterials();
+        }
+
+        private TileMaterialRuntime ResolveMaterialRuntime(
+            TileKey key,
+            MeshRenderer renderer,
+            TerrainData terrainData,
+            Material templateMaterial)
+        {
+            if (tileMaterials.TryGetValue(
+                    key,
+                    out var runtime) &&
+                runtime.Material != null &&
+                runtime.TerrainData ==
+                    terrainData &&
+                runtime.TemplateMaterial ==
+                    templateMaterial)
             {
-                return;
+                runtime.Renderer =
+                    renderer;
+                return
+                    runtime;
             }
 
-            ConfigureGeneratedMaterial(
-                terrainData,
-                terrainLayers,
-                controlTextures,
-                tileX,
-                tileZ);
-            curvedTile.CurvedTileRenderer.sharedMaterial =
-                generatedMaterial;
-            hasAdaptedMaterial = true;
+            RemoveGeneratedMaterial(
+                key);
+            runtime =
+                new TileMaterialRuntime
+                {
+                    Renderer =
+                        renderer,
+                    TerrainData =
+                        terrainData,
+                    TemplateMaterial =
+                        templateMaterial,
+                    UsesDefinitionMaterial =
+                        IsCompatibleTemplate(
+                            templateMaterial)
+                };
+
+            if (runtime.UsesDefinitionMaterial)
+            {
+                runtime.Material =
+                    new Material(
+                        templateMaterial);
+            }
+            else
+            {
+                var shader =
+                    Shader.Find(
+                        DefaultLayerShaderName);
+
+                if (shader == null)
+                {
+                    if (!missingShaderLogged)
+                    {
+                        Debug.LogError(
+                            $"Shader '{DefaultLayerShaderName}' was not found for the MapMagic terrain-layer material adapter.",
+                            this);
+                        missingShaderLogged =
+                            true;
+                    }
+
+                    return null;
+                }
+
+                runtime.Material =
+                    new Material(
+                        shader);
+            }
+
+            runtime.Material.name =
+                $"Curved MapMagic Terrain Layers {key.X},{key.Z}";
+            runtime.Material.hideFlags =
+                HideFlags.HideAndDontSave;
+            tileMaterials.Add(
+                key,
+                runtime);
+            missingShaderLogged =
+                false;
+            return
+                runtime;
         }
 
         private static bool CanAdapt(
@@ -182,66 +365,11 @@ namespace jcan.CelestialSystems
             }
 
             return
-                terrainLayers.Length == 1 ||
+                terrainLayers.Length ==
+                    1 ||
                 (controlTextures != null &&
                 controlTextures.Length > 0 &&
                 controlTextures[0] != null);
-        }
-
-        private void BuildGeneratedMaterial(
-            TerrainData terrainData,
-            Material templateMaterial,
-            int tileX,
-            int tileZ)
-        {
-            ReleaseGeneratedMaterial();
-            usesDefinitionMaterial =
-                IsCompatibleTemplate(
-                    templateMaterial);
-
-            if (usesDefinitionMaterial)
-            {
-                generatedMaterial =
-                    new Material(
-                        templateMaterial);
-            }
-            else
-            {
-                var shader =
-                    Shader.Find(
-                        DefaultLayerShaderName);
-
-                if (shader == null)
-                {
-                    if (!missingShaderLogged)
-                    {
-                        Debug.LogError(
-                            $"Shader '{DefaultLayerShaderName}' was not found for the MapMagic terrain-layer material adapter.",
-                            this);
-                        missingShaderLogged = true;
-                    }
-
-                    return;
-                }
-
-                generatedMaterial =
-                    new Material(
-                        shader);
-            }
-
-            generatedMaterial.name =
-                "Curved MapMagic Terrain Layers Material";
-            generatedMaterial.hideFlags =
-                HideFlags.HideAndDontSave;
-            builtTerrainData =
-                terrainData;
-            builtTemplateMaterial =
-                templateMaterial;
-            builtTileX =
-                tileX;
-            builtTileZ =
-                tileZ;
-            missingShaderLogged = false;
         }
 
         private static bool IsCompatibleTemplate(
@@ -257,16 +385,15 @@ namespace jcan.CelestialSystems
                     "_Splat0");
         }
 
-        private void ConfigureGeneratedMaterial(
+        private static void ConfigureGeneratedMaterial(
+            Material material,
             TerrainData terrainData,
             TerrainLayer[] terrainLayers,
             Texture2D[] controlTextures,
             int tileX,
             int tileZ)
         {
-            adaptedLayerCount =
-                terrainLayers.Length;
-            controlTexture =
+            var firstControlTexture =
                 controlTextures != null &&
                 controlTextures.Length > 0 &&
                 controlTextures[0] != null
@@ -274,21 +401,22 @@ namespace jcan.CelestialSystems
                     : Texture2D.whiteTexture;
 
             ApplyTexture(
-                generatedMaterial,
+                material,
                 "_Control",
-                controlTexture,
+                firstControlTexture,
                 Vector2.one,
                 Vector2.zero);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_LayerCount",
-                adaptedLayerCount);
+                terrainLayers.Length);
 
             for (var index = 0;
                 index < MaximumAdaptedLayerCount;
                 index++)
             {
                 ConfigureLayer(
+                    material,
                     terrainData,
                     index < terrainLayers.Length
                         ? terrainLayers[index]
@@ -297,29 +425,10 @@ namespace jcan.CelestialSystems
                     tileX,
                     tileZ);
             }
-
-            var firstLayer =
-                terrainLayers[0];
-            activeTerrainLayer =
-                firstLayer;
-            diffuseTexture =
-                firstLayer.diffuseTexture;
-            normalTexture =
-                firstLayer.normalMapTexture;
-            maskTexture =
-                firstLayer.maskMapTexture;
-            layerTileSizeMeters =
-                firstLayer.tileSize;
-            ResolveTextureTransform(
-                terrainData,
-                firstLayer,
-                tileX,
-                tileZ,
-                out materialTextureScale,
-                out materialTextureOffset);
         }
 
-        private void ConfigureLayer(
+        private static void ConfigureLayer(
+            Material material,
             TerrainData terrainData,
             TerrainLayer terrainLayer,
             int layerIndex,
@@ -332,29 +441,29 @@ namespace jcan.CelestialSystems
             if (terrainLayer == null)
             {
                 ApplyTexture(
-                    generatedMaterial,
+                    material,
                     "_Splat" + suffix,
                     Texture2D.whiteTexture,
                     Vector2.one,
                     Vector2.zero);
                 ApplyTexture(
-                    generatedMaterial,
+                    material,
                     "_Normal" + suffix,
                     null,
                     Vector2.one,
                     Vector2.zero);
                 ApplyTexture(
-                    generatedMaterial,
+                    material,
                     "_Mask" + suffix,
                     null,
                     Vector2.one,
                     Vector2.zero);
                 SetFloatIfPresent(
-                    generatedMaterial,
+                    material,
                     "_HasNormal" + suffix,
                     0.0f);
                 SetFloatIfPresent(
-                    generatedMaterial,
+                    material,
                     "_HasMask" + suffix,
                     0.0f);
                 return;
@@ -377,47 +486,96 @@ namespace jcan.CelestialSystems
                 terrainLayer.maskMapTexture;
 
             ApplyTexture(
-                generatedMaterial,
+                material,
                 "_Splat" + suffix,
                 layerDiffuse,
                 textureScale,
                 textureOffset);
             ApplyTexture(
-                generatedMaterial,
+                material,
                 "_Normal" + suffix,
                 layerNormal,
                 textureScale,
                 textureOffset);
             ApplyTexture(
-                generatedMaterial,
+                material,
                 "_Mask" + suffix,
                 layerMask,
                 textureScale,
                 textureOffset);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_HasNormal" + suffix,
                 layerNormal != null
                     ? 1.0f
                     : 0.0f);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_HasMask" + suffix,
                 layerMask != null
                     ? 1.0f
                     : 0.0f);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_NormalScale" + suffix,
                 terrainLayer.normalScale);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_Metallic" + suffix,
                 terrainLayer.metallic);
             SetFloatIfPresent(
-                generatedMaterial,
+                material,
                 "_Smoothness" + suffix,
                 terrainLayer.smoothness);
+        }
+
+        private void ReportPrimaryRuntime(
+            TileMaterialRuntime runtime,
+            TerrainData terrainData,
+            TerrainLayer[] terrainLayers,
+            Texture2D[] controlTextures,
+            int tileX,
+            int tileZ)
+        {
+            var firstLayer =
+                terrainLayers[0];
+            hasAdaptedMaterial =
+                true;
+            terrainLayerCount =
+                terrainLayers.Length;
+            adaptedLayerCount =
+                terrainLayers.Length;
+            controlTextureCount =
+                controlTextures != null
+                    ? controlTextures.Length
+                    : 0;
+            controlTexture =
+                controlTextures != null &&
+                controlTextures.Length > 0 &&
+                controlTextures[0] != null
+                    ? controlTextures[0]
+                    : Texture2D.whiteTexture;
+            activeTerrainLayer =
+                firstLayer;
+            diffuseTexture =
+                firstLayer.diffuseTexture;
+            normalTexture =
+                firstLayer.normalMapTexture;
+            maskTexture =
+                firstLayer.maskMapTexture;
+            layerTileSizeMeters =
+                firstLayer.tileSize;
+            ResolveTextureTransform(
+                terrainData,
+                firstLayer,
+                tileX,
+                tileZ,
+                out materialTextureScale,
+                out materialTextureOffset);
+            usesDefinitionMaterial =
+                runtime.UsesDefinitionMaterial;
+            generatedMaterial =
+                runtime.Material;
         }
 
         private static void ResolveTextureTransform(
@@ -492,78 +650,136 @@ namespace jcan.CelestialSystems
             }
         }
 
-        private void ReleaseGeneratedMaterial()
+        private void RemoveUndesiredMaterials()
         {
-            if (generatedMaterial == null)
+            removalBuffer.Clear();
+
+            foreach (var entry in
+                tileMaterials)
             {
-                usesDefinitionMaterial = false;
+                if (!desiredMaterialTiles.Contains(
+                        entry.Key))
+                {
+                    removalBuffer.Add(
+                        entry.Key);
+                }
+            }
+
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
+            {
+                RemoveGeneratedMaterial(
+                    removalBuffer[index]);
+            }
+        }
+
+        private void RemoveGeneratedMaterial(
+            TileKey key)
+        {
+            if (!tileMaterials.TryGetValue(
+                    key,
+                    out var runtime))
+            {
                 return;
             }
 
-            var renderer =
-                curvedTile != null
-                    ? curvedTile.CurvedTileRenderer
-                    : null;
-
-            if (renderer != null &&
-                renderer.sharedMaterial ==
-                    generatedMaterial)
+            if (runtime.Material != null)
             {
-                renderer.sharedMaterial =
-                    curvedTile.ResolvedMeshMaterial;
+                DestroyUnityObject(
+                    runtime.Material);
             }
 
-            DestroyUnityObject(
-                generatedMaterial);
-            generatedMaterial = null;
-            builtTerrainData = null;
-            builtTemplateMaterial = null;
-            builtTileX = default;
-            builtTileZ = default;
-            hasAdaptedMaterial = false;
-            usesDefinitionMaterial = false;
+            tileMaterials.Remove(
+                key);
+        }
+
+        private void ReleaseAllGeneratedMaterials()
+        {
+            removalBuffer.Clear();
+
+            foreach (var key in
+                tileMaterials.Keys)
+            {
+                removalBuffer.Add(
+                    key);
+            }
+
+            for (var index = 0;
+                index < removalBuffer.Count;
+                index++)
+            {
+                RemoveGeneratedMaterial(
+                    removalBuffer[index]);
+            }
+
+            desiredMaterialTiles.Clear();
+            sourceTiles.Clear();
         }
 
         private void ClearRuntimeState()
         {
-            terrainLayerCount = default;
-            controlTextureCount = default;
-            ClearLayerRuntimeState();
+            sourceCurvedTileCount =
+                default;
+            adaptedCurvedTileCount =
+                default;
+            ClearPrimaryRuntimeState();
         }
 
-        private void ClearLayerRuntimeState()
+        private void ClearPrimaryRuntimeState()
         {
-            adaptedLayerCount = default;
-            controlTexture = null;
-            activeTerrainLayer = null;
-            diffuseTexture = null;
-            normalTexture = null;
-            maskTexture = null;
-            layerTileSizeMeters = default;
-            materialTextureScale = default;
-            materialTextureOffset = default;
-            hasAdaptedMaterial = false;
+            hasAdaptedMaterial =
+                false;
+            terrainLayerCount =
+                default;
+            adaptedLayerCount =
+                default;
+            controlTextureCount =
+                default;
+            controlTexture =
+                null;
+            activeTerrainLayer =
+                null;
+            diffuseTexture =
+                null;
+            normalTexture =
+                null;
+            maskTexture =
+                null;
+            layerTileSizeMeters =
+                default;
+            materialTextureScale =
+                default;
+            materialTextureOffset =
+                default;
+            usesDefinitionMaterial =
+                false;
+            generatedMaterial =
+                null;
         }
 
         private void OnDisable()
         {
-            ReleaseGeneratedMaterial();
+            ReleaseAllGeneratedMaterials();
             ClearRuntimeState();
         }
 
         private void OnDestroy()
         {
-            ReleaseGeneratedMaterial();
+            ReleaseAllGeneratedMaterials();
         }
 
         private static float SafeTileSize(
             float value)
         {
             return
-                IsFinite(value) &&
-                Mathf.Abs(value) >
+                IsFinite(
+                    value) &&
+                Mathf.Abs(
+                    value) >
                     Mathf.Epsilon
-                    ? Mathf.Abs(value)
+                    ? Mathf.Abs(
+                        value)
                     : 1.0f;
         }
 
@@ -581,8 +797,10 @@ namespace jcan.CelestialSystems
             float value)
         {
             return
-                !float.IsNaN(value) &&
-                !float.IsInfinity(value);
+                !float.IsNaN(
+                    value) &&
+                !float.IsInfinity(
+                    value);
         }
 
         private static void DestroyUnityObject(
@@ -595,11 +813,13 @@ namespace jcan.CelestialSystems
 
             if (Application.isPlaying)
             {
-                Destroy(value);
+                Destroy(
+                    value);
             }
             else
             {
-                DestroyImmediate(value);
+                DestroyImmediate(
+                    value);
             }
         }
     }
