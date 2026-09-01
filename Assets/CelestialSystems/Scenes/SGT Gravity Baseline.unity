@@ -2604,6 +2604,7 @@ MonoBehaviour:
   meshMaterial: {fileID: 0}
   fallbackMeshColor: {r: 0.35, g: 0.55, b: 0.25, a: 1}
   hideSourceTerrain: 1
+  generateMeshCollider: 1
   hasCurvedTile: 0
   activeFace: 0
   effectiveMeshRadiusMeters: 0
@@ -2611,6 +2612,7 @@ MonoBehaviour:
   sourceTileZ: 0
   vertexCount: 0
   triangleCount: 0
+  hasMeshCollider: 0
 --- !u!1 &1557184261
 GameObject:
   m_ObjectHideFlags: 0
@@ -3088,9 +3090,9 @@ GameObject:
   - component: {fileID: 1844408963}
   - component: {fileID: 1844408964}
   - component: {fileID: 1844408966}
-  - component: {fileID: 1844408965}
   - component: {fileID: 1844408967}
   - component: {fileID: 1844408968}
+  - component: {fileID: 1844408965}
   m_Layer: 0
   m_Name: Planet Surface Frame
   m_TagString: Untagged
