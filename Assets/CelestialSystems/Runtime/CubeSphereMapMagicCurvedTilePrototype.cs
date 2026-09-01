@@ -712,14 +712,7 @@ namespace jcan.CelestialSystems
             }
 
             var shader =
-                Shader.Find(
-                    "Universal Render Pipeline/Unlit") ??
-                Shader.Find(
-                    "HDRP/Unlit") ??
-                Shader.Find(
-                    "Unlit/Color") ??
-                Shader.Find(
-                    "Standard");
+                ResolveFallbackShader();
 
             if (shader == null)
             {
@@ -749,6 +742,50 @@ namespace jcan.CelestialSystems
             missingShaderLogged = false;
             return
                 runtimeFallbackMaterial;
+        }
+
+        private static Shader ResolveFallbackShader()
+        {
+            var renderPipeline =
+                GraphicsSettings.currentRenderPipeline;
+
+            if (renderPipeline == null)
+            {
+                return
+                    Shader.Find(
+                        "Unlit/Color") ??
+                    Shader.Find(
+                        "Standard");
+            }
+
+            var pipelineName =
+                renderPipeline.GetType().Name;
+
+            if (pipelineName.IndexOf(
+                    "Universal",
+                    StringComparison.OrdinalIgnoreCase) >=
+                0)
+            {
+                return
+                    Shader.Find(
+                        "Universal Render Pipeline/Unlit");
+            }
+
+            if (pipelineName.IndexOf(
+                    "HDRender",
+                    StringComparison.OrdinalIgnoreCase) >=
+                    0 ||
+                pipelineName.IndexOf(
+                    "HighDefinition",
+                    StringComparison.OrdinalIgnoreCase) >=
+                    0)
+            {
+                return
+                    Shader.Find(
+                        "HDRP/Unlit");
+            }
+
+            return null;
         }
 
         private static void SetMaterialColor(
