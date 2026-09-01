@@ -70,44 +70,81 @@ namespace jcan.CelestialSystems
         public CubeSphereFaceProximity AnchorFaceProximity =>
             anchorFaceProximity;
 
+        public bool TrySetBodyContext(
+            CelestialBodyRuntimeContext newBodyContext)
+        {
+            if (newBodyContext == null)
+            {
+                ClearBodyContext();
+                return true;
+            }
+
+            var definition =
+                newBodyContext.Definition;
+
+            if (definition == null)
+            {
+                Debug.LogError(
+                    "A round-body surface session requires a body context with a definition.",
+                    newBodyContext);
+                return false;
+            }
+
+            if (definition.ResolvedSurfaceSystem !=
+                CelestialSurfaceSystem.RoundMapMagic)
+            {
+                Debug.LogError(
+                    "A round-body surface session can only bind a body definition resolved to Round MapMagic.",
+                    newBodyContext);
+                return false;
+            }
+
+            if (!definition.HasValidPhysicalSettings ||
+                !definition.HasValidResolvedSurfaceSettings ||
+                newBodyContext.UniverseFrame == null ||
+                newBodyContext.GravityBody == null)
+            {
+                Debug.LogError(
+                    "A round-body surface session requires a fully initialized body context with valid definition settings.",
+                    newBodyContext);
+                return false;
+            }
+
+            bodyContext =
+                newBodyContext;
+            previousTangentForwardSet = false;
+
+            ResolveBodyConfiguration(
+                out _,
+                out _);
+            return true;
+        }
+
+        public void ClearBodyContext()
+        {
+            bodyContext = null;
+            ClearResolvedBodyConfiguration();
+        }
+
         private void Start()
         {
             gravityEngine =
                 GravityEngine.Instance();
 
-            if (bodyContext == null)
+            if (bodyContext != null)
             {
-                Debug.LogError(
-                    "The round-body surface frame requires a celestial body runtime context.",
-                    this);
-                return;
+                TrySetBodyContext(
+                    bodyContext);
             }
-
-            if (bodyContext.Definition == null)
+            else
             {
-                Debug.LogError(
-                    "The round-body surface frame requires a body context with a definition.",
-                    this);
-                return;
+                ClearResolvedBodyConfiguration();
             }
-
-            if (bodyContext.ResolvedSurfaceSystem !=
-                CelestialSurfaceSystem.RoundMapMagic)
-            {
-                Debug.LogError(
-                    "The round-body surface frame requires a body definition resolved to Round MapMagic.",
-                    this);
-            }
-
-            ResolveBodyConfiguration(
-                out _,
-                out _);
         }
 
         private void LateUpdate()
         {
-            hasAnchorAddress = false;
-            anchorFaceProximity = default;
+            ClearAnchorRuntimeState();
 
             if (!ResolveBodyConfiguration(
                     out var universeFrame,
@@ -258,6 +295,25 @@ namespace jcan.CelestialSystems
                 transform.up *
                     (float)planetRadiusMeters;
             return true;
+        }
+
+        private void ClearResolvedBodyConfiguration()
+        {
+            planetRadiusMeters = default;
+            planetNorthAxis =
+                Vector3.up;
+            poleReferenceAxis =
+                Vector3.forward;
+            previousTangentForwardSet = false;
+            ClearAnchorRuntimeState();
+        }
+
+        private void ClearAnchorRuntimeState()
+        {
+            anchorAltitudeMeters = default;
+            hasAnchorAddress = false;
+            anchorAddress = default;
+            anchorFaceProximity = default;
         }
 
         private bool ResolveBodyConfiguration(
