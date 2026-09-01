@@ -37,6 +37,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CubeSphereAddress anchorAddress;
 
+        [SerializeField]
+        private CubeSphereFaceProximity anchorFaceProximity;
+
         [Header("Gizmos")]
         [SerializeField]
         private GizmoDrawMode gizmoDrawMode;
@@ -56,6 +59,9 @@ namespace jcan.CelestialSystems
 
         public CubeSphereAddress AnchorAddress =>
             anchorAddress;
+
+        public CubeSphereFaceProximity AnchorFaceProximity =>
+            anchorFaceProximity;
 
         private void Start()
         {
@@ -86,6 +92,7 @@ namespace jcan.CelestialSystems
         private void LateUpdate()
         {
             hasAnchorAddress = false;
+            anchorFaceProximity = default;
 
             if (universeFrame == null ||
                 planetBody == null ||
@@ -160,6 +167,14 @@ namespace jcan.CelestialSystems
                         radialZ),
                     anchorAltitudeMeters,
                     out anchorAddress);
+
+            if (hasAnchorAddress)
+            {
+                anchorFaceProximity =
+                    CubeSphereMapping.GetFaceProximity(
+                        anchorAddress,
+                        planetRadiusMeters);
+            }
 
             transform.SetPositionAndRotation(
                 surfacePosition,
