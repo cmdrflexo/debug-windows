@@ -132,6 +132,12 @@ namespace jcan.CelestialSystems
         private int expectedSampleCount;
 
         [SerializeField]
+        private int readyVisibleSampleCount;
+
+        [SerializeField]
+        private int expectedPrefetchSampleCount;
+
+        [SerializeField]
         private int cachedSampleCount;
 
         [SerializeField]
@@ -151,6 +157,12 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int resolvedStreamedTileRadius;
+
+        [SerializeField]
+        private double resolvedVisibleCoverageRadiusMeters;
+
+        [SerializeField]
+        private double resolvedPrefetchCoverageRadiusMeters;
 
         [SerializeField]
         private CubeSphereFace sampleFace;
@@ -211,6 +223,9 @@ namespace jcan.CelestialSystems
         private readonly HashSet<SampleKey>
             desiredKeys =
                 new HashSet<SampleKey>();
+        private readonly HashSet<SampleKey>
+            visibleKeys =
+                new HashSet<SampleKey>();
         private readonly List<SampleKey>
             generationQueue =
                 new List<SampleKey>();
@@ -229,6 +244,7 @@ namespace jcan.CelestialSystems
         private int desiredResolution;
         private double desiredTileSizeX;
         private double desiredTileSizeZ;
+        private double desiredVisibleCoverageRadiusMeters;
         private double desiredCoverageRadiusMeters;
         private double desiredPatchCenterWorldX;
         private double desiredPatchCenterWorldZ;
@@ -259,7 +275,7 @@ namespace jcan.CelestialSystems
 
         public bool HasCompleteCoverage =>
             expectedSampleCount > 0 &&
-            samples.Count ==
+            readyVisibleSampleCount ==
                 expectedSampleCount;
 
         public CelestialBodyRuntimeContext TrackedBodyContext =>
@@ -393,14 +409,27 @@ namespace jcan.CelestialSystems
             var nextTileSizeZ =
                 mapMagicObject.tileSize.z *
                 tileSizeMultiplier;
-            var requestedCoverageRadiusMeters =
+            var requestedVisibleCoverageRadiusMeters =
                 sampleStream ==
                     RoundMapMagicVirtualSampleStream.Local
                     ? qualityProfile.LocalCoverageRadiusMeters
                     : qualityProfile.MidCoverageRadiusMeters;
-            var nextCoverageRadiusMeters =
+            var prefetchMarginMeters =
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local
+                    ? qualityProfile.LocalPrefetchMarginMeters
+                    : qualityProfile.MidPrefetchMarginMeters;
+            var requestedPrefetchCoverageRadiusMeters =
+                requestedVisibleCoverageRadiusMeters +
+                prefetchMarginMeters;
+            var nextVisibleCoverageRadiusMeters =
                 ResolveSampleCenterCoverageRadius(
-                    requestedCoverageRadiusMeters,
+                    requestedVisibleCoverageRadiusMeters,
+                    nextTileSizeX,
+                    nextTileSizeZ);
+            var nextPrefetchCoverageRadiusMeters =
+                ResolveSampleCenterCoverageRadius(
+                    requestedPrefetchCoverageRadiusMeters,
                     nextTileSizeX,
                     nextTileSizeZ);
             var nextPatchCenterWorldX =
@@ -418,7 +447,7 @@ namespace jcan.CelestialSystems
                         : mapMagicObject.draftMargins);
             var nextRadius =
                 ResolveStreamedTileRadius(
-                    nextCoverageRadiusMeters,
+                    nextPrefetchCoverageRadiusMeters,
                     nextTileSizeX,
                     nextTileSizeZ);
 
@@ -429,7 +458,8 @@ namespace jcan.CelestialSystems
                     nextResolution,
                     nextTileSizeX,
                     nextTileSizeZ,
-                    nextCoverageRadiusMeters,
+                    nextVisibleCoverageRadiusMeters,
+                    nextPrefetchCoverageRadiusMeters,
                     nextPatchCenterWorldX,
                     nextPatchCenterWorldZ,
                     nextMargins))
@@ -441,7 +471,8 @@ namespace jcan.CelestialSystems
                     nextResolution,
                     nextTileSizeX,
                     nextTileSizeZ,
-                    nextCoverageRadiusMeters,
+                    nextVisibleCoverageRadiusMeters,
+                    nextPrefetchCoverageRadiusMeters,
                     nextPatchCenterWorldX,
                     nextPatchCenterWorldZ,
                     nextMargins);
@@ -463,6 +494,10 @@ namespace jcan.CelestialSystems
                 nextResolution;
             resolvedStreamedTileRadius =
                 nextRadius;
+            resolvedVisibleCoverageRadiusMeters =
+                requestedVisibleCoverageRadiusMeters;
+            resolvedPrefetchCoverageRadiusMeters =
+                requestedPrefetchCoverageRadiusMeters;
 
             RefreshSampleDiagnostics();
             StartNextGeneration(
@@ -618,6 +653,29 @@ namespace jcan.CelestialSystems
             }
         }
 
+        public void CopyVisibleSamplesTo(
+            List<RoundMapMagicVirtualHeightSample> destination)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(destination));
+            }
+
+            destination.Clear();
+
+            foreach (var key in
+                visibleKeys)
+            {
+                if (samples.TryGetValue(
+                        key,
+                        out var sample))
+                {
+                    destination.Add(sample);
+                }
+            }
+        }
+
         public bool TryGetCurrentSample(
             CubeSphereFace face,
             int tileX,
@@ -641,6 +699,7 @@ namespace jcan.CelestialSystems
             int nextResolution,
             double nextTileSizeX,
             double nextTileSizeZ,
+            double nextVisibleCoverageRadiusMeters,
             double nextCoverageRadiusMeters,
             double nextPatchCenterWorldX,
             double nextPatchCenterWorldZ,
@@ -654,6 +713,8 @@ namespace jcan.CelestialSystems
                 desiredResolution != nextResolution ||
                 desiredTileSizeX != nextTileSizeX ||
                 desiredTileSizeZ != nextTileSizeZ ||
+                desiredVisibleCoverageRadiusMeters !=
+                    nextVisibleCoverageRadiusMeters ||
                 desiredCoverageRadiusMeters !=
                     nextCoverageRadiusMeters ||
                 desiredPatchCenterWorldX !=
@@ -670,6 +731,7 @@ namespace jcan.CelestialSystems
             int nextResolution,
             double nextTileSizeX,
             double nextTileSizeZ,
+            double nextVisibleCoverageRadiusMeters,
             double nextCoverageRadiusMeters,
             double nextPatchCenterWorldX,
             double nextPatchCenterWorldZ,
@@ -705,6 +767,8 @@ namespace jcan.CelestialSystems
                 nextTileSizeX;
             desiredTileSizeZ =
                 nextTileSizeZ;
+            desiredVisibleCoverageRadiusMeters =
+                nextVisibleCoverageRadiusMeters;
             desiredCoverageRadiusMeters =
                 nextCoverageRadiusMeters;
             desiredPatchCenterWorldX =
@@ -714,6 +778,7 @@ namespace jcan.CelestialSystems
             desiredMargins =
                 nextMargins;
             desiredKeys.Clear();
+            visibleKeys.Clear();
             generationQueue.Clear();
 
             for (var offsetZ = -nextRadius;
@@ -746,6 +811,17 @@ namespace jcan.CelestialSystems
                             nextCoverageRadiusMeters))
                     {
                         desiredKeys.Add(key);
+
+                        if (IsSampleCenterWithinCoverage(
+                                key,
+                                nextTileSizeX,
+                                nextTileSizeZ,
+                                nextPatchCenterWorldX,
+                                nextPatchCenterWorldZ,
+                                nextVisibleCoverageRadiusMeters))
+                        {
+                            visibleKeys.Add(key);
+                        }
                     }
                 }
             }
@@ -782,7 +858,11 @@ namespace jcan.CelestialSystems
                 nextCenterKey,
                 nextRadius);
             expectedSampleCount =
+                visibleKeys.Count;
+            expectedPrefetchSampleCount =
                 desiredKeys.Count;
+            readyVisibleSampleCount =
+                CountReadyVisibleSamples();
             cachedSampleCount =
                 samples.Count;
             queuedSampleCount =
@@ -897,6 +977,7 @@ namespace jcan.CelestialSystems
             var viewCamera =
                 resolvedView.GetComponent<Camera>();
             var bestIndex = 0;
+            var bestCoverageBand = int.MaxValue;
             var bestBand = int.MaxValue;
             var bestDistanceSquared =
                 float.PositiveInfinity;
@@ -919,6 +1000,11 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
+                var coverageBand =
+                    visibleKeys.Contains(key)
+                        ? 0
+                        : 1;
+
                 var viewBand =
                     ResolveViewBand(
                         resolvedView,
@@ -927,10 +1013,18 @@ namespace jcan.CelestialSystems
                         out var distanceSquared,
                         out var alignment);
 
-                if (viewBand > bestBand ||
+                if (coverageBand >
+                        bestCoverageBand ||
+                    coverageBand ==
+                        bestCoverageBand &&
+                    viewBand > bestBand ||
+                    coverageBand ==
+                        bestCoverageBand &&
                     viewBand == bestBand &&
                     distanceSquared >
                         bestDistanceSquared ||
+                    coverageBand ==
+                        bestCoverageBand &&
                     viewBand == bestBand &&
                     distanceSquared ==
                         bestDistanceSquared &&
@@ -940,6 +1034,8 @@ namespace jcan.CelestialSystems
                 }
 
                 bestIndex = index;
+                bestCoverageBand =
+                    coverageBand;
                 bestBand = viewBand;
                 bestDistanceSquared =
                     distanceSquared;
@@ -1423,6 +1519,8 @@ namespace jcan.CelestialSystems
 
         private void RefreshSampleDiagnostics()
         {
+            readyVisibleSampleCount =
+                CountReadyVisibleSamples();
             cachedSampleCount =
                 samples.Count;
             queuedSampleCount =
@@ -1481,6 +1579,22 @@ namespace jcan.CelestialSystems
                     : 0;
         }
 
+        private int CountReadyVisibleSamples()
+        {
+            var count = 0;
+
+            foreach (var key in
+                visibleKeys)
+            {
+                if (samples.ContainsKey(key))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         private void ClearStreamingState()
         {
             if (hasCenterKey ||
@@ -1502,18 +1616,24 @@ namespace jcan.CelestialSystems
             desiredResolution = default;
             desiredTileSizeX = default;
             desiredTileSizeZ = default;
+            desiredVisibleCoverageRadiusMeters = default;
             desiredCoverageRadiusMeters = default;
             desiredPatchCenterWorldX = default;
             desiredPatchCenterWorldZ = default;
             desiredMargins = default;
             desiredKeys.Clear();
+            visibleKeys.Clear();
             generationQueue.Clear();
             samples.Clear();
             currentSample = null;
             expectedSampleCount = default;
+            readyVisibleSampleCount = default;
+            expectedPrefetchSampleCount = default;
             cachedSampleCount = default;
             queuedSampleCount = default;
             resolvedStreamedTileRadius = default;
+            resolvedVisibleCoverageRadiusMeters = default;
+            resolvedPrefetchCoverageRadiusMeters = default;
             hasGenerationView = false;
             lastSelectedViewBand = default;
             hasSample = false;
