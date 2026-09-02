@@ -195,6 +195,16 @@ namespace jcan.CelestialSystems
         public bool MidStreamingActive =>
             midStreamingActive;
 
+        public bool HasCompleteCoverage =>
+            expectedSampleCount > 0 &&
+            samples.Count ==
+                expectedSampleCount;
+
+        public CelestialBodyRuntimeContext TrackedBodyContext =>
+            surfaceFrame != null
+                ? surfaceFrame.BodyContext
+                : null;
+
         private void Reset()
         {
             ResolveLocalReferences();

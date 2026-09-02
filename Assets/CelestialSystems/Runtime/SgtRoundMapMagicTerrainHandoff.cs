@@ -1,5 +1,5 @@
 /*
- * Switches one body's SGT terrain-height modifiers between distant and near-surface settings when it owns the shared Round MapMagic session.
+ * Switches one body's SGT terrain-height modifiers between distant and near-surface settings when local or mid-detail custom terrain is ready.
  */
 
 using System;
@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
-    [DefaultExecutionOrder(-60)]
+    [DefaultExecutionOrder(350)]
     [DisallowMultipleComponent]
     public sealed class SgtRoundMapMagicTerrainHandoff :
         MonoBehaviour
@@ -57,6 +57,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicSurfaceSession surfaceSession;
 
+        [SerializeField]
+        private RoundMapMagicVirtualHeightSampler midHeightSampler;
+
         [Header("SGT Heightmap")]
         [SerializeField]
         private SgtTerrainHeightmap heightmap;
@@ -75,6 +78,12 @@ namespace jcan.CelestialSystems
 
         [Header("Runtime")]
         [SerializeField]
+        private bool localSurfaceReady;
+
+        [SerializeField]
+        private bool midSurfaceReady;
+
+        [SerializeField]
         private bool nearSurfaceMode;
 
         [SerializeField]
@@ -87,6 +96,7 @@ namespace jcan.CelestialSystems
 
         private void Start()
         {
+            ResolveMidHeightSampler();
             configurationIsValid =
                 ValidateConfiguration(
                     true);
@@ -128,6 +138,17 @@ namespace jcan.CelestialSystems
                 surfaceSession.HasActiveSession &&
                 surfaceSession.ActiveBodyContext ==
                     bodyContext;
+            localSurfaceReady =
+                shouldUseNearSurfaceMode;
+            midSurfaceReady =
+                midHeightSampler != null &&
+                midHeightSampler.MidStreamingActive &&
+                midHeightSampler.HasCompleteCoverage &&
+                midHeightSampler.TrackedBodyContext ==
+                    bodyContext;
+            shouldUseNearSurfaceMode =
+                localSurfaceReady ||
+                midSurfaceReady;
 
             if (!hasAppliedMode ||
                 nearSurfaceMode !=
@@ -208,6 +229,18 @@ namespace jcan.CelestialSystems
                 }
             }
 
+            if (midHeightSampler == null)
+            {
+                valid = false;
+
+                if (logErrors)
+                {
+                    Debug.LogError(
+                        "The SGT terrain handoff requires the shared virtual mid-height sampler.",
+                        this);
+                }
+            }
+
             if (!IsFinite(
                     farHeightmapDisplacementMeters) ||
                 !IsFinite(
@@ -256,6 +289,16 @@ namespace jcan.CelestialSystems
             }
 
             return valid;
+        }
+
+        private void ResolveMidHeightSampler()
+        {
+            if (midHeightSampler == null &&
+                surfaceSession != null)
+            {
+                midHeightSampler =
+                    surfaceSession.GetComponent<RoundMapMagicVirtualHeightSampler>();
+            }
         }
 
         private static bool IsFinite(
