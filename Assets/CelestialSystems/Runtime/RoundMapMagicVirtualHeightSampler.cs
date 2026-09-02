@@ -80,6 +80,21 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool generateAutomatically = true;
 
+        [Header("Generation Priority")]
+        [SerializeField]
+        private Transform generationView;
+
+        [SerializeField]
+        private bool prioritizeVisibleTiles = true;
+
+        [SerializeField]
+        [Range(0.0f, 0.5f)]
+        private float viewOverscan = 0.1f;
+
+        [SerializeField]
+        [Range(2, 32)]
+        private int offscreenCatchUpInterval = 8;
+
         [Header("Runtime Request")]
         [SerializeField]
         private bool midStreamingActive;
@@ -107,6 +122,18 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int queuedSampleCount;
+
+        [SerializeField]
+        private bool hasGenerationView;
+
+        [SerializeField]
+        private int viewPrioritizedRequestCount;
+
+        [SerializeField]
+        private int catchUpRequestCount;
+
+        [SerializeField]
+        private int lastSelectedViewBand;
 
         [SerializeField]
         private int resolvedStreamedTileRadius;
@@ -160,9 +187,9 @@ namespace jcan.CelestialSystems
         private readonly HashSet<SampleKey>
             desiredKeys =
                 new HashSet<SampleKey>();
-        private readonly Queue<SampleKey>
+        private readonly List<SampleKey>
             generationQueue =
-                new Queue<SampleKey>();
+                new List<SampleKey>();
         private readonly List<SampleKey>
             removalBuffer =
                 new List<SampleKey>();
@@ -711,7 +738,7 @@ namespace jcan.CelestialSystems
                         if (desiredKeys.Contains(key) &&
                             !samples.ContainsKey(key))
                         {
-                            generationQueue.Enqueue(key);
+                            generationQueue.Add(key);
                         }
                     }
                 }
@@ -746,6 +773,231 @@ namespace jcan.CelestialSystems
                     coverageRadiusMeters;
         }
 
+        private int ResolveNextGenerationIndex()
+        {
+            lastSelectedViewBand = default;
+
+            if (!prioritizeVisibleTiles ||
+                generationQueue.Count <= 1)
+            {
+                hasGenerationView = false;
+                return 0;
+            }
+
+            var resolvedView =
+                ResolveGenerationView();
+            hasGenerationView =
+                resolvedView != null;
+
+            if (resolvedView == null)
+            {
+                return 0;
+            }
+
+            var catchUpInterval =
+                Mathf.Max(
+                    2,
+                    offscreenCatchUpInterval);
+
+            if (generationRequestCount > 0 &&
+                generationRequestCount %
+                    catchUpInterval ==
+                    0)
+            {
+                catchUpRequestCount++;
+                lastSelectedViewBand = -1;
+                return 0;
+            }
+
+            var viewCamera =
+                resolvedView.GetComponent<Camera>();
+            var bestIndex = 0;
+            var bestBand = int.MaxValue;
+            var bestDistanceSquared =
+                float.PositiveInfinity;
+            var bestAlignment =
+                float.NegativeInfinity;
+
+            for (var index = 0;
+                index < generationQueue.Count;
+                index++)
+            {
+                var key =
+                    generationQueue[index];
+
+                if (!desiredKeys.Contains(key) ||
+                    samples.ContainsKey(key) ||
+                    !TryGetSampleCenterScenePosition(
+                        key,
+                        out var tileCenterScenePosition))
+                {
+                    continue;
+                }
+
+                var viewBand =
+                    ResolveViewBand(
+                        resolvedView,
+                        viewCamera,
+                        tileCenterScenePosition,
+                        out var distanceSquared,
+                        out var alignment);
+
+                if (viewBand > bestBand ||
+                    viewBand == bestBand &&
+                    distanceSquared >
+                        bestDistanceSquared ||
+                    viewBand == bestBand &&
+                    distanceSquared ==
+                        bestDistanceSquared &&
+                    alignment <= bestAlignment)
+                {
+                    continue;
+                }
+
+                bestIndex = index;
+                bestBand = viewBand;
+                bestDistanceSquared =
+                    distanceSquared;
+                bestAlignment =
+                    alignment;
+            }
+
+            lastSelectedViewBand =
+                bestBand != int.MaxValue
+                    ? bestBand
+                    : default;
+
+            if (bestBand == 0)
+            {
+                viewPrioritizedRequestCount++;
+            }
+
+            return bestIndex;
+        }
+
+        private Transform ResolveGenerationView()
+        {
+            if (generationView != null &&
+                generationView.gameObject.activeInHierarchy)
+            {
+                return generationView;
+            }
+
+            var mainCamera =
+                Camera.main;
+
+            return
+                mainCamera != null
+                    ? mainCamera.transform
+                    : null;
+        }
+
+        private int ResolveViewBand(
+            Transform resolvedView,
+            Camera viewCamera,
+            Vector3 tileCenterScenePosition,
+            out float distanceSquared,
+            out float alignment)
+        {
+            var offset =
+                tileCenterScenePosition -
+                resolvedView.position;
+            distanceSquared =
+                offset.sqrMagnitude;
+
+            if (distanceSquared <=
+                Mathf.Epsilon)
+            {
+                alignment = 1.0f;
+                return 0;
+            }
+
+            alignment =
+                Vector3.Dot(
+                    resolvedView.forward,
+                    offset /
+                        Mathf.Sqrt(
+                            distanceSquared));
+
+            if (viewCamera != null)
+            {
+                var viewportPosition =
+                    viewCamera.WorldToViewportPoint(
+                        tileCenterScenePosition);
+                var overscan =
+                    Mathf.Clamp(
+                        viewOverscan,
+                        0.0f,
+                        0.5f);
+
+                if (viewportPosition.z > 0.0f &&
+                    viewportPosition.x >= -overscan &&
+                    viewportPosition.x <=
+                        1.0f + overscan &&
+                    viewportPosition.y >= -overscan &&
+                    viewportPosition.y <=
+                        1.0f + overscan)
+                {
+                    return 0;
+                }
+            }
+            else if (alignment >= 0.5f)
+            {
+                return 0;
+            }
+
+            return
+                alignment > 0.0f
+                    ? 1
+                    : 2;
+        }
+
+        private bool TryGetSampleCenterScenePosition(
+            SampleKey key,
+            out Vector3 scenePosition)
+        {
+            if (surfaceFrame == null ||
+                desiredTileSizeX <= 0.0 ||
+                desiredTileSizeZ <= 0.0 ||
+                !surfaceFrame.TryGetPlanetCenterScenePosition(
+                    out var planetCenterScenePosition))
+            {
+                scenePosition = default;
+                return false;
+            }
+
+            var planetRadiusMeters =
+                surfaceFrame.PlanetRadiusMeters;
+            var tileCenterUMeters =
+                (key.TileX + 0.5) *
+                desiredTileSizeX;
+            var tileCenterVMeters =
+                -((key.TileZ + 0.5) *
+                desiredTileSizeZ);
+            var tileCenterAddress =
+                new CubeSphereAddress(
+                    key.Face,
+                    CubeSphereMapping.MetersToFaceCoordinate(
+                        tileCenterUMeters,
+                        planetRadiusMeters),
+                    CubeSphereMapping.MetersToFaceCoordinate(
+                        tileCenterVMeters,
+                        planetRadiusMeters),
+                    0.0);
+            var tileCenterDirection =
+                CubeSphereMapping.AddressToDirection(
+                    tileCenterAddress);
+
+            scenePosition =
+                planetCenterScenePosition +
+                new Vector3(
+                    (float)tileCenterDirection.x,
+                    (float)tileCenterDirection.y,
+                    (float)tileCenterDirection.z) *
+                    (float)planetRadiusMeters;
+            return true;
+        }
+
         private void StartNextGeneration(
             MapMagicObject mapMagicObject,
             int resolution,
@@ -768,8 +1020,12 @@ namespace jcan.CelestialSystems
                     return;
                 }
 
+                var generationIndex =
+                    ResolveNextGenerationIndex();
                 key =
-                    generationQueue.Dequeue();
+                    generationQueue[generationIndex];
+                generationQueue.RemoveAt(
+                    generationIndex);
             }
             while (!desiredKeys.Contains(key) ||
                 samples.ContainsKey(key));
@@ -1152,6 +1408,8 @@ namespace jcan.CelestialSystems
             cachedSampleCount = default;
             queuedSampleCount = default;
             resolvedStreamedTileRadius = default;
+            hasGenerationView = false;
+            lastSelectedViewBand = default;
             hasSample = false;
             sampleVertexCount = default;
             minimumHeightMeters = default;
