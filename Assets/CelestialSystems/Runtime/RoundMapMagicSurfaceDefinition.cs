@@ -17,6 +17,9 @@ namespace jcan.CelestialSystems
         private Graph graph;
 
         [SerializeField]
+        private int surfaceSeed = 12345;
+
+        [SerializeField]
         private double tileSizeMeters =
             1000.0;
 
@@ -33,6 +36,9 @@ namespace jcan.CelestialSystems
 
         public Graph Graph =>
             graph;
+
+        public int SurfaceSeed =>
+            surfaceSeed;
 
         public double TileSizeMeters =>
             tileSizeMeters;
