@@ -13,7 +13,7 @@ namespace jcan.CelestialSystems
 {
     [Serializable]
     [GeneratorMenu(
-        menu = "Map/Generate",
+        menu = "Map/Initial",
         name = "Spherical Noise",
         section = 1,
         colorType = typeof(MatrixWorld),
