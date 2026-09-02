@@ -1223,9 +1223,29 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            var activeSurfaceDefinition =
+                surfaceSession != null
+                    ? surfaceSession.ActiveSurfaceDefinition
+                    : null;
+            var configuredSurfaceDefinition =
+                surfaceSession != null
+                    ? surfaceSession.ConfiguredSurfaceDefinition
+                    : null;
+            var surfaceDefinition =
+                activeSurfaceDefinition != null
+                    ? activeSurfaceDefinition
+                    : configuredSurfaceDefinition;
             var data =
-                new TileData
+                new RoundMapMagicSphericalTileData
                 {
+                    Face =
+                        key.Face,
+                    PlanetRadiusMeters =
+                        surfaceFrame.PlanetRadiusMeters,
+                    SurfaceSeed =
+                        surfaceDefinition != null
+                            ? surfaceDefinition.SurfaceSeed
+                            : 0,
                     area =
                         new Area(
                             new Coord(
