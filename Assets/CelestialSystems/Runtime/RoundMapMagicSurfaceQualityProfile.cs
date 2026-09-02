@@ -47,6 +47,14 @@ namespace jcan.CelestialSystems
         private double transitionOverlapMeters =
             2000.0;
 
+        [SerializeField]
+        private double customSurfaceHandoffAltitudeMeters =
+            750.0;
+
+        [SerializeField]
+        private double customSurfaceReleaseAltitudeMeters =
+            1000.0;
+
         public int LocalMeshResolution =>
             localMeshResolution;
 
@@ -70,6 +78,12 @@ namespace jcan.CelestialSystems
 
         public double TransitionOverlapMeters =>
             transitionOverlapMeters;
+
+        public double CustomSurfaceHandoffAltitudeMeters =>
+            customSurfaceHandoffAltitudeMeters;
+
+        public double CustomSurfaceReleaseAltitudeMeters =>
+            customSurfaceReleaseAltitudeMeters;
 
         public bool HasValidSettings =>
             HasPowerOfTwoIntervals(
@@ -97,7 +111,15 @@ namespace jcan.CelestialSystems
             IsFinite(
                 transitionOverlapMeters) &&
             transitionOverlapMeters >=
-                0.0;
+                0.0 &&
+            IsFinite(
+                customSurfaceHandoffAltitudeMeters) &&
+            customSurfaceHandoffAltitudeMeters >=
+                0.0 &&
+            IsFinite(
+                customSurfaceReleaseAltitudeMeters) &&
+            customSurfaceReleaseAltitudeMeters >=
+                customSurfaceHandoffAltitudeMeters;
 
         private static bool HasPowerOfTwoIntervals(
             int resolution)

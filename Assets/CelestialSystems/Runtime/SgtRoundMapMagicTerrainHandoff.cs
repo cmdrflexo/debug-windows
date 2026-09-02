@@ -84,6 +84,15 @@ namespace jcan.CelestialSystems
         private bool midSurfaceReady;
 
         [SerializeField]
+        private bool customSurfaceHandoffAllowed;
+
+        [SerializeField]
+        private double resolvedHandoffAltitudeMeters;
+
+        [SerializeField]
+        private double resolvedReleaseAltitudeMeters;
+
+        [SerializeField]
         private bool nearSurfaceMode;
 
         [SerializeField]
@@ -134,21 +143,28 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            var shouldUseNearSurfaceMode =
+            localSurfaceReady =
                 surfaceSession.HasActiveSession &&
                 surfaceSession.ActiveBodyContext ==
                     bodyContext;
-            localSurfaceReady =
-                shouldUseNearSurfaceMode;
-            midSurfaceReady =
+            var hasTrackedMidSurface =
                 midHeightSampler != null &&
                 midHeightSampler.MidStreamingActive &&
-                midHeightSampler.HasCompleteCoverage &&
                 midHeightSampler.TrackedBodyContext ==
                     bodyContext;
-            shouldUseNearSurfaceMode =
-                localSurfaceReady ||
-                midSurfaceReady;
+            midSurfaceReady =
+                hasTrackedMidSurface &&
+                midHeightSampler.HasCompleteCoverage &&
+                midHeightSampler.HasSample;
+            UpdateHandoffAltitudeState();
+            var hasUsableMidSurface =
+                nearSurfaceMode
+                    ? hasTrackedMidSurface &&
+                        midHeightSampler.HasSample
+                    : midSurfaceReady;
+            var shouldUseNearSurfaceMode =
+                customSurfaceHandoffAllowed &&
+                hasUsableMidSurface;
 
             if (!hasAppliedMode ||
                 nearSurfaceMode !=
@@ -156,6 +172,48 @@ namespace jcan.CelestialSystems
             {
                 ApplyMode(
                     shouldUseNearSurfaceMode);
+            }
+        }
+
+        private void UpdateHandoffAltitudeState()
+        {
+            var qualityProfile =
+                surfaceSession.ConfiguredQualityProfile;
+
+            if (qualityProfile == null ||
+                !qualityProfile.HasValidSettings ||
+                midHeightSampler == null ||
+                midHeightSampler.TrackedBodyContext !=
+                    bodyContext)
+            {
+                customSurfaceHandoffAllowed = false;
+                resolvedHandoffAltitudeMeters = default;
+                resolvedReleaseAltitudeMeters = default;
+                return;
+            }
+
+            resolvedHandoffAltitudeMeters =
+                qualityProfile.CustomSurfaceHandoffAltitudeMeters;
+            resolvedReleaseAltitudeMeters =
+                qualityProfile.CustomSurfaceReleaseAltitudeMeters;
+            var altitudeMeters =
+                midHeightSampler.AnchorAltitudeMeters;
+
+            if (customSurfaceHandoffAllowed)
+            {
+                if (altitudeMeters >
+                    resolvedReleaseAltitudeMeters)
+                {
+                    customSurfaceHandoffAllowed = false;
+                }
+
+                return;
+            }
+
+            if (altitudeMeters <=
+                resolvedHandoffAltitudeMeters)
+            {
+                customSurfaceHandoffAllowed = true;
             }
         }
 
