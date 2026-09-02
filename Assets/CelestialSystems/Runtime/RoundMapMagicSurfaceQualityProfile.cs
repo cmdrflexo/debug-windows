@@ -22,6 +22,11 @@ namespace jcan.CelestialSystems
             3000.0;
 
         [SerializeField]
+        [Tooltip("Radius around the active anchor that receives close-tile colliders, independent of the Local visual coverage radius. Zero disables collider coverage.")]
+        private double localColliderCoverageRadiusMeters =
+            2000.0;
+
+        [SerializeField]
         private double localActivationAltitudeMeters =
             25000.0;
 
@@ -69,6 +74,9 @@ namespace jcan.CelestialSystems
         public double LocalCoverageRadiusMeters =>
             localCoverageRadiusMeters;
 
+        public double LocalColliderCoverageRadiusMeters =>
+            localColliderCoverageRadiusMeters;
+
         public double LocalActivationAltitudeMeters =>
             localActivationAltitudeMeters;
 
@@ -105,6 +113,10 @@ namespace jcan.CelestialSystems
             IsFinite(
                 localCoverageRadiusMeters) &&
             localCoverageRadiusMeters >
+                0.0 &&
+            IsFinite(
+                localColliderCoverageRadiusMeters) &&
+            localColliderCoverageRadiusMeters >=
                 0.0 &&
             IsFinite(
                 localActivationAltitudeMeters) &&

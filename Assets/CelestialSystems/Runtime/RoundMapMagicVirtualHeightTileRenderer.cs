@@ -106,6 +106,7 @@ namespace jcan.CelestialSystems
                 1.0f);
 
         [SerializeField]
+        [Tooltip("Master switch for collider generation. Local collider distance is resolved separately from the quality profile.")]
         private bool generateMeshCollider;
 
         [SerializeField]
@@ -157,6 +158,9 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private Texture renderedControlTexture;
+
+        [SerializeField]
+        private double resolvedColliderCoverageRadiusMeters;
 
         [SerializeField]
         private int colliderRenderedTileCount;
@@ -490,9 +494,6 @@ namespace jcan.CelestialSystems
             runtime.CurvedMesh.RecalculateNormals();
             runtime.CurvedMesh.RecalculateTangents();
             runtime.CurvedMesh.RecalculateBounds();
-            ApplyMeshCollider(
-                runtime,
-                true);
 
             runtime.MeshObject.name =
                 $"{ResolveStreamName()} Curved Tile {sample.TileX},{sample.TileZ}";
@@ -504,6 +505,9 @@ namespace jcan.CelestialSystems
                 planetRadiusMeters;
             runtime.SurfaceOffsetMeters =
                 surfaceOffsetMeters;
+            ApplyMeshCollider(
+                runtime,
+                true);
         }
 
         private void EnsureMeshObjects(
@@ -546,7 +550,8 @@ namespace jcan.CelestialSystems
             TileRuntime runtime,
             bool forceRefresh)
         {
-            if (!generateMeshCollider ||
+            if (!ShouldGenerateMeshCollider(
+                    runtime) ||
                 runtime.MeshObject == null ||
                 runtime.CurvedMesh == null)
             {
@@ -578,6 +583,63 @@ namespace jcan.CelestialSystems
                 runtime.MeshCollider.sharedMesh =
                     runtime.CurvedMesh;
             }
+        }
+
+        private bool ShouldGenerateMeshCollider(
+            TileRuntime runtime)
+        {
+            if (!generateMeshCollider ||
+                sampleStream !=
+                    RoundMapMagicVirtualSampleStream.Local ||
+                runtime == null ||
+                runtime.Sample == null ||
+                !surfaceFrame.HasAnchorAddress)
+            {
+                return false;
+            }
+
+            var qualityProfile =
+                surfaceSession.ConfiguredQualityProfile;
+            var coverageRadiusMeters =
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? qualityProfile
+                        .LocalColliderCoverageRadiusMeters
+                    : 0.0;
+
+            if (coverageRadiusMeters <=
+                0.0)
+            {
+                return false;
+            }
+
+            var anchorDirection =
+                CubeSphereMapping.AddressToDirection(
+                    surfaceFrame.AnchorAddress);
+            var directionDot =
+                Math.Max(
+                    -1.0,
+                    Math.Min(
+                        1.0,
+                        Dot(
+                            anchorDirection,
+                            runtime.TileCenterDirection)));
+            var centerDistanceMeters =
+                Math.Acos(
+                    directionDot) *
+                surfaceFrame.PlanetRadiusMeters;
+            var tileHalfDiagonalMeters =
+                Math.Sqrt(
+                    runtime.Sample.WorldSizeXMeters *
+                        runtime.Sample.WorldSizeXMeters +
+                    runtime.Sample.WorldSizeZMeters *
+                        runtime.Sample.WorldSizeZMeters) *
+                0.5;
+
+            return
+                centerDistanceMeters <=
+                coverageRadiusMeters +
+                    tileHalfDiagonalMeters;
         }
 
         private string ResolveStreamName()
@@ -1373,6 +1435,14 @@ namespace jcan.CelestialSystems
                     : default;
             texturedRenderedTileCount =
                 0;
+            var qualityProfile =
+                surfaceSession.ConfiguredQualityProfile;
+            resolvedColliderCoverageRadiusMeters =
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? qualityProfile
+                        .LocalColliderCoverageRadiusMeters
+                    : 0.0;
             colliderRenderedTileCount =
                 0;
 
@@ -1474,6 +1544,7 @@ namespace jcan.CelestialSystems
             renderedControlResolution = default;
             renderedTerrainLayerCount = default;
             renderedControlTexture = null;
+            resolvedColliderCoverageRadiusMeters = default;
             colliderRenderedTileCount = default;
         }
 
