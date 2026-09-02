@@ -776,20 +776,14 @@ namespace jcan.CelestialSystems
         private int ResolveNextGenerationIndex()
         {
             lastSelectedViewBand = default;
-
-            if (!prioritizeVisibleTiles ||
-                generationQueue.Count <= 1)
-            {
-                hasGenerationView = false;
-                return 0;
-            }
-
             var resolvedView =
                 ResolveGenerationView();
             hasGenerationView =
                 resolvedView != null;
 
-            if (resolvedView == null)
+            if (!prioritizeVisibleTiles ||
+                generationQueue.Count <= 1 ||
+                resolvedView == null)
             {
                 return 0;
             }
