@@ -14,6 +14,12 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicVirtualHeightTileRenderer :
         MonoBehaviour
     {
+        private const int MaximumAdaptedLayerCount =
+            4;
+
+        private const string DefaultLayerShaderName =
+            "jcan/Celestial Systems/Curved MapMagic Terrain Layers";
+
         private struct TileKey :
             IEquatable<TileKey>
         {
@@ -65,6 +71,10 @@ namespace jcan.CelestialSystems
             public MeshRenderer MeshRenderer;
             public Mesh CurvedMesh;
             public RoundMapMagicVirtualHeightSample Sample;
+            public RoundMapMagicVirtualHeightSample MaterialSample;
+            public Material GeneratedMaterial;
+            public Material TemplateMaterial;
+            public Texture2D ControlTexture;
             public DoubleVector3 TileCenterDirection;
             public double PlanetRadiusMeters;
             public double SurfaceOffsetMeters;
@@ -125,6 +135,21 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int triangleCount;
+
+        [SerializeField]
+        private int texturedRenderedTileCount;
+
+        [SerializeField]
+        private bool hasDirectTextureData;
+
+        [SerializeField]
+        private int renderedControlResolution;
+
+        [SerializeField]
+        private int renderedTerrainLayerCount;
+
+        [SerializeField]
+        private Texture renderedControlTexture;
 
         private readonly Dictionary<TileKey, TileRuntime>
             tiles =
@@ -557,10 +582,482 @@ namespace jcan.CelestialSystems
                         ? surfaceDefinition.Material
                         : null;
 
+            if (CanAdaptTextureSample(
+                    runtime.Sample))
+            {
+                var material =
+                    ResolveGeneratedMaterial(
+                        runtime,
+                        resolvedMaterial);
+
+                if (material != null)
+                {
+                    runtime.MeshRenderer.sharedMaterial =
+                        material;
+                    return;
+                }
+            }
+
+            ReleaseGeneratedMaterial(
+                runtime);
+
             runtime.MeshRenderer.sharedMaterial =
                 resolvedMaterial != null
                     ? resolvedMaterial
                     : ResolveFallbackMaterial();
+        }
+
+        private static bool CanAdaptTextureSample(
+            RoundMapMagicVirtualHeightSample sample)
+        {
+            if (sample == null ||
+                !sample.HasTextureData ||
+                sample.TerrainLayerCount < 1 ||
+                sample.TerrainLayerCount >
+                    MaximumAdaptedLayerCount)
+            {
+                return false;
+            }
+
+            for (var index = 0;
+                index < sample.TerrainLayerCount;
+                index++)
+            {
+                if (sample.GetTerrainLayer(
+                        index) == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private Material ResolveGeneratedMaterial(
+            TileRuntime runtime,
+            Material templateMaterial)
+        {
+            if (runtime.GeneratedMaterial != null &&
+                runtime.ControlTexture != null &&
+                runtime.TemplateMaterial ==
+                    templateMaterial &&
+                ReferenceEquals(
+                    runtime.MaterialSample,
+                    runtime.Sample))
+            {
+                return
+                    runtime.GeneratedMaterial;
+            }
+
+            ReleaseGeneratedMaterial(
+                runtime);
+            var usesDefinitionMaterial =
+                IsCompatibleTemplate(
+                    templateMaterial);
+            Material generatedMaterial;
+
+            if (usesDefinitionMaterial)
+            {
+                generatedMaterial =
+                    new Material(
+                        templateMaterial);
+            }
+            else
+            {
+                var shader =
+                    Shader.Find(
+                        DefaultLayerShaderName);
+
+                if (shader == null)
+                {
+                    if (!missingShaderLogged)
+                    {
+                        Debug.LogError(
+                            $"Shader '{DefaultLayerShaderName}' was not found for the virtual height tile renderer.",
+                            this);
+                        missingShaderLogged =
+                            true;
+                    }
+
+                    return null;
+                }
+
+                generatedMaterial =
+                    new Material(
+                        shader);
+            }
+
+            var controlTexture =
+                CreateControlTexture(
+                    runtime.Sample);
+            generatedMaterial.name =
+                $"Virtual MapMagic Terrain Layers {runtime.Sample.TileX},{runtime.Sample.TileZ}";
+            generatedMaterial.hideFlags =
+                HideFlags.HideAndDontSave;
+            ConfigureGeneratedMaterial(
+                generatedMaterial,
+                controlTexture,
+                runtime.Sample);
+            runtime.GeneratedMaterial =
+                generatedMaterial;
+            runtime.TemplateMaterial =
+                templateMaterial;
+            runtime.ControlTexture =
+                controlTexture;
+            runtime.MaterialSample =
+                runtime.Sample;
+            missingShaderLogged =
+                false;
+            return
+                generatedMaterial;
+        }
+
+        private static Texture2D CreateControlTexture(
+            RoundMapMagicVirtualHeightSample sample)
+        {
+            var resolution =
+                sample.ControlResolution;
+            var pixels =
+                new Color[
+                    resolution *
+                    resolution];
+
+            for (var z = 0;
+                z < resolution;
+                z++)
+            {
+                for (var x = 0;
+                    x < resolution;
+                    x++)
+                {
+                    pixels[
+                        z *
+                        resolution +
+                        x] =
+                        new Color(
+                            ResolveControlWeight(
+                                sample,
+                                x,
+                                z,
+                                0),
+                            ResolveControlWeight(
+                                sample,
+                                x,
+                                z,
+                                1),
+                            ResolveControlWeight(
+                                sample,
+                                x,
+                                z,
+                                2),
+                            ResolveControlWeight(
+                                sample,
+                                x,
+                                z,
+                                3));
+                }
+            }
+
+            var texture =
+                new Texture2D(
+                    resolution,
+                    resolution,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name =
+                        $"Virtual MapMagic Control {sample.TileX},{sample.TileZ}",
+                    filterMode =
+                        FilterMode.Bilinear,
+                    wrapMode =
+                        TextureWrapMode.Clamp,
+                    hideFlags =
+                        HideFlags.HideAndDontSave
+                };
+            texture.SetPixels(
+                pixels);
+            texture.Apply(
+                false,
+                false);
+            return
+                texture;
+        }
+
+        private static float ResolveControlWeight(
+            RoundMapMagicVirtualHeightSample sample,
+            int x,
+            int z,
+            int layer)
+        {
+            return
+                layer < sample.TerrainLayerCount
+                    ? sample.GetControlWeight(
+                        x,
+                        z,
+                        layer)
+                    : 0.0f;
+        }
+
+        private static bool IsCompatibleTemplate(
+            Material material)
+        {
+            return
+                material != null &&
+                material.HasProperty(
+                    "_Control") &&
+                material.HasProperty(
+                    "_LayerCount") &&
+                material.HasProperty(
+                    "_Splat0");
+        }
+
+        private static void ConfigureGeneratedMaterial(
+            Material material,
+            Texture2D controlTexture,
+            RoundMapMagicVirtualHeightSample sample)
+        {
+            ApplyTexture(
+                material,
+                "_Control",
+                controlTexture,
+                Vector2.one,
+                Vector2.zero);
+            SetFloatIfPresent(
+                material,
+                "_LayerCount",
+                sample.TerrainLayerCount);
+
+            for (var index = 0;
+                index < MaximumAdaptedLayerCount;
+                index++)
+            {
+                ConfigureLayer(
+                    material,
+                    sample,
+                    index < sample.TerrainLayerCount
+                        ? sample.GetTerrainLayer(
+                            index)
+                        : null,
+                    index);
+            }
+        }
+
+        private static void ConfigureLayer(
+            Material material,
+            RoundMapMagicVirtualHeightSample sample,
+            TerrainLayer terrainLayer,
+            int layerIndex)
+        {
+            var suffix =
+                layerIndex.ToString();
+
+            if (terrainLayer == null)
+            {
+                ApplyTexture(
+                    material,
+                    "_Splat" + suffix,
+                    Texture2D.whiteTexture,
+                    Vector2.one,
+                    Vector2.zero);
+                ApplyTexture(
+                    material,
+                    "_Normal" + suffix,
+                    null,
+                    Vector2.one,
+                    Vector2.zero);
+                ApplyTexture(
+                    material,
+                    "_Mask" + suffix,
+                    null,
+                    Vector2.one,
+                    Vector2.zero);
+                SetFloatIfPresent(
+                    material,
+                    "_HasNormal" + suffix,
+                    0.0f);
+                SetFloatIfPresent(
+                    material,
+                    "_HasMask" + suffix,
+                    0.0f);
+                return;
+            }
+
+            ResolveTextureTransform(
+                sample,
+                terrainLayer,
+                out var textureScale,
+                out var textureOffset);
+            var layerDiffuse =
+                terrainLayer.diffuseTexture != null
+                    ? terrainLayer.diffuseTexture
+                    : Texture2D.whiteTexture;
+            var layerNormal =
+                terrainLayer.normalMapTexture;
+            var layerMask =
+                terrainLayer.maskMapTexture;
+
+            ApplyTexture(
+                material,
+                "_Splat" + suffix,
+                layerDiffuse,
+                textureScale,
+                textureOffset);
+            ApplyTexture(
+                material,
+                "_Normal" + suffix,
+                layerNormal,
+                textureScale,
+                textureOffset);
+            ApplyTexture(
+                material,
+                "_Mask" + suffix,
+                layerMask,
+                textureScale,
+                textureOffset);
+            SetFloatIfPresent(
+                material,
+                "_HasNormal" + suffix,
+                layerNormal != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_HasMask" + suffix,
+                layerMask != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_NormalScale" + suffix,
+                terrainLayer.normalScale);
+            SetFloatIfPresent(
+                material,
+                "_Metallic" + suffix,
+                terrainLayer.metallic);
+            SetFloatIfPresent(
+                material,
+                "_Smoothness" + suffix,
+                terrainLayer.smoothness);
+        }
+
+        private static void ResolveTextureTransform(
+            RoundMapMagicVirtualHeightSample sample,
+            TerrainLayer terrainLayer,
+            out Vector2 scale,
+            out Vector2 offset)
+        {
+            var tileSizeX =
+                SafeTileSize(
+                    terrainLayer.tileSize.x);
+            var tileSizeZ =
+                SafeTileSize(
+                    terrainLayer.tileSize.y);
+            scale =
+                new Vector2(
+                    (float)(
+                        sample.WorldSizeXMeters /
+                        tileSizeX),
+                    (float)(
+                        sample.WorldSizeZMeters /
+                        tileSizeZ));
+            offset =
+                new Vector2(
+                    Repeat01(
+                        (sample.WorldOriginXMeters +
+                            terrainLayer.tileOffset.x) /
+                        tileSizeX),
+                    Repeat01(
+                        (sample.WorldOriginZMeters +
+                            terrainLayer.tileOffset.y) /
+                        tileSizeZ));
+        }
+
+        private static void ApplyTexture(
+            Material material,
+            string propertyName,
+            Texture texture,
+            Vector2 scale,
+            Vector2 offset)
+        {
+            if (!material.HasProperty(
+                    propertyName))
+            {
+                return;
+            }
+
+            material.SetTexture(
+                propertyName,
+                texture);
+            material.SetTextureScale(
+                propertyName,
+                scale);
+            material.SetTextureOffset(
+                propertyName,
+                offset);
+        }
+
+        private static void SetFloatIfPresent(
+            Material material,
+            string propertyName,
+            float value)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetFloat(
+                    propertyName,
+                    value);
+            }
+        }
+
+        private static float SafeTileSize(
+            float value)
+        {
+            return
+                IsFinite(
+                    value) &&
+                Mathf.Abs(
+                    value) >
+                    Mathf.Epsilon
+                    ? Mathf.Abs(
+                        value)
+                    : 1.0f;
+        }
+
+        private static float Repeat01(
+            double value)
+        {
+            return
+                (float)(
+                    value -
+                    Math.Floor(
+                        value));
+        }
+
+        private static void ReleaseGeneratedMaterial(
+            TileRuntime runtime)
+        {
+            if (runtime.GeneratedMaterial != null)
+            {
+                DestroyUnityObject(
+                    runtime.GeneratedMaterial);
+            }
+
+            if (runtime.ControlTexture != null)
+            {
+                DestroyUnityObject(
+                    runtime.ControlTexture);
+            }
+
+            runtime.GeneratedMaterial =
+                null;
+            runtime.TemplateMaterial =
+                null;
+            runtime.ControlTexture =
+                null;
+            runtime.MaterialSample =
+                null;
         }
 
         private Material ResolveFallbackMaterial()
@@ -710,6 +1207,9 @@ namespace jcan.CelestialSystems
                     runtime.MeshObject);
             }
 
+            ReleaseGeneratedMaterial(
+                runtime);
+
             if (runtime.CurvedMesh != null)
             {
                 DestroyUnityObject(
@@ -767,6 +1267,43 @@ namespace jcan.CelestialSystems
                         (primarySample.Resolution - 1) *
                         2
                     : default;
+            texturedRenderedTileCount =
+                0;
+
+            foreach (var runtime in
+                tiles.Values)
+            {
+                if (runtime.GeneratedMaterial != null)
+                {
+                    texturedRenderedTileCount++;
+                }
+            }
+
+            var primaryRuntime =
+                primarySample != null &&
+                tiles.TryGetValue(
+                    new TileKey(
+                        primarySample.Face,
+                        primarySample.TileX,
+                        primarySample.TileZ),
+                    out var resolvedPrimaryRuntime)
+                    ? resolvedPrimaryRuntime
+                    : null;
+            hasDirectTextureData =
+                primaryRuntime != null &&
+                primaryRuntime.GeneratedMaterial != null;
+            renderedControlResolution =
+                hasDirectTextureData
+                    ? primaryRuntime.Sample.ControlResolution
+                    : default;
+            renderedTerrainLayerCount =
+                hasDirectTextureData
+                    ? primaryRuntime.Sample.TerrainLayerCount
+                    : default;
+            renderedControlTexture =
+                hasDirectTextureData
+                    ? primaryRuntime.ControlTexture
+                    : null;
         }
 
         private bool ConfigurationIsValid()
@@ -820,6 +1357,11 @@ namespace jcan.CelestialSystems
             renderedResolution = default;
             vertexCount = default;
             triangleCount = default;
+            texturedRenderedTileCount = default;
+            hasDirectTextureData = false;
+            renderedControlResolution = default;
+            renderedTerrainLayerCount = default;
+            renderedControlTexture = null;
         }
 
         private void OnDisable()

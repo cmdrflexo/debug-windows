@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Den.Tools;
 using Den.Tools.Matrices;
 using MapMagic.Core;
+using MapMagic.Nodes.MatrixGenerators;
 using MapMagic.Products;
 using MapMagic.Terrains;
 using UnityEngine;
@@ -174,6 +175,15 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private float centerHeightMeters;
+
+        [SerializeField]
+        private bool hasTextureSample;
+
+        [SerializeField]
+        private int sampleControlResolution;
+
+        [SerializeField]
+        private int sampleTerrainLayerCount;
 
         [SerializeField]
         private double generationMilliseconds;
@@ -1147,6 +1157,8 @@ namespace jcan.CelestialSystems
                             key,
                             data.area,
                             data.heights,
+                            data.ApplyOfType<
+                                TexturesOutput200.ApplyData>(),
                             resolution);
                 }
                 finally
@@ -1234,6 +1246,7 @@ namespace jcan.CelestialSystems
             SampleKey key,
             Area area,
             MatrixWorld heightMatrix,
+            TexturesOutput200.ApplyData textureData,
             int resolution)
         {
             var heightsMeters =
@@ -1317,7 +1330,13 @@ namespace jcan.CelestialSystems
                     worldSizeZ,
                     heightsMeters,
                     minimumHeight,
-                    maximumHeight);
+                    maximumHeight,
+                    textureData != null
+                        ? textureData.splats
+                        : null,
+                    textureData != null
+                        ? textureData.prototypes
+                        : null);
         }
 
         private void RefreshSampleDiagnostics()
@@ -1367,6 +1386,17 @@ namespace jcan.CelestialSystems
                 diagnosticSample != null
                     ? diagnosticSample.CenterHeightMeters
                     : 0.0f;
+            hasTextureSample =
+                diagnosticSample != null &&
+                diagnosticSample.HasTextureData;
+            sampleControlResolution =
+                diagnosticSample != null
+                    ? diagnosticSample.ControlResolution
+                    : 0;
+            sampleTerrainLayerCount =
+                diagnosticSample != null
+                    ? diagnosticSample.TerrainLayerCount
+                    : 0;
         }
 
         private void ClearStreamingState()
@@ -1469,6 +1499,8 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicVirtualHeightSample
     {
         private readonly float[] heightsMeters;
+        private readonly float[,,] controlWeights;
+        private readonly TerrainLayer[] terrainLayers;
 
         public CubeSphereFace Face { get; }
 
@@ -1488,6 +1520,25 @@ namespace jcan.CelestialSystems
 
         public int VertexCount =>
             heightsMeters.Length;
+
+        public bool HasTextureData =>
+            controlWeights != null &&
+            terrainLayers != null &&
+            terrainLayers.Length > 0 &&
+            controlWeights.GetLength(0) > 0 &&
+            controlWeights.GetLength(1) > 0 &&
+            controlWeights.GetLength(2) ==
+                terrainLayers.Length;
+
+        public int ControlResolution =>
+            controlWeights != null
+                ? controlWeights.GetLength(0)
+                : 0;
+
+        public int TerrainLayerCount =>
+            terrainLayers != null
+                ? terrainLayers.Length
+                : 0;
 
         public float MinimumHeightMeters { get; }
 
@@ -1512,7 +1563,9 @@ namespace jcan.CelestialSystems
             double worldSizeZMeters,
             float[] heightsMeters,
             float minimumHeightMeters,
-            float maximumHeightMeters)
+            float maximumHeightMeters,
+            float[,,] controlWeights,
+            TerrainLayer[] terrainLayers)
         {
             Face =
                 face;
@@ -1532,6 +1585,10 @@ namespace jcan.CelestialSystems
                 worldSizeZMeters;
             this.heightsMeters =
                 heightsMeters;
+            this.controlWeights =
+                controlWeights;
+            this.terrainLayers =
+                terrainLayers;
             MinimumHeightMeters =
                 minimumHeightMeters;
             MaximumHeightMeters =
@@ -1556,6 +1613,57 @@ namespace jcan.CelestialSystems
                     z *
                     Resolution +
                     x];
+        }
+
+        public float GetControlWeight(
+            int x,
+            int z,
+            int layer)
+        {
+            if (controlWeights == null)
+            {
+                throw new InvalidOperationException(
+                    "This virtual MapMagic sample does not contain texture control data.");
+            }
+
+            var resolutionZ =
+                controlWeights.GetLength(0);
+            var resolutionX =
+                controlWeights.GetLength(1);
+            var layerCount =
+                controlWeights.GetLength(2);
+
+            if (x < 0 ||
+                x >= resolutionX ||
+                z < 0 ||
+                z >= resolutionZ ||
+                layer < 0 ||
+                layer >= layerCount)
+            {
+                throw new ArgumentOutOfRangeException(
+                    $"Control coordinate ({x}, {z}, {layer}) is outside dimensions {resolutionX}x{resolutionZ}x{layerCount}.");
+            }
+
+            return
+                controlWeights[
+                    z,
+                    x,
+                    layer];
+        }
+
+        public TerrainLayer GetTerrainLayer(
+            int index)
+        {
+            if (terrainLayers == null ||
+                index < 0 ||
+                index >= terrainLayers.Length)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(index));
+            }
+
+            return
+                terrainLayers[index];
         }
 
         public bool TryGetInterpolatedHeightMeters(
