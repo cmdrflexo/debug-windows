@@ -63,6 +63,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicVirtualHeightSampler localHeightSampler;
 
+        [SerializeField]
+        private RoundMapMagicVirtualHeightTileRenderer midTileRenderer;
+
+        [SerializeField]
+        private RoundMapMagicVirtualHeightTileRenderer localTileRenderer;
+
         [Header("SGT Heightmap")]
         [SerializeField]
         private SgtTerrainHeightmap heightmap;
@@ -157,7 +163,9 @@ namespace jcan.CelestialSystems
             localSurfaceReady =
                 hasTrackedLocalSurface &&
                 localHeightSampler.HasCompleteCoverage &&
-                localHeightSampler.HasSample;
+                localHeightSampler.HasSample &&
+                (localTileRenderer == null ||
+                    localTileRenderer.HasCompleteVisibleCoverage);
             var hasTrackedMidSurface =
                 midHeightSampler != null &&
                 midHeightSampler.MidStreamingActive &&
@@ -166,7 +174,9 @@ namespace jcan.CelestialSystems
             midSurfaceReady =
                 hasTrackedMidSurface &&
                 midHeightSampler.HasCompleteCoverage &&
-                midHeightSampler.HasSample;
+                midHeightSampler.HasSample &&
+                (midTileRenderer == null ||
+                    midTileRenderer.HasCompleteVisibleCoverage);
             UpdateHandoffAltitudeState();
             var hasUsableMidSurface =
                 nearSurfaceMode
@@ -391,8 +401,26 @@ namespace jcan.CelestialSystems
                     null;
             }
 
+            if (midTileRenderer != null &&
+                midTileRenderer.SampleStream !=
+                    RoundMapMagicVirtualSampleStream.Mid)
+            {
+                midTileRenderer =
+                    null;
+            }
+
+            if (localTileRenderer != null &&
+                localTileRenderer.SampleStream !=
+                    RoundMapMagicVirtualSampleStream.Local)
+            {
+                localTileRenderer =
+                    null;
+            }
+
             if (midHeightSampler != null &&
-                localHeightSampler != null)
+                localHeightSampler != null &&
+                midTileRenderer != null &&
+                localTileRenderer != null)
             {
                 return;
             }
@@ -418,6 +446,36 @@ namespace jcan.CelestialSystems
                 {
                     localHeightSampler =
                         sampler;
+                }
+            }
+
+            if (midTileRenderer != null &&
+                localTileRenderer != null)
+            {
+                return;
+            }
+
+            var renderers =
+                surfaceSession.GetComponents<RoundMapMagicVirtualHeightTileRenderer>();
+
+            for (var index = 0;
+                index < renderers.Length;
+                index++)
+            {
+                var renderer =
+                    renderers[index];
+
+                if (renderer.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Mid)
+                {
+                    midTileRenderer =
+                        renderer;
+                }
+                else if (renderer.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local)
+                {
+                    localTileRenderer =
+                        renderer;
                 }
             }
         }

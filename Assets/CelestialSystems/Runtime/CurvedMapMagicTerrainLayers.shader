@@ -4,6 +4,13 @@ Shader "jcan/Celestial Systems/Curved MapMagic Terrain Layers"
     {
         _Control ("Control (RGBA)", 2D) = "white" {}
         [HideInInspector] _LayerCount ("Layer Count", Float) = 1
+        [HideInInspector] _TileFade ("Tile Fade", Range(0, 1)) = 1
+        [HideInInspector] _LodMaskMode ("LOD Mask Mode", Float) = 0
+        [HideInInspector] _LodFadeStartMeters ("LOD Fade Start", Float) = 0
+        [HideInInspector] _LodFadeEndMeters ("LOD Fade End", Float) = 0
+        [HideInInspector] _PlanetRadiusMeters ("Planet Radius", Float) = 1
+        [HideInInspector] _PlanetCenterScenePosition ("Planet Center", Vector) = (0, 0, 0, 1)
+        [HideInInspector] _LodCenterDirection ("LOD Center Direction", Vector) = (0, 1, 0, 0)
 
         _Splat0 ("Layer 0 Diffuse", 2D) = "white" {}
         _Splat1 ("Layer 1 Diffuse", 2D) = "white" {}
@@ -85,6 +92,13 @@ Shader "jcan/Celestial Systems/Curved MapMagic Terrain Layers"
         float4 _Splat3_ST;
 
         half _LayerCount;
+        half _TileFade;
+        half _LodMaskMode;
+        float _LodFadeStartMeters;
+        float _LodFadeEndMeters;
+        float _PlanetRadiusMeters;
+        float4 _PlanetCenterScenePosition;
+        float4 _LodCenterDirection;
 
         half _HasNormal0;
         half _HasNormal1;
@@ -114,12 +128,117 @@ Shader "jcan/Celestial Systems/Curved MapMagic Terrain Layers"
         struct Input
         {
             float2 uv_Control;
+            float3 worldPos;
+            float4 screenPos;
         };
+
+        float InterleavedGradientNoise(
+            float2 pixelPosition)
+        {
+            return
+                frac(
+                    52.9829189 *
+                    frac(
+                        dot(
+                            pixelPosition,
+                            float2(
+                                0.06711056,
+                                0.00583715))));
+        }
+
+        half ResolveLocalVisibility(
+            float3 worldPosition)
+        {
+            float3 planetOffset =
+                worldPosition -
+                _PlanetCenterScenePosition.xyz;
+            float3 surfaceDirection =
+                planetOffset *
+                rsqrt(
+                    max(
+                        dot(
+                            planetOffset,
+                            planetOffset),
+                        0.0001));
+            float3 lodCenterDirection =
+                normalize(
+                    _LodCenterDirection.xyz);
+            float chordDistanceMeters =
+                length(
+                    (surfaceDirection -
+                        lodCenterDirection) *
+                    _PlanetRadiusMeters);
+            float blendWidthMeters =
+                _LodFadeEndMeters -
+                _LodFadeStartMeters;
+
+            if (blendWidthMeters <=
+                0.0001)
+            {
+                return
+                    chordDistanceMeters <=
+                        _LodFadeEndMeters
+                        ? 1.0h
+                        : 0.0h;
+            }
+
+            return
+                1.0h -
+                smoothstep(
+                    _LodFadeStartMeters,
+                    _LodFadeEndMeters,
+                    chordDistanceMeters);
+        }
 
         void Surface(
             Input input,
             inout SurfaceOutputStandard output)
         {
+            float inverseScreenW =
+                rcp(
+                    max(
+                        input.screenPos.w,
+                        0.00001));
+            float2 pixelPosition =
+                floor(
+                    input.screenPos.xy *
+                    inverseScreenW *
+                    _ScreenParams.xy);
+            half tileNoise =
+                InterleavedGradientNoise(
+                    pixelPosition +
+                    float2(
+                        17.0,
+                        31.0));
+            clip(
+                _TileFade -
+                tileNoise);
+
+            if (_LodMaskMode >
+                0.5h)
+            {
+                half localVisibility =
+                    ResolveLocalVisibility(
+                        input.worldPos);
+                half lodNoise =
+                    InterleavedGradientNoise(
+                        pixelPosition);
+
+                if (_LodMaskMode <
+                    1.5h)
+                {
+                    clip(
+                        localVisibility -
+                        lodNoise);
+                }
+                else
+                {
+                    clip(
+                        lodNoise -
+                        localVisibility);
+                }
+            }
+
             half4 weights =
                 saturate(
                     tex2D(

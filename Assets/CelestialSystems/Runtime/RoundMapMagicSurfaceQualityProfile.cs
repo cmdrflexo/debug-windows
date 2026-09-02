@@ -22,6 +22,11 @@ namespace jcan.CelestialSystems
             3000.0;
 
         [SerializeField]
+        [Tooltip("Additional Local sample-cache distance beyond the visible coverage radius.")]
+        private double localPrefetchMarginMeters =
+            1000.0;
+
+        [SerializeField]
         [Tooltip("Radius around the active anchor that receives close-tile colliders, independent of the Local visual coverage radius. Zero disables collider coverage.")]
         private double localColliderCoverageRadiusMeters =
             2000.0;
@@ -48,6 +53,11 @@ namespace jcan.CelestialSystems
             60000.0;
 
         [SerializeField]
+        [Tooltip("Additional Mid sample-cache distance beyond the visible coverage radius.")]
+        private double midPrefetchMarginMeters =
+            8000.0;
+
+        [SerializeField]
         private double midActivationAltitudeMeters =
             60000.0;
 
@@ -56,6 +66,16 @@ namespace jcan.CelestialSystems
             75000.0;
 
         [Header("Transitions")]
+        [SerializeField]
+        [Tooltip("Width of the complementary dithered blend between Local and Mid terrain.")]
+        private double localMidBlendWidthMeters =
+            1000.0;
+
+        [SerializeField]
+        [Tooltip("Seconds taken for a newly visible custom terrain tile to dither into view. Zero disables tile fading.")]
+        private float tileFadeDurationSeconds =
+            0.3f;
+
         [SerializeField]
         private double transitionOverlapMeters =
             2000.0;
@@ -73,6 +93,9 @@ namespace jcan.CelestialSystems
 
         public double LocalCoverageRadiusMeters =>
             localCoverageRadiusMeters;
+
+        public double LocalPrefetchMarginMeters =>
+            localPrefetchMarginMeters;
 
         public double LocalColliderCoverageRadiusMeters =>
             localColliderCoverageRadiusMeters;
@@ -92,6 +115,9 @@ namespace jcan.CelestialSystems
         public double MidCoverageRadiusMeters =>
             midCoverageRadiusMeters;
 
+        public double MidPrefetchMarginMeters =>
+            midPrefetchMarginMeters;
+
         public double MidActivationAltitudeMeters =>
             midActivationAltitudeMeters;
 
@@ -100,6 +126,12 @@ namespace jcan.CelestialSystems
 
         public double TransitionOverlapMeters =>
             transitionOverlapMeters;
+
+        public double LocalMidBlendWidthMeters =>
+            localMidBlendWidthMeters;
+
+        public float TileFadeDurationSeconds =>
+            tileFadeDurationSeconds;
 
         public double CustomSurfaceHandoffAltitudeMeters =>
             customSurfaceHandoffAltitudeMeters;
@@ -113,6 +145,10 @@ namespace jcan.CelestialSystems
             IsFinite(
                 localCoverageRadiusMeters) &&
             localCoverageRadiusMeters >
+                0.0 &&
+            IsFinite(
+                localPrefetchMarginMeters) &&
+            localPrefetchMarginMeters >=
                 0.0 &&
             IsFinite(
                 localColliderCoverageRadiusMeters) &&
@@ -135,6 +171,10 @@ namespace jcan.CelestialSystems
             midCoverageRadiusMeters >=
                 localCoverageRadiusMeters &&
             IsFinite(
+                midPrefetchMarginMeters) &&
+            midPrefetchMarginMeters >=
+                0.0 &&
+            IsFinite(
                 midActivationAltitudeMeters) &&
             midActivationAltitudeMeters >=
                 0.0 &&
@@ -142,6 +182,16 @@ namespace jcan.CelestialSystems
                 midReleaseAltitudeMeters) &&
             midReleaseAltitudeMeters >=
                 midActivationAltitudeMeters &&
+            IsFinite(
+                localMidBlendWidthMeters) &&
+            localMidBlendWidthMeters >=
+                0.0 &&
+            localMidBlendWidthMeters <=
+                localCoverageRadiusMeters &&
+            IsFinite(
+                tileFadeDurationSeconds) &&
+            tileFadeDurationSeconds >=
+                0.0f &&
             IsFinite(
                 transitionOverlapMeters) &&
             transitionOverlapMeters >=
@@ -176,6 +226,14 @@ namespace jcan.CelestialSystems
             return
                 !double.IsNaN(value) &&
                 !double.IsInfinity(value);
+        }
+
+        private static bool IsFinite(
+            float value)
+        {
+            return
+                !float.IsNaN(value) &&
+                !float.IsInfinity(value);
         }
     }
 }
