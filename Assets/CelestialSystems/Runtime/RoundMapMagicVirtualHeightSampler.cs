@@ -19,6 +19,8 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicVirtualHeightSampler :
         MonoBehaviour
     {
+        private const int MaximumStreamedTileRadius = 16;
+
         private struct SampleKey :
             IEquatable<SampleKey>
         {
@@ -78,11 +80,6 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool generateAutomatically = true;
 
-        [SerializeField]
-        [Range(0, 4)]
-        [Tooltip("Temporary streamed radius for validating the incremental mid-detail cache. One creates a 3 by 3 virtual-tile grid.")]
-        private int streamedTileRadius = 1;
-
         [Header("Runtime Request")]
         [SerializeField]
         private bool midStreamingActive;
@@ -110,6 +107,9 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int queuedSampleCount;
+
+        [SerializeField]
+        private int resolvedStreamedTileRadius;
 
         [SerializeField]
         private CubeSphereFace sampleFace;
@@ -317,10 +317,10 @@ namespace jcan.CelestialSystems
                     0,
                     mapMagicObject.draftMargins);
             var nextRadius =
-                Mathf.Clamp(
-                    streamedTileRadius,
-                    0,
-                    4);
+                ResolveStreamedTileRadius(
+                    qualityProfile,
+                    nextTileSizeX,
+                    nextTileSizeZ);
 
             if (DesiredGridChanged(
                     mapMagicObject,
@@ -355,6 +355,8 @@ namespace jcan.CelestialSystems
                 nextTileSizeX;
             resolvedMidResolution =
                 nextResolution;
+            resolvedStreamedTileRadius =
+                nextRadius;
 
             RefreshSampleDiagnostics();
             StartNextGeneration(
@@ -408,6 +410,48 @@ namespace jcan.CelestialSystems
             {
                 midStreamingActive = true;
             }
+        }
+
+        private static int ResolveStreamedTileRadius(
+            RoundMapMagicSurfaceQualityProfile qualityProfile,
+            double tileSizeX,
+            double tileSizeZ)
+        {
+            var smallestTileSize =
+                Math.Min(
+                    tileSizeX,
+                    tileSizeZ);
+            var remainingCoverageMeters =
+                qualityProfile.MidCoverageRadiusMeters -
+                smallestTileSize *
+                    0.5;
+
+            if (remainingCoverageMeters <=
+                0.0)
+            {
+                return 0;
+            }
+
+            var tileRadiusValue =
+                Math.Ceiling(
+                    remainingCoverageMeters /
+                    smallestTileSize);
+
+            if (tileRadiusValue >=
+                MaximumStreamedTileRadius)
+            {
+                return
+                    MaximumStreamedTileRadius;
+            }
+
+            var tileRadius =
+                (int)tileRadiusValue;
+
+            return
+                Mathf.Clamp(
+                    tileRadius,
+                    0,
+                    MaximumStreamedTileRadius);
         }
 
         public void CopyCurrentSamplesTo(
@@ -1015,6 +1059,7 @@ namespace jcan.CelestialSystems
             expectedSampleCount = default;
             cachedSampleCount = default;
             queuedSampleCount = default;
+            resolvedStreamedTileRadius = default;
             hasSample = false;
             sampleVertexCount = default;
             minimumHeightMeters = default;
