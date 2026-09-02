@@ -19,6 +19,31 @@ namespace jcan.CelestialSystems
         private const string DefaultLayerShaderName =
             "jcan/Celestial Systems/Curved MapMagic Terrain Layers";
 
+        private const float CompleteFadeProgress =
+            0.9999f;
+
+        private static readonly int TileFadeId =
+            Shader.PropertyToID(
+                "_TileFade");
+        private static readonly int LodMaskModeId =
+            Shader.PropertyToID(
+                "_LodMaskMode");
+        private static readonly int LodFadeStartId =
+            Shader.PropertyToID(
+                "_LodFadeStartMeters");
+        private static readonly int LodFadeEndId =
+            Shader.PropertyToID(
+                "_LodFadeEndMeters");
+        private static readonly int PlanetRadiusId =
+            Shader.PropertyToID(
+                "_PlanetRadiusMeters");
+        private static readonly int PlanetCenterId =
+            Shader.PropertyToID(
+                "_PlanetCenterScenePosition");
+        private static readonly int LodCenterDirectionId =
+            Shader.PropertyToID(
+                "_LodCenterDirection");
+
         private struct TileKey :
             IEquatable<TileKey>
         {
@@ -75,9 +100,11 @@ namespace jcan.CelestialSystems
             public Material GeneratedMaterial;
             public Material TemplateMaterial;
             public Texture2D ControlTexture;
+            public MaterialPropertyBlock PropertyBlock;
             public DoubleVector3 TileCenterDirection;
             public double PlanetRadiusMeters;
             public double SurfaceOffsetMeters;
+            public float FadeProgress;
         }
 
         [Header("Configuration")]
@@ -93,6 +120,10 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private RoundMapMagicVirtualHeightSampler heightSampler;
+
+        [SerializeField]
+        [Tooltip("Local renderer whose completed coverage owns the inner region when this renderer is the Mid stream. Resolved automatically when omitted.")]
+        private RoundMapMagicVirtualHeightTileRenderer localTileRenderer;
 
         [SerializeField]
         private Material meshMaterial;
@@ -165,6 +196,21 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private int colliderRenderedTileCount;
 
+        [SerializeField]
+        private bool hasCompleteVisibleCoverage;
+
+        [SerializeField]
+        private bool localOwnershipReady;
+
+        [SerializeField]
+        private int fadingTileCount;
+
+        [SerializeField]
+        private double resolvedVisibleCoverageRadiusMeters;
+
+        [SerializeField]
+        private double resolvedLocalMidBlendWidthMeters;
+
         private readonly Dictionary<TileKey, TileRuntime>
             tiles =
                 new Dictionary<TileKey, TileRuntime>();
@@ -183,6 +229,17 @@ namespace jcan.CelestialSystems
 
         public bool HasRenderedTile =>
             hasRenderedTile;
+
+        public RoundMapMagicVirtualSampleStream SampleStream =>
+            sampleStream;
+
+        public bool HasCompleteVisibleCoverage =>
+            hasCompleteVisibleCoverage;
+
+        public bool HasReadyVisibleSamples =>
+            heightSampler != null &&
+            heightSampler.StreamingActive &&
+            heightSampler.HasCompleteCoverage;
 
         private void Reset()
         {
@@ -229,7 +286,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            heightSampler.CopyCurrentSamplesTo(
+            heightSampler.CopyVisibleSamplesTo(
                 sampleBuffer);
             desiredKeys.Clear();
 
@@ -252,15 +309,32 @@ namespace jcan.CelestialSystems
             }
 
             RemoveUndesiredTiles();
+            var qualityProfile =
+                surfaceSession.ConfiguredQualityProfile;
+            localOwnershipReady =
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Mid &&
+                localTileRenderer != null &&
+                localTileRenderer.HasReadyVisibleSamples;
+            var lodCenterDirection =
+                ResolveLodCenterDirection();
 
             foreach (var runtime in
                 tiles.Values)
             {
+                UpdateFadeProgress(
+                    runtime,
+                    qualityProfile);
                 UpdateTilePose(
                     runtime,
                     planetCenterScenePosition);
                 ApplyMaterial(
                     runtime);
+                ApplyVisibilityProperties(
+                    runtime,
+                    qualityProfile,
+                    planetCenterScenePosition,
+                    lodCenterDirection);
                 ApplyMeshCollider(
                     runtime,
                     false);
@@ -308,6 +382,11 @@ namespace jcan.CelestialSystems
             RoundMapMagicVirtualHeightSample sample,
             double planetRadiusMeters)
         {
+            var restartFade =
+                runtime.CurvedMesh == null ||
+                !ReferenceEquals(
+                    runtime.Sample,
+                    sample);
             EnsureMeshObjects(
                 runtime);
 
@@ -505,6 +584,13 @@ namespace jcan.CelestialSystems
                 planetRadiusMeters;
             runtime.SurfaceOffsetMeters =
                 surfaceOffsetMeters;
+
+            if (restartFade)
+            {
+                runtime.FadeProgress =
+                    0.0f;
+            }
+
             ApplyMeshCollider(
                 runtime,
                 true);
@@ -665,30 +751,65 @@ namespace jcan.CelestialSystems
                     GetComponent<RoundMapMagicSurfaceSession>();
             }
 
-            if (heightSampler != null &&
-                heightSampler.SampleStream ==
+            if (heightSampler == null ||
+                heightSampler.SampleStream !=
                     sampleStream)
+            {
+                heightSampler =
+                    null;
+                var samplers =
+                    GetComponents<RoundMapMagicVirtualHeightSampler>();
+
+                for (var index = 0;
+                    index < samplers.Length;
+                    index++)
+                {
+                    if (samplers[index].SampleStream !=
+                        sampleStream)
+                    {
+                        continue;
+                    }
+
+                    heightSampler =
+                        samplers[index];
+                    break;
+                }
+            }
+
+            if (sampleStream !=
+                RoundMapMagicVirtualSampleStream.Mid)
+            {
+                localTileRenderer =
+                    null;
+                return;
+            }
+
+            if (localTileRenderer != null &&
+                localTileRenderer != this &&
+                localTileRenderer.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local)
             {
                 return;
             }
 
-            heightSampler =
+            localTileRenderer =
                 null;
-            var samplers =
-                GetComponents<RoundMapMagicVirtualHeightSampler>();
+            var renderers =
+                GetComponents<RoundMapMagicVirtualHeightTileRenderer>();
 
             for (var index = 0;
-                index < samplers.Length;
+                index < renderers.Length;
                 index++)
             {
-                if (samplers[index].SampleStream !=
-                    sampleStream)
+                if (renderers[index] == this ||
+                    renderers[index].SampleStream !=
+                        RoundMapMagicVirtualSampleStream.Local)
                 {
                     continue;
                 }
 
-                heightSampler =
-                    samplers[index];
+                localTileRenderer =
+                    renderers[index];
                 break;
             }
         }
@@ -727,6 +848,166 @@ namespace jcan.CelestialSystems
                 Quaternion.LookRotation(
                     forward,
                     faceNormal));
+        }
+
+        private static void UpdateFadeProgress(
+            TileRuntime runtime,
+            RoundMapMagicSurfaceQualityProfile qualityProfile)
+        {
+            var durationSeconds =
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? qualityProfile.TileFadeDurationSeconds
+                    : 0.0f;
+
+            if (durationSeconds <=
+                0.0f)
+            {
+                runtime.FadeProgress =
+                    1.0f;
+                return;
+            }
+
+            runtime.FadeProgress =
+                Mathf.MoveTowards(
+                    runtime.FadeProgress,
+                    1.0f,
+                    Time.deltaTime /
+                        durationSeconds);
+        }
+
+        private void ApplyVisibilityProperties(
+            TileRuntime runtime,
+            RoundMapMagicSurfaceQualityProfile qualityProfile,
+            Vector3 planetCenterScenePosition,
+            Vector3 lodCenterDirection)
+        {
+            if (runtime.MeshRenderer == null)
+            {
+                return;
+            }
+
+            if (runtime.PropertyBlock == null)
+            {
+                runtime.PropertyBlock =
+                    new MaterialPropertyBlock();
+            }
+
+            var maskMode =
+                0.0f;
+            var fadeStartMeters =
+                0.0f;
+            var fadeEndMeters =
+                0.0f;
+            var resolvedLodCenterDirection =
+                lodCenterDirection;
+
+            if (qualityProfile != null &&
+                qualityProfile.HasValidSettings &&
+                surfaceFrame.HasAnchorAddress)
+            {
+                fadeEndMeters =
+                    (float)qualityProfile.LocalCoverageRadiusMeters;
+                fadeStartMeters =
+                    (float)Math.Max(
+                        0.0,
+                        qualityProfile.LocalCoverageRadiusMeters -
+                            qualityProfile.LocalMidBlendWidthMeters);
+
+                if (sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local)
+                {
+                    maskMode =
+                        1.0f;
+                }
+                else if (localOwnershipReady)
+                {
+                    maskMode =
+                        2.0f;
+                }
+            }
+
+            runtime.PropertyBlock.Clear();
+            runtime.PropertyBlock.SetFloat(
+                TileFadeId,
+                runtime.FadeProgress);
+            runtime.PropertyBlock.SetFloat(
+                LodMaskModeId,
+                maskMode);
+            runtime.PropertyBlock.SetFloat(
+                LodFadeStartId,
+                fadeStartMeters);
+            runtime.PropertyBlock.SetFloat(
+                LodFadeEndId,
+                fadeEndMeters);
+            runtime.PropertyBlock.SetFloat(
+                PlanetRadiusId,
+                (float)surfaceFrame.PlanetRadiusMeters);
+            runtime.PropertyBlock.SetVector(
+                PlanetCenterId,
+                new Vector4(
+                    planetCenterScenePosition.x,
+                    planetCenterScenePosition.y,
+                    planetCenterScenePosition.z,
+                    1.0f));
+            runtime.PropertyBlock.SetVector(
+                LodCenterDirectionId,
+                new Vector4(
+                    resolvedLodCenterDirection.x,
+                    resolvedLodCenterDirection.y,
+                    resolvedLodCenterDirection.z,
+                    0.0f));
+            runtime.MeshRenderer.SetPropertyBlock(
+                runtime.PropertyBlock);
+        }
+
+        private Vector3 ResolveLodCenterDirection()
+        {
+            var centerSampler =
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Mid &&
+                localTileRenderer != null &&
+                localTileRenderer.heightSampler != null
+                    ? localTileRenderer.heightSampler
+                    : heightSampler;
+            var centerSample =
+                centerSampler != null
+                    ? centerSampler.CurrentSample
+                    : null;
+
+            if (centerSample != null)
+            {
+                var centerUMeters =
+                    centerSample.WorldOriginXMeters +
+                    centerSample.WorldSizeXMeters *
+                        0.5;
+                var centerVMeters =
+                    -(centerSample.WorldOriginZMeters +
+                        centerSample.WorldSizeZMeters *
+                            0.5);
+                var centerAddress =
+                    new CubeSphereAddress(
+                        centerSample.Face,
+                        CubeSphereMapping.MetersToFaceCoordinate(
+                            centerUMeters,
+                            surfaceFrame.PlanetRadiusMeters),
+                        CubeSphereMapping.MetersToFaceCoordinate(
+                            centerVMeters,
+                            surfaceFrame.PlanetRadiusMeters),
+                        0.0);
+
+                return
+                    ToVector3(
+                        CubeSphereMapping.AddressToDirection(
+                            centerAddress)).normalized;
+            }
+
+            return
+                surfaceFrame.HasAnchorAddress
+                    ? ToVector3(
+                        CubeSphereMapping.AddressToDirection(
+                            surfaceFrame.AnchorAddress)).normalized
+                    : Vector3.up;
         }
 
         private void ApplyMaterial(
@@ -1443,7 +1724,22 @@ namespace jcan.CelestialSystems
                     ? qualityProfile
                         .LocalColliderCoverageRadiusMeters
                     : 0.0;
+            resolvedVisibleCoverageRadiusMeters =
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? sampleStream ==
+                        RoundMapMagicVirtualSampleStream.Local
+                            ? qualityProfile.LocalCoverageRadiusMeters
+                            : qualityProfile.MidCoverageRadiusMeters
+                    : 0.0;
+            resolvedLocalMidBlendWidthMeters =
+                qualityProfile != null &&
+                qualityProfile.HasValidSettings
+                    ? qualityProfile.LocalMidBlendWidthMeters
+                    : 0.0;
             colliderRenderedTileCount =
+                0;
+            fadingTileCount =
                 0;
 
             foreach (var runtime in
@@ -1459,7 +1755,20 @@ namespace jcan.CelestialSystems
                 {
                     colliderRenderedTileCount++;
                 }
+
+                if (runtime.FadeProgress <
+                    CompleteFadeProgress)
+                {
+                    fadingTileCount++;
+                }
             }
+
+            hasCompleteVisibleCoverage =
+                heightSampler.HasCompleteCoverage &&
+                expectedRenderedTileCount > 0 &&
+                activeRenderedTileCount ==
+                    expectedRenderedTileCount &&
+                fadingTileCount == 0;
 
             var primaryRuntime =
                 primarySample != null &&
@@ -1546,6 +1855,11 @@ namespace jcan.CelestialSystems
             renderedControlTexture = null;
             resolvedColliderCoverageRadiusMeters = default;
             colliderRenderedTileCount = default;
+            hasCompleteVisibleCoverage = false;
+            localOwnershipReady = false;
+            fadingTileCount = default;
+            resolvedVisibleCoverageRadiusMeters = default;
+            resolvedLocalMidBlendWidthMeters = default;
         }
 
         private void OnDisable()
