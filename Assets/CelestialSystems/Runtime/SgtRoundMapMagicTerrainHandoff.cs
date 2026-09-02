@@ -60,6 +60,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicVirtualHeightSampler midHeightSampler;
 
+        [SerializeField]
+        private RoundMapMagicVirtualHeightSampler localHeightSampler;
+
         [Header("SGT Heightmap")]
         [SerializeField]
         private SgtTerrainHeightmap heightmap;
@@ -105,7 +108,7 @@ namespace jcan.CelestialSystems
 
         private void Start()
         {
-            ResolveMidHeightSampler();
+            ResolveHeightSamplers();
             configurationIsValid =
                 ValidateConfiguration(
                     true);
@@ -143,10 +146,18 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            localSurfaceReady =
-                surfaceSession.HasActiveSession &&
-                surfaceSession.ActiveBodyContext ==
+            ResolveHeightSamplers();
+            var hasTrackedLocalSurface =
+                localHeightSampler != null &&
+                localHeightSampler.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local &&
+                localHeightSampler.StreamingActive &&
+                localHeightSampler.TrackedBodyContext ==
                     bodyContext;
+            localSurfaceReady =
+                hasTrackedLocalSurface &&
+                localHeightSampler.HasCompleteCoverage &&
+                localHeightSampler.HasSample;
             var hasTrackedMidSurface =
                 midHeightSampler != null &&
                 midHeightSampler.MidStreamingActive &&
@@ -162,9 +173,17 @@ namespace jcan.CelestialSystems
                     ? hasTrackedMidSurface &&
                         midHeightSampler.HasSample
                     : midSurfaceReady;
+            var hasUsableLocalSurface =
+                localHeightSampler == null
+                    ? hasUsableMidSurface
+                    : nearSurfaceMode
+                        ? hasTrackedLocalSurface &&
+                            localHeightSampler.HasSample
+                        : localSurfaceReady;
             var shouldUseNearSurfaceMode =
                 customSurfaceHandoffAllowed &&
-                hasUsableMidSurface;
+                hasUsableMidSurface &&
+                hasUsableLocalSurface;
 
             if (!hasAppliedMode ||
                 nearSurfaceMode !=
@@ -349,13 +368,57 @@ namespace jcan.CelestialSystems
             return valid;
         }
 
-        private void ResolveMidHeightSampler()
+        private void ResolveHeightSamplers()
         {
-            if (midHeightSampler == null &&
-                surfaceSession != null)
+            if (surfaceSession == null)
+            {
+                return;
+            }
+
+            if (midHeightSampler != null &&
+                midHeightSampler.SampleStream !=
+                    RoundMapMagicVirtualSampleStream.Mid)
             {
                 midHeightSampler =
-                    surfaceSession.GetComponent<RoundMapMagicVirtualHeightSampler>();
+                    null;
+            }
+
+            if (localHeightSampler != null &&
+                localHeightSampler.SampleStream !=
+                    RoundMapMagicVirtualSampleStream.Local)
+            {
+                localHeightSampler =
+                    null;
+            }
+
+            if (midHeightSampler != null &&
+                localHeightSampler != null)
+            {
+                return;
+            }
+
+            var samplers =
+                surfaceSession.GetComponents<RoundMapMagicVirtualHeightSampler>();
+
+            for (var index = 0;
+                index < samplers.Length;
+                index++)
+            {
+                var sampler =
+                    samplers[index];
+
+                if (sampler.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Mid)
+                {
+                    midHeightSampler =
+                        sampler;
+                }
+                else if (sampler.SampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local)
+                {
+                    localHeightSampler =
+                        sampler;
+                }
             }
         }
 
