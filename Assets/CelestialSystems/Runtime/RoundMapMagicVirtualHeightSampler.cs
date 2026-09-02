@@ -178,6 +178,9 @@ namespace jcan.CelestialSystems
         private int desiredResolution;
         private double desiredTileSizeX;
         private double desiredTileSizeZ;
+        private double desiredCoverageRadiusMeters;
+        private double desiredPatchCenterWorldX;
+        private double desiredPatchCenterWorldZ;
         private int desiredMargins;
 
         public bool HasSample =>
@@ -204,6 +207,9 @@ namespace jcan.CelestialSystems
             surfaceFrame != null
                 ? surfaceFrame.BodyContext
                 : null;
+
+        public double AnchorAltitudeMeters =>
+            anchorAltitudeMeters;
 
         private void Reset()
         {
@@ -322,6 +328,14 @@ namespace jcan.CelestialSystems
             var nextTileSizeZ =
                 mapMagicObject.tileSize.z *
                 tileSizeMultiplier;
+            var nextCoverageRadiusMeters =
+                qualityProfile.MidCoverageRadiusMeters;
+            var nextPatchCenterWorldX =
+                (nextSourceTileX + 0.5) *
+                mapMagicObject.tileSize.x;
+            var nextPatchCenterWorldZ =
+                (nextSourceTileZ + 0.5) *
+                mapMagicObject.tileSize.z;
             var nextMargins =
                 Math.Max(
                     0,
@@ -339,6 +353,9 @@ namespace jcan.CelestialSystems
                     nextResolution,
                     nextTileSizeX,
                     nextTileSizeZ,
+                    nextCoverageRadiusMeters,
+                    nextPatchCenterWorldX,
+                    nextPatchCenterWorldZ,
                     nextMargins))
             {
                 RebuildDesiredGrid(
@@ -348,6 +365,9 @@ namespace jcan.CelestialSystems
                     nextResolution,
                     nextTileSizeX,
                     nextTileSizeZ,
+                    nextCoverageRadiusMeters,
+                    nextPatchCenterWorldX,
+                    nextPatchCenterWorldZ,
                     nextMargins);
             }
 
@@ -431,20 +451,18 @@ namespace jcan.CelestialSystems
                 Math.Min(
                     tileSizeX,
                     tileSizeZ);
-            var remainingCoverageMeters =
-                qualityProfile.MidCoverageRadiusMeters -
-                smallestTileSize *
+            var largestTileSize =
+                Math.Max(
+                    tileSizeX,
+                    tileSizeZ);
+            var searchCoverageMeters =
+                qualityProfile.MidCoverageRadiusMeters +
+                largestTileSize *
                     0.5;
-
-            if (remainingCoverageMeters <=
-                0.0)
-            {
-                return 0;
-            }
 
             var tileRadiusValue =
                 Math.Ceiling(
-                    remainingCoverageMeters /
+                    searchCoverageMeters /
                     smallestTileSize);
 
             if (tileRadiusValue >=
@@ -505,6 +523,9 @@ namespace jcan.CelestialSystems
             int nextResolution,
             double nextTileSizeX,
             double nextTileSizeZ,
+            double nextCoverageRadiusMeters,
+            double nextPatchCenterWorldX,
+            double nextPatchCenterWorldZ,
             int nextMargins)
         {
             return
@@ -515,6 +536,12 @@ namespace jcan.CelestialSystems
                 desiredResolution != nextResolution ||
                 desiredTileSizeX != nextTileSizeX ||
                 desiredTileSizeZ != nextTileSizeZ ||
+                desiredCoverageRadiusMeters !=
+                    nextCoverageRadiusMeters ||
+                desiredPatchCenterWorldX !=
+                    nextPatchCenterWorldX ||
+                desiredPatchCenterWorldZ !=
+                    nextPatchCenterWorldZ ||
                 desiredMargins != nextMargins;
         }
 
@@ -525,6 +552,9 @@ namespace jcan.CelestialSystems
             int nextResolution,
             double nextTileSizeX,
             double nextTileSizeZ,
+            double nextCoverageRadiusMeters,
+            double nextPatchCenterWorldX,
+            double nextPatchCenterWorldZ,
             int nextMargins)
         {
             var sourceSettingsChanged =
@@ -534,11 +564,14 @@ namespace jcan.CelestialSystems
                 desiredTileSizeZ != nextTileSizeZ ||
                 desiredMargins != nextMargins;
 
-            generationVersion++;
-
-            if (generationStop != null)
+            if (sourceSettingsChanged)
             {
-                generationStop.stop = true;
+                generationVersion++;
+
+                if (generationStop != null)
+                {
+                    generationStop.stop = true;
+                }
             }
 
             generationSource =
@@ -554,6 +587,12 @@ namespace jcan.CelestialSystems
                 nextTileSizeX;
             desiredTileSizeZ =
                 nextTileSizeZ;
+            desiredCoverageRadiusMeters =
+                nextCoverageRadiusMeters;
+            desiredPatchCenterWorldX =
+                nextPatchCenterWorldX;
+            desiredPatchCenterWorldZ =
+                nextPatchCenterWorldZ;
             desiredMargins =
                 nextMargins;
             desiredKeys.Clear();
@@ -567,7 +606,7 @@ namespace jcan.CelestialSystems
                     offsetX <= nextRadius;
                     offsetX++)
                 {
-                    desiredKeys.Add(
+                    var key =
                         new SampleKey
                         {
                             Face =
@@ -578,7 +617,18 @@ namespace jcan.CelestialSystems
                             TileZ =
                                 nextCenterKey.TileZ +
                                 offsetZ
-                        });
+                        };
+
+                    if (IsSampleCenterWithinCoverage(
+                            key,
+                            nextTileSizeX,
+                            nextTileSizeZ,
+                            nextPatchCenterWorldX,
+                            nextPatchCenterWorldZ,
+                            nextCoverageRadiusMeters))
+                    {
+                        desiredKeys.Add(key);
+                    }
                 }
             }
 
@@ -658,13 +708,42 @@ namespace jcan.CelestialSystems
                                     offsetZ
                             };
 
-                        if (!samples.ContainsKey(key))
+                        if (desiredKeys.Contains(key) &&
+                            !samples.ContainsKey(key))
                         {
                             generationQueue.Enqueue(key);
                         }
                     }
                 }
             }
+        }
+
+        private static bool IsSampleCenterWithinCoverage(
+            SampleKey key,
+            double tileSizeX,
+            double tileSizeZ,
+            double patchCenterWorldX,
+            double patchCenterWorldZ,
+            double coverageRadiusMeters)
+        {
+            var sampleCenterWorldX =
+                (key.TileX + 0.5) *
+                tileSizeX;
+            var sampleCenterWorldZ =
+                (key.TileZ + 0.5) *
+                tileSizeZ;
+            var deltaX =
+                sampleCenterWorldX -
+                patchCenterWorldX;
+            var deltaZ =
+                sampleCenterWorldZ -
+                patchCenterWorldZ;
+
+            return
+                deltaX * deltaX +
+                    deltaZ * deltaZ <=
+                coverageRadiusMeters *
+                    coverageRadiusMeters;
         }
 
         private void StartNextGeneration(
@@ -1061,6 +1140,9 @@ namespace jcan.CelestialSystems
             desiredResolution = default;
             desiredTileSizeX = default;
             desiredTileSizeZ = default;
+            desiredCoverageRadiusMeters = default;
+            desiredPatchCenterWorldX = default;
+            desiredPatchCenterWorldZ = default;
             desiredMargins = default;
             desiredKeys.Clear();
             generationQueue.Clear();
