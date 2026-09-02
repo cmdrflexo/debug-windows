@@ -129,19 +129,33 @@ namespace jcan.CelestialSystems
                         matrix.PixelToWorld(
                             pixelX,
                             pixelZ);
-                    var address =
-                        new CubeSphereAddress(
-                            face,
-                            CubeSphereMapping.MetersToFaceCoordinate(
-                                mapWorldPosition.x,
-                                planetRadiusMeters),
-                            CubeSphereMapping.MetersToFaceCoordinate(
-                                -mapWorldPosition.z,
-                                planetRadiusMeters),
-                            0.0);
-                    var direction =
-                        CubeSphereMapping.AddressToDirection(
-                            address);
+                    DoubleVector3 direction;
+
+                    if (sphericalData == null ||
+                        !sphericalData.TryMapPixelToDirection(
+                            pixelX,
+                            pixelZ,
+                            data.area.active.rect.offset.x,
+                            data.area.active.rect.offset.z,
+                            data.area.active.rect.size.x,
+                            data.area.active.rect.size.z,
+                            out direction))
+                    {
+                        var address =
+                            new CubeSphereAddress(
+                                face,
+                                CubeSphereMapping.MetersToFaceCoordinate(
+                                    mapWorldPosition.x,
+                                    planetRadiusMeters),
+                                CubeSphereMapping.MetersToFaceCoordinate(
+                                    -mapWorldPosition.z,
+                                    planetRadiusMeters),
+                                0.0);
+
+                        direction =
+                            CubeSphereMapping.AddressToDirection(
+                                address);
+                    }
                     var normalizedNoise =
                         RoundMapMagicSphericalNoise.EvaluateNormalized(
                             direction,

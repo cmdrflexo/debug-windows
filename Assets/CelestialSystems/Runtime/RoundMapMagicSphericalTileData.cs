@@ -16,9 +16,65 @@ namespace jcan.CelestialSystems
 
         public int SurfaceSeed { get; set; }
 
+        public double MapWorldOriginXMeters { get; set; }
+
+        public double MapWorldOriginZMeters { get; set; }
+
+        public double MapWorldSizeXMeters { get; set; }
+
+        public double MapWorldSizeZMeters { get; set; }
+
         public bool HasValidSphericalContext =>
             IsFinite(PlanetRadiusMeters) &&
             PlanetRadiusMeters > 0.0;
+
+        public bool HasExactMapWorldBounds =>
+            IsFinite(MapWorldOriginXMeters) &&
+            IsFinite(MapWorldOriginZMeters) &&
+            IsFinite(MapWorldSizeXMeters) &&
+            IsFinite(MapWorldSizeZMeters) &&
+            MapWorldSizeXMeters > 0.0 &&
+            MapWorldSizeZMeters > 0.0;
+
+        public bool TryMapPixelToDirection(
+            int pixelX,
+            int pixelZ,
+            int activePixelOffsetX,
+            int activePixelOffsetZ,
+            int activeResolutionX,
+            int activeResolutionZ,
+            out DoubleVector3 direction)
+        {
+            if (!HasExactMapWorldBounds ||
+                activeResolutionX < 2 ||
+                activeResolutionZ < 2)
+            {
+                direction = default;
+                return false;
+            }
+
+            var normalizedX =
+                (pixelX -
+                    activePixelOffsetX) /
+                (double)(
+                    activeResolutionX -
+                    1);
+            var normalizedZ =
+                (pixelZ -
+                    activePixelOffsetZ) /
+                (double)(
+                    activeResolutionZ -
+                    1);
+
+            return TryMapWorldPositionToDirection(
+                MapWorldOriginXMeters +
+                    MapWorldSizeXMeters *
+                    normalizedX,
+                MapWorldOriginZMeters +
+                    MapWorldSizeZMeters *
+                    normalizedZ,
+                out direction);
+        }
 
         public bool TryMapWorldPositionToDirection(
             double mapWorldXMeters,

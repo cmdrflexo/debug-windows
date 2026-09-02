@@ -1246,6 +1246,16 @@ namespace jcan.CelestialSystems
                         surfaceDefinition != null
                             ? surfaceDefinition.SurfaceSeed
                             : 0,
+                    MapWorldOriginXMeters =
+                        key.TileX *
+                        tileSizeX,
+                    MapWorldOriginZMeters =
+                        key.TileZ *
+                        tileSizeZ,
+                    MapWorldSizeXMeters =
+                        tileSizeX,
+                    MapWorldSizeZMeters =
+                        tileSizeZ,
                     area =
                         new Area(
                             new Coord(
