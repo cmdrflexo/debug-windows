@@ -57,6 +57,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CubeSphereMapMagicCoordinateDriver rootC;
 
+        [SerializeField]
+        [Tooltip("When disabled, the roots remain available as graph sources for direct sampling but do not create Unity Terrain tiles.")]
+        private bool generateUnityTerrainTiles = true;
+
         [Header("Runtime")]
         [SerializeField]
         private int activeRootCount;
@@ -97,6 +101,9 @@ namespace jcan.CelestialSystems
 
         public CubeSphereMapMagicCoordinateDriver PrimaryAssignedRoot =>
             primaryAssignedRoot;
+
+        public bool GenerateUnityTerrainTiles =>
+            generateUnityTerrainTiles;
 
         public MapMagicObject GenerationSource =>
             rootA != null &&
@@ -213,6 +220,12 @@ namespace jcan.CelestialSystems
                 !surfaceSession.HasActiveSession ||
                 addressTracker == null ||
                 !addressTracker.HasPrimaryTileAddress)
+            {
+                DeactivateAllRoots();
+                return;
+            }
+
+            if (!generateUnityTerrainTiles)
             {
                 DeactivateAllRoots();
                 return;
