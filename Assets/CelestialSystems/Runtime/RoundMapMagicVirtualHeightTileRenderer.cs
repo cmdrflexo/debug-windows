@@ -182,7 +182,7 @@ namespace jcan.CelestialSystems
         private void LateUpdate()
         {
             if (!ConfigurationIsValid() ||
-                !surfaceSession.HasActiveSession ||
+                !heightSampler.MidStreamingActive ||
                 !surfaceFrame.TryGetPlanetCenterScenePosition(
                     out var planetCenterScenePosition))
             {
@@ -547,7 +547,9 @@ namespace jcan.CelestialSystems
             }
 
             var surfaceDefinition =
-                surfaceSession.ActiveSurfaceDefinition;
+                surfaceSession.ActiveSurfaceDefinition != null
+                    ? surfaceSession.ActiveSurfaceDefinition
+                    : surfaceSession.ConfiguredSurfaceDefinition;
             var resolvedMaterial =
                 meshMaterial != null
                     ? meshMaterial

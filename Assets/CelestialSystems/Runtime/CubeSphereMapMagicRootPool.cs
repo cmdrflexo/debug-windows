@@ -2,6 +2,7 @@
  * Manages three reusable MapMagic roots while preserving each face-to-root assignment across cube-sphere handoffs.
  */
 
+using MapMagic.Core;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -96,6 +97,17 @@ namespace jcan.CelestialSystems
 
         public CubeSphereMapMagicCoordinateDriver PrimaryAssignedRoot =>
             primaryAssignedRoot;
+
+        public MapMagicObject GenerationSource =>
+            rootA != null &&
+            rootA.MapMagicObject != null
+                ? rootA.MapMagicObject
+                : rootB != null &&
+                    rootB.MapMagicObject != null
+                    ? rootB.MapMagicObject
+                    : rootC != null
+                        ? rootC.MapMagicObject
+                        : null;
 
         public void ReleaseAllRoots()
         {

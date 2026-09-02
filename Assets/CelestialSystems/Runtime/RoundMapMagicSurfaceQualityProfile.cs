@@ -34,6 +34,14 @@ namespace jcan.CelestialSystems
         private double midCoverageRadiusMeters =
             60000.0;
 
+        [SerializeField]
+        private double midActivationAltitudeMeters =
+            60000.0;
+
+        [SerializeField]
+        private double midReleaseAltitudeMeters =
+            75000.0;
+
         [Header("Transitions")]
         [SerializeField]
         private double transitionOverlapMeters =
@@ -54,6 +62,12 @@ namespace jcan.CelestialSystems
         public double MidCoverageRadiusMeters =>
             midCoverageRadiusMeters;
 
+        public double MidActivationAltitudeMeters =>
+            midActivationAltitudeMeters;
+
+        public double MidReleaseAltitudeMeters =>
+            midReleaseAltitudeMeters;
+
         public double TransitionOverlapMeters =>
             transitionOverlapMeters;
 
@@ -72,6 +86,14 @@ namespace jcan.CelestialSystems
                 midCoverageRadiusMeters) &&
             midCoverageRadiusMeters >=
                 localCoverageRadiusMeters &&
+            IsFinite(
+                midActivationAltitudeMeters) &&
+            midActivationAltitudeMeters >=
+                0.0 &&
+            IsFinite(
+                midReleaseAltitudeMeters) &&
+            midReleaseAltitudeMeters >=
+                midActivationAltitudeMeters &&
             IsFinite(
                 transitionOverlapMeters) &&
             transitionOverlapMeters >=
