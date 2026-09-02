@@ -1,5 +1,5 @@
 /*
- * Incrementally generates and caches low-resolution height samples directly from the active MapMagic graph without creating Unity Terrains.
+ * Incrementally generates and caches configurable-detail surface samples directly from the active MapMagic graph without creating Unity Terrains.
  */
 
 using System;
@@ -12,11 +12,17 @@ using MapMagic.Nodes.MatrixGenerators;
 using MapMagic.Products;
 using MapMagic.Terrains;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
+    public enum RoundMapMagicVirtualSampleStream
+    {
+        Mid,
+        Local
+    }
+
     [DefaultExecutionOrder(250)]
-    [DisallowMultipleComponent]
     public sealed class RoundMapMagicVirtualHeightSampler :
         MonoBehaviour
     {
@@ -79,6 +85,10 @@ namespace jcan.CelestialSystems
         private CubeSphereMapMagicRootPool rootPool;
 
         [SerializeField]
+        private RoundMapMagicVirtualSampleStream sampleStream =
+            RoundMapMagicVirtualSampleStream.Mid;
+
+        [SerializeField]
         private bool generateAutomatically = true;
 
         [Header("Generation Priority")]
@@ -97,17 +107,20 @@ namespace jcan.CelestialSystems
         private int offscreenCatchUpInterval = 8;
 
         [Header("Runtime Request")]
+        [FormerlySerializedAs("midStreamingActive")]
         [SerializeField]
-        private bool midStreamingActive;
+        private bool streamingActive;
 
         [SerializeField]
         private double anchorAltitudeMeters;
 
+        [FormerlySerializedAs("resolvedMidActivationAltitudeMeters")]
         [SerializeField]
-        private double resolvedMidActivationAltitudeMeters;
+        private double resolvedActivationAltitudeMeters;
 
+        [FormerlySerializedAs("resolvedMidReleaseAltitudeMeters")]
         [SerializeField]
-        private double resolvedMidReleaseAltitudeMeters;
+        private double resolvedReleaseAltitudeMeters;
 
         [SerializeField]
         private bool isGenerating;
@@ -157,8 +170,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double virtualTileSizeMeters;
 
+        [FormerlySerializedAs("resolvedMidResolution")]
         [SerializeField]
-        private int resolvedMidResolution;
+        private int resolvedStreamResolution;
 
         [Header("Runtime Sample")]
         [SerializeField]
@@ -232,8 +246,16 @@ namespace jcan.CelestialSystems
         public int ExpectedSampleCount =>
             expectedSampleCount;
 
+        public RoundMapMagicVirtualSampleStream SampleStream =>
+            sampleStream;
+
+        public bool StreamingActive =>
+            streamingActive;
+
         public bool MidStreamingActive =>
-            midStreamingActive;
+            sampleStream ==
+                RoundMapMagicVirtualSampleStream.Mid &&
+            streamingActive;
 
         public bool HasCompleteCoverage =>
             expectedSampleCount > 0 &&
@@ -299,7 +321,7 @@ namespace jcan.CelestialSystems
                 surfaceSession == null ||
                 rootPool == null)
             {
-                midStreamingActive = false;
+                streamingActive = false;
                 ClearStreamingState();
                 return;
             }
@@ -310,15 +332,15 @@ namespace jcan.CelestialSystems
             if (qualityProfile == null ||
                 !qualityProfile.HasValidSettings)
             {
-                midStreamingActive = false;
+                streamingActive = false;
                 ClearStreamingState();
                 return;
             }
 
-            UpdateMidStreamingState(
+            UpdateStreamingState(
                 qualityProfile);
 
-            if (!midStreamingActive ||
+            if (!streamingActive ||
                 !addressTracker.HasPrimaryTileAddress)
             {
                 ClearStreamingState();
@@ -340,7 +362,10 @@ namespace jcan.CelestialSystems
             }
 
             var tileSizeMultiplier =
-                qualityProfile.MidTileSizeMultiplier;
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local
+                    ? 1
+                    : qualityProfile.MidTileSizeMultiplier;
             var sourceAddress =
                 addressTracker.PrimaryTileAddress;
             var nextCenterKey =
@@ -358,15 +383,26 @@ namespace jcan.CelestialSystems
                             tileSizeMultiplier)
                 };
             var nextResolution =
-                qualityProfile.MidMeshResolution;
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local
+                    ? qualityProfile.LocalMeshResolution
+                    : qualityProfile.MidMeshResolution;
             var nextTileSizeX =
                 mapMagicObject.tileSize.x *
                 tileSizeMultiplier;
             var nextTileSizeZ =
                 mapMagicObject.tileSize.z *
                 tileSizeMultiplier;
+            var requestedCoverageRadiusMeters =
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local
+                    ? qualityProfile.LocalCoverageRadiusMeters
+                    : qualityProfile.MidCoverageRadiusMeters;
             var nextCoverageRadiusMeters =
-                qualityProfile.MidCoverageRadiusMeters;
+                ResolveSampleCenterCoverageRadius(
+                    requestedCoverageRadiusMeters,
+                    nextTileSizeX,
+                    nextTileSizeZ);
             var nextPatchCenterWorldX =
                 (nextSourceTileX + 0.5) *
                 mapMagicObject.tileSize.x;
@@ -376,10 +412,13 @@ namespace jcan.CelestialSystems
             var nextMargins =
                 Math.Max(
                     0,
-                    mapMagicObject.draftMargins);
+                    sampleStream ==
+                        RoundMapMagicVirtualSampleStream.Local
+                        ? mapMagicObject.tileMargins
+                        : mapMagicObject.draftMargins);
             var nextRadius =
                 ResolveStreamedTileRadius(
-                    qualityProfile,
+                    nextCoverageRadiusMeters,
                     nextTileSizeX,
                     nextTileSizeZ);
 
@@ -420,7 +459,7 @@ namespace jcan.CelestialSystems
                 nextCenterKey.TileZ;
             virtualTileSizeMeters =
                 nextTileSizeX;
-            resolvedMidResolution =
+            resolvedStreamResolution =
                 nextResolution;
             resolvedStreamedTileRadius =
                 nextRadius;
@@ -434,53 +473,73 @@ namespace jcan.CelestialSystems
                 nextMargins);
         }
 
-        private void UpdateMidStreamingState(
+        private void UpdateStreamingState(
             RoundMapMagicSurfaceQualityProfile qualityProfile)
         {
-            resolvedMidActivationAltitudeMeters =
-                qualityProfile.MidActivationAltitudeMeters >
-                    0.0
-                    ? qualityProfile.MidActivationAltitudeMeters
-                    : qualityProfile.MidCoverageRadiusMeters;
-            resolvedMidReleaseAltitudeMeters =
-                qualityProfile.MidReleaseAltitudeMeters >
-                    resolvedMidActivationAltitudeMeters
-                    ? qualityProfile.MidReleaseAltitudeMeters
-                    : resolvedMidActivationAltitudeMeters +
-                        Math.Max(
-                            1000.0,
-                            qualityProfile.TransitionOverlapMeters);
+            if (sampleStream ==
+                RoundMapMagicVirtualSampleStream.Local)
+            {
+                resolvedActivationAltitudeMeters =
+                    qualityProfile.LocalActivationAltitudeMeters >
+                        0.0
+                        ? qualityProfile.LocalActivationAltitudeMeters
+                        : qualityProfile.LocalCoverageRadiusMeters;
+                resolvedReleaseAltitudeMeters =
+                    qualityProfile.LocalReleaseAltitudeMeters >
+                        resolvedActivationAltitudeMeters
+                        ? qualityProfile.LocalReleaseAltitudeMeters
+                        : resolvedActivationAltitudeMeters +
+                            Math.Max(
+                                1000.0,
+                                qualityProfile.TransitionOverlapMeters);
+            }
+            else
+            {
+                resolvedActivationAltitudeMeters =
+                    qualityProfile.MidActivationAltitudeMeters >
+                        0.0
+                        ? qualityProfile.MidActivationAltitudeMeters
+                        : qualityProfile.MidCoverageRadiusMeters;
+                resolvedReleaseAltitudeMeters =
+                    qualityProfile.MidReleaseAltitudeMeters >
+                        resolvedActivationAltitudeMeters
+                        ? qualityProfile.MidReleaseAltitudeMeters
+                        : resolvedActivationAltitudeMeters +
+                            Math.Max(
+                                1000.0,
+                                qualityProfile.TransitionOverlapMeters);
+            }
 
             if (!surfaceFrame.HasAnchorAddress)
             {
                 anchorAltitudeMeters = default;
-                midStreamingActive = false;
+                streamingActive = false;
                 return;
             }
 
             anchorAltitudeMeters =
                 surfaceFrame.AnchorAltitudeMeters;
 
-            if (midStreamingActive)
+            if (streamingActive)
             {
                 if (anchorAltitudeMeters >
-                    resolvedMidReleaseAltitudeMeters)
+                    resolvedReleaseAltitudeMeters)
                 {
-                    midStreamingActive = false;
+                    streamingActive = false;
                 }
 
                 return;
             }
 
             if (anchorAltitudeMeters <=
-                resolvedMidActivationAltitudeMeters)
+                resolvedActivationAltitudeMeters)
             {
-                midStreamingActive = true;
+                streamingActive = true;
             }
         }
 
         private static int ResolveStreamedTileRadius(
-            RoundMapMagicSurfaceQualityProfile qualityProfile,
+            double coverageRadiusMeters,
             double tileSizeX,
             double tileSizeZ)
         {
@@ -493,7 +552,7 @@ namespace jcan.CelestialSystems
                     tileSizeX,
                     tileSizeZ);
             var searchCoverageMeters =
-                qualityProfile.MidCoverageRadiusMeters +
+                coverageRadiusMeters +
                 largestTileSize *
                     0.5;
 
@@ -517,6 +576,28 @@ namespace jcan.CelestialSystems
                     tileRadius,
                     0,
                     MaximumStreamedTileRadius);
+        }
+
+        private double ResolveSampleCenterCoverageRadius(
+            double requestedCoverageRadiusMeters,
+            double tileSizeX,
+            double tileSizeZ)
+        {
+            if (sampleStream !=
+                RoundMapMagicVirtualSampleStream.Local)
+            {
+                return
+                    requestedCoverageRadiusMeters;
+            }
+
+            return
+                Math.Max(
+                    0.0,
+                    requestedCoverageRadiusMeters -
+                    Math.Max(
+                        tileSizeX,
+                        tileSizeZ) *
+                        0.5);
         }
 
         public void CopyCurrentSamplesTo(
@@ -1066,7 +1147,8 @@ namespace jcan.CelestialSystems
                     isPreview =
                         false,
                     isDraft =
-                        true
+                        sampleStream !=
+                            RoundMapMagicVirtualSampleStream.Local
                 };
 
             try
@@ -1448,6 +1530,7 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
+            streamingActive = false;
             generationVersion++;
 
             if (generationStop != null)

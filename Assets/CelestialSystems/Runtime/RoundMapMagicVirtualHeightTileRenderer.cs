@@ -1,5 +1,5 @@
 /*
- * Renders the cached mid-detail MapMagic height samples as curved cube-sphere meshes without creating Unity Terrains.
+ * Renders cached MapMagic surface samples as curved cube-sphere meshes without creating Unity Terrains.
  */
 
 using System;
@@ -10,7 +10,6 @@ using UnityEngine.Rendering;
 namespace jcan.CelestialSystems
 {
     [DefaultExecutionOrder(300)]
-    [DisallowMultipleComponent]
     public sealed class RoundMapMagicVirtualHeightTileRenderer :
         MonoBehaviour
     {
@@ -69,6 +68,7 @@ namespace jcan.CelestialSystems
             public GameObject MeshObject;
             public MeshFilter MeshFilter;
             public MeshRenderer MeshRenderer;
+            public MeshCollider MeshCollider;
             public Mesh CurvedMesh;
             public RoundMapMagicVirtualHeightSample Sample;
             public RoundMapMagicVirtualHeightSample MaterialSample;
@@ -88,6 +88,10 @@ namespace jcan.CelestialSystems
         private RoundMapMagicSurfaceSession surfaceSession;
 
         [SerializeField]
+        private RoundMapMagicVirtualSampleStream sampleStream =
+            RoundMapMagicVirtualSampleStream.Mid;
+
+        [SerializeField]
         private RoundMapMagicVirtualHeightSampler heightSampler;
 
         [SerializeField]
@@ -100,6 +104,9 @@ namespace jcan.CelestialSystems
                 0.45f,
                 0.2f,
                 1.0f);
+
+        [SerializeField]
+        private bool generateMeshCollider;
 
         [SerializeField]
         [Tooltip("Moves these validation meshes radially without changing their sampled heights. Zero places them on the generated surface.")]
@@ -151,6 +158,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Texture renderedControlTexture;
 
+        [SerializeField]
+        private int colliderRenderedTileCount;
+
         private readonly Dictionary<TileKey, TileRuntime>
             tiles =
                 new Dictionary<TileKey, TileRuntime>();
@@ -172,16 +182,13 @@ namespace jcan.CelestialSystems
 
         private void Reset()
         {
-            surfaceFrame =
-                GetComponent<GePlanetSurfaceFrame>();
-            surfaceSession =
-                GetComponent<RoundMapMagicSurfaceSession>();
-            heightSampler =
-                GetComponent<RoundMapMagicVirtualHeightSampler>();
+            ResolveLocalReferences();
         }
 
         private void Start()
         {
+            ResolveLocalReferences();
+
             if (surfaceFrame == null)
             {
                 Debug.LogError(
@@ -206,8 +213,10 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            ResolveLocalReferences();
+
             if (!ConfigurationIsValid() ||
-                !heightSampler.MidStreamingActive ||
+                !heightSampler.StreamingActive ||
                 !surfaceFrame.TryGetPlanetCenterScenePosition(
                     out var planetCenterScenePosition))
             {
@@ -248,6 +257,9 @@ namespace jcan.CelestialSystems
                     planetCenterScenePosition);
                 ApplyMaterial(
                     runtime);
+                ApplyMeshCollider(
+                    runtime,
+                    false);
             }
 
             RefreshRuntimeState();
@@ -478,9 +490,12 @@ namespace jcan.CelestialSystems
             runtime.CurvedMesh.RecalculateNormals();
             runtime.CurvedMesh.RecalculateTangents();
             runtime.CurvedMesh.RecalculateBounds();
+            ApplyMeshCollider(
+                runtime,
+                true);
 
             runtime.MeshObject.name =
-                $"Mid Curved Tile {sample.TileX},{sample.TileZ}";
+                $"{ResolveStreamName()} Curved Tile {sample.TileX},{sample.TileZ}";
             runtime.Sample =
                 sample;
             runtime.TileCenterDirection =
@@ -520,10 +535,99 @@ namespace jcan.CelestialSystems
                     new Mesh
                     {
                         name =
-                            "Virtual MapMagic Mid Curved Tile"
+                            $"Virtual MapMagic {ResolveStreamName()} Curved Tile"
                     };
                 runtime.MeshFilter.sharedMesh =
+                runtime.CurvedMesh;
+            }
+        }
+
+        private void ApplyMeshCollider(
+            TileRuntime runtime,
+            bool forceRefresh)
+        {
+            if (!generateMeshCollider ||
+                runtime.MeshObject == null ||
+                runtime.CurvedMesh == null)
+            {
+                if (runtime.MeshCollider != null)
+                {
+                    DestroyUnityObject(
+                        runtime.MeshCollider);
+                }
+
+                runtime.MeshCollider =
+                    null;
+                return;
+            }
+
+            if (runtime.MeshCollider == null)
+            {
+                runtime.MeshCollider =
+                    runtime.MeshObject.AddComponent<MeshCollider>();
+                forceRefresh =
+                    true;
+            }
+
+            if (forceRefresh ||
+                runtime.MeshCollider.sharedMesh !=
+                    runtime.CurvedMesh)
+            {
+                runtime.MeshCollider.sharedMesh =
+                    null;
+                runtime.MeshCollider.sharedMesh =
                     runtime.CurvedMesh;
+            }
+        }
+
+        private string ResolveStreamName()
+        {
+            return
+                sampleStream ==
+                    RoundMapMagicVirtualSampleStream.Local
+                    ? "Local"
+                    : "Mid";
+        }
+
+        private void ResolveLocalReferences()
+        {
+            if (surfaceFrame == null)
+            {
+                surfaceFrame =
+                    GetComponent<GePlanetSurfaceFrame>();
+            }
+
+            if (surfaceSession == null)
+            {
+                surfaceSession =
+                    GetComponent<RoundMapMagicSurfaceSession>();
+            }
+
+            if (heightSampler != null &&
+                heightSampler.SampleStream ==
+                    sampleStream)
+            {
+                return;
+            }
+
+            heightSampler =
+                null;
+            var samplers =
+                GetComponents<RoundMapMagicVirtualHeightSampler>();
+
+            for (var index = 0;
+                index < samplers.Length;
+                index++)
+            {
+                if (samplers[index].SampleStream !=
+                    sampleStream)
+                {
+                    continue;
+                }
+
+                heightSampler =
+                    samplers[index];
+                break;
             }
         }
 
@@ -1269,6 +1373,8 @@ namespace jcan.CelestialSystems
                     : default;
             texturedRenderedTileCount =
                 0;
+            colliderRenderedTileCount =
+                0;
 
             foreach (var runtime in
                 tiles.Values)
@@ -1276,6 +1382,12 @@ namespace jcan.CelestialSystems
                 if (runtime.GeneratedMaterial != null)
                 {
                     texturedRenderedTileCount++;
+                }
+
+                if (runtime.MeshCollider != null &&
+                    runtime.MeshCollider.sharedMesh != null)
+                {
+                    colliderRenderedTileCount++;
                 }
             }
 
@@ -1362,6 +1474,7 @@ namespace jcan.CelestialSystems
             renderedControlResolution = default;
             renderedTerrainLayerCount = default;
             renderedControlTexture = null;
+            colliderRenderedTileCount = default;
         }
 
         private void OnDisable()

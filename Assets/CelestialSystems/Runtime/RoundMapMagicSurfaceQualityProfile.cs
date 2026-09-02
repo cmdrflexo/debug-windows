@@ -21,6 +21,14 @@ namespace jcan.CelestialSystems
         private double localCoverageRadiusMeters =
             3000.0;
 
+        [SerializeField]
+        private double localActivationAltitudeMeters =
+            25000.0;
+
+        [SerializeField]
+        private double localReleaseAltitudeMeters =
+            30000.0;
+
         [Header("Mid Detail")]
         [SerializeField]
         [Range(3, 257)]
@@ -61,6 +69,12 @@ namespace jcan.CelestialSystems
         public double LocalCoverageRadiusMeters =>
             localCoverageRadiusMeters;
 
+        public double LocalActivationAltitudeMeters =>
+            localActivationAltitudeMeters;
+
+        public double LocalReleaseAltitudeMeters =>
+            localReleaseAltitudeMeters;
+
         public int MidMeshResolution =>
             midMeshResolution;
 
@@ -92,6 +106,14 @@ namespace jcan.CelestialSystems
                 localCoverageRadiusMeters) &&
             localCoverageRadiusMeters >
                 0.0 &&
+            IsFinite(
+                localActivationAltitudeMeters) &&
+            localActivationAltitudeMeters >=
+                0.0 &&
+            IsFinite(
+                localReleaseAltitudeMeters) &&
+            localReleaseAltitudeMeters >=
+                localActivationAltitudeMeters &&
             HasPowerOfTwoIntervals(
                 midMeshResolution) &&
             midTileSizeMultiplier >=
