@@ -64,6 +64,12 @@ namespace jcan.CelestialSystems
 
         [Header("Configuration")]
         [SerializeField]
+        private GePlanetSurfaceFrame surfaceFrame;
+
+        [SerializeField]
+        private CubeSphereTerrainAddressTracker addressTracker;
+
+        [SerializeField]
         private RoundMapMagicSurfaceSession surfaceSession;
 
         [SerializeField]
@@ -78,6 +84,18 @@ namespace jcan.CelestialSystems
         private int streamedTileRadius = 1;
 
         [Header("Runtime Request")]
+        [SerializeField]
+        private bool midStreamingActive;
+
+        [SerializeField]
+        private double anchorAltitudeMeters;
+
+        [SerializeField]
+        private double resolvedMidActivationAltitudeMeters;
+
+        [SerializeField]
+        private double resolvedMidReleaseAltitudeMeters;
+
         [SerializeField]
         private bool isGenerating;
 
@@ -174,16 +192,35 @@ namespace jcan.CelestialSystems
         public int ExpectedSampleCount =>
             expectedSampleCount;
 
+        public bool MidStreamingActive =>
+            midStreamingActive;
+
         private void Reset()
         {
-            surfaceSession =
-                GetComponent<RoundMapMagicSurfaceSession>();
-            rootPool =
-                GetComponent<CubeSphereMapMagicRootPool>();
+            ResolveLocalReferences();
+        }
+
+        private void Awake()
+        {
+            ResolveLocalReferences();
         }
 
         private void Start()
         {
+            if (surfaceFrame == null)
+            {
+                Debug.LogError(
+                    "The virtual MapMagic height sampler requires a planet surface frame.",
+                    this);
+            }
+
+            if (addressTracker == null)
+            {
+                Debug.LogError(
+                    "The virtual MapMagic height sampler requires the persistent cube-sphere terrain address tracker.",
+                    this);
+            }
+
             if (surfaceSession == null)
             {
                 Debug.LogError(
@@ -204,45 +241,67 @@ namespace jcan.CelestialSystems
             CompleteGeneration();
 
             if (!generateAutomatically ||
+                surfaceFrame == null ||
+                addressTracker == null ||
                 surfaceSession == null ||
-                rootPool == null ||
-                !surfaceSession.HasActiveSession)
+                rootPool == null)
             {
+                midStreamingActive = false;
                 ClearStreamingState();
                 return;
             }
 
             var qualityProfile =
                 surfaceSession.ConfiguredQualityProfile;
-            var primaryRoot =
-                rootPool.PrimaryAssignedRoot;
 
             if (qualityProfile == null ||
-                !qualityProfile.HasValidSettings ||
-                primaryRoot == null ||
-                !primaryRoot.HasMapMagicCoordinate ||
-                primaryRoot.MapMagicObject == null)
+                !qualityProfile.HasValidSettings)
+            {
+                midStreamingActive = false;
+                ClearStreamingState();
+                return;
+            }
+
+            UpdateMidStreamingState(
+                qualityProfile);
+
+            if (!midStreamingActive ||
+                !addressTracker.HasPrimaryTileAddress)
             {
                 ClearStreamingState();
                 return;
             }
 
             var mapMagicObject =
-                primaryRoot.MapMagicObject;
+                rootPool.GenerationSource;
+
+            if (mapMagicObject == null ||
+                !CubeSphereMapMagicCoordinateDriver
+                    .TryTileAddressToMapMagicCoordinate(
+                        addressTracker.PrimaryTileAddress,
+                        out var nextSourceTileX,
+                        out var nextSourceTileZ))
+            {
+                ClearStreamingState();
+                return;
+            }
+
             var tileSizeMultiplier =
                 qualityProfile.MidTileSizeMultiplier;
+            var sourceAddress =
+                addressTracker.PrimaryTileAddress;
             var nextCenterKey =
                 new SampleKey
                 {
                     Face =
-                        primaryRoot.ActiveFace,
+                        sourceAddress.Face,
                     TileX =
                         FloorDivide(
-                            primaryRoot.MapMagicTileX,
+                            nextSourceTileX,
                             tileSizeMultiplier),
                     TileZ =
                         FloorDivide(
-                            primaryRoot.MapMagicTileZ,
+                            nextSourceTileZ,
                             tileSizeMultiplier)
                 };
             var nextResolution =
@@ -285,9 +344,9 @@ namespace jcan.CelestialSystems
             sampleFace =
                 nextCenterKey.Face;
             sourceTileX =
-                primaryRoot.MapMagicTileX;
+                nextSourceTileX;
             sourceTileZ =
-                primaryRoot.MapMagicTileZ;
+                nextSourceTileZ;
             virtualTileX =
                 nextCenterKey.TileX;
             virtualTileZ =
@@ -304,6 +363,51 @@ namespace jcan.CelestialSystems
                 nextTileSizeX,
                 nextTileSizeZ,
                 nextMargins);
+        }
+
+        private void UpdateMidStreamingState(
+            RoundMapMagicSurfaceQualityProfile qualityProfile)
+        {
+            resolvedMidActivationAltitudeMeters =
+                qualityProfile.MidActivationAltitudeMeters >
+                    0.0
+                    ? qualityProfile.MidActivationAltitudeMeters
+                    : qualityProfile.MidCoverageRadiusMeters;
+            resolvedMidReleaseAltitudeMeters =
+                qualityProfile.MidReleaseAltitudeMeters >
+                    resolvedMidActivationAltitudeMeters
+                    ? qualityProfile.MidReleaseAltitudeMeters
+                    : resolvedMidActivationAltitudeMeters +
+                        Math.Max(
+                            1000.0,
+                            qualityProfile.TransitionOverlapMeters);
+
+            if (!surfaceFrame.HasAnchorAddress)
+            {
+                anchorAltitudeMeters = default;
+                midStreamingActive = false;
+                return;
+            }
+
+            anchorAltitudeMeters =
+                surfaceFrame.AnchorAltitudeMeters;
+
+            if (midStreamingActive)
+            {
+                if (anchorAltitudeMeters >
+                    resolvedMidReleaseAltitudeMeters)
+                {
+                    midStreamingActive = false;
+                }
+
+                return;
+            }
+
+            if (anchorAltitudeMeters <=
+                resolvedMidActivationAltitudeMeters)
+            {
+                midStreamingActive = true;
+            }
         }
 
         public void CopyCurrentSamplesTo(
@@ -933,6 +1037,33 @@ namespace jcan.CelestialSystems
             }
 
             ClearStreamingState();
+        }
+
+        private void ResolveLocalReferences()
+        {
+            if (surfaceFrame == null)
+            {
+                surfaceFrame =
+                    GetComponent<GePlanetSurfaceFrame>();
+            }
+
+            if (addressTracker == null)
+            {
+                addressTracker =
+                    GetComponent<CubeSphereTerrainAddressTracker>();
+            }
+
+            if (surfaceSession == null)
+            {
+                surfaceSession =
+                    GetComponent<RoundMapMagicSurfaceSession>();
+            }
+
+            if (rootPool == null)
+            {
+                rootPool =
+                    GetComponent<CubeSphereMapMagicRootPool>();
+            }
         }
 
         private static int FloorDivide(

@@ -147,10 +147,8 @@ namespace jcan.CelestialSystems
             sourceLocalVMeters =
                 address.LocalVMeters;
 
-            if (!TryConvertCoordinate(
-                    sourceTileU,
-                    sourceTileV,
-                    sourceLocalVMeters,
+            if (!TryTileAddressToMapMagicCoordinate(
+                    address,
                     out mapMagicTileX,
                     out mapMagicTileZ))
             {
@@ -308,15 +306,19 @@ namespace jcan.CelestialSystems
             currentCoordinateSet = false;
         }
 
-        private static bool TryConvertCoordinate(
-            long tileU,
-            long tileV,
-            double localVMeters,
+        public static bool TryTileAddressToMapMagicCoordinate(
+            CubeSphereTileAddress address,
             out int tileX,
             out int tileZ)
         {
             const double boundaryToleranceMeters =
                 0.000001;
+            var tileU =
+                address.TileU;
+            var tileV =
+                address.TileV;
+            var localVMeters =
+                address.LocalVMeters;
 
             if (tileV == long.MinValue)
             {
