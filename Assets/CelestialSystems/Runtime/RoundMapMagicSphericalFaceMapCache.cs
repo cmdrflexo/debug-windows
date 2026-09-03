@@ -24,6 +24,7 @@ namespace jcan.CelestialSystems
             public CubeSphereFace Face;
             public int Resolution;
             public float[] NormalizedHeights;
+            public float HeightScaleMeters;
             public float MinimumHeightMeters;
             public float MaximumHeightMeters;
             public double Milliseconds;
@@ -84,6 +85,9 @@ namespace jcan.CelestialSystems
         private float maximumHeightMeters;
 
         [SerializeField]
+        private float heightScaleMeters;
+
+        [SerializeField]
         private double lastFaceGenerationMilliseconds;
 
         [SerializeField]
@@ -122,6 +126,9 @@ namespace jcan.CelestialSystems
 
         public int CompletedFaceCount =>
             completedFaceCount;
+
+        public float HeightScaleMeters =>
+            heightScaleMeters;
 
         public Texture2D GetHeightMap(CubeSphereFace face)
         {
@@ -211,6 +218,7 @@ namespace jcan.CelestialSystems
             generatedSampleCount = 0;
             minimumHeightMeters = 0.0f;
             maximumHeightMeters = 0.0f;
+            heightScaleMeters = 0.0f;
             lastFaceGenerationMilliseconds = 0.0;
             totalGenerationMilliseconds = 0.0;
             lastError = string.Empty;
@@ -394,6 +402,8 @@ namespace jcan.CelestialSystems
                             resolution,
                             out var minimumHeight,
                             out var maximumHeight);
+                    result.HeightScaleMeters =
+                        data.heights.worldSize.y;
                     result.MinimumHeightMeters =
                         minimumHeight;
                     result.MaximumHeightMeters =
@@ -540,6 +550,8 @@ namespace jcan.CelestialSystems
 
             if (completedFaceCount == 1)
             {
+                heightScaleMeters =
+                    result.HeightScaleMeters;
                 minimumHeightMeters =
                     result.MinimumHeightMeters;
                 maximumHeightMeters =
