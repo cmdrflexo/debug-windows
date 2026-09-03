@@ -1,0 +1,75 @@
+{
+    "version": 1,
+    "name": "Basic Actions",
+    "maps": [
+        {
+            "name": "Basic Action Map",
+            "id": "9356aaa0-dad5-4fa3-8b1d-80f21cd4c830",
+            "actions": [
+                {
+                    "name": "Toggle Minimap",
+                    "type": "Button",
+                    "id": "48266f78-7b5c-4a96-b5a9-1394d0c33fa3",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Terrain",
+                    "type": "Button",
+                    "id": "8c3bbd29-af8a-432f-ae96-65f8b3a01a93",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Gizmos",
+                    "type": "Button",
+                    "id": "40de4100-3dd5-4f25-b1fa-78e00e814cf4",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "ade86d17-2e74-4ffe-ac0a-6976510aa6c1",
+                    "path": "<Keyboard>/comma",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Minimap",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d9802647-ae51-4b33-b08d-7fea8e7c585f",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Terrain",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4df45306-233f-4813-9e41-3d87f5a6bdc0",
+                    "path": "<Keyboard>/g",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Gizmos",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
