@@ -1,5 +1,5 @@
 /*
- * Renders the six cached spherical MapMagic height maps as a complete low-detail cube-sphere surface without Unity Terrains or colliders.
+ * Renders cached spherical MapMagic height and terrain-layer maps as a complete low-detail cube-sphere surface without Unity Terrains or colliders.
  */
 
 using System;
@@ -13,10 +13,17 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicSphericalFarSurfaceRenderer :
         MonoBehaviour
     {
+        private const int MaximumAdaptedLayerCount =
+            4;
+
+        private const string DefaultLayerShaderName =
+            "jcan/Celestial Systems/Curved MapMagic Terrain Layers";
+
         private sealed class FaceRuntime
         {
             public CubeSphereFace Face;
             public Texture2D SourceTexture;
+            public Texture2D SourceControlTexture;
             public GameObject MeshObject;
             public Mesh Mesh;
             public MeshRenderer MeshRenderer;
@@ -41,6 +48,9 @@ namespace jcan.CelestialSystems
         private RoundMapMagicSphericalFaceMapCache faceMapCache;
 
         [SerializeField]
+        private RoundMapMagicSurfaceSession surfaceSession;
+
+        [SerializeField]
         private Material meshMaterial;
 
         [SerializeField]
@@ -57,7 +67,7 @@ namespace jcan.CelestialSystems
         private double surfaceOffsetMeters;
 
         [SerializeField]
-        [Tooltip("Displays each face's single-channel height map through the selected material when supported.")]
+        [Tooltip("Displays each face's single-channel height map instead of the cached MapMagic terrain layers.")]
         private bool displayHeightMaps = true;
 
         [SerializeField]
@@ -89,6 +99,15 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private float resolvedHeightScaleMeters;
+
+        [SerializeField]
+        private bool hasTerrainLayerMaterial;
+
+        [SerializeField]
+        private int renderedTerrainLayerCount;
+
+        [SerializeField]
+        private int renderedControlResolution;
 
         [SerializeField]
         private double lastBuildMilliseconds;
@@ -246,10 +265,15 @@ namespace jcan.CelestialSystems
                 var sourceTexture =
                     faceMapCache.GetHeightMap(
                         Faces[index]);
+                var sourceControlTexture =
+                    faceMapCache.GetControlMap(
+                        Faces[index]);
 
                 if (runtime == null ||
                     runtime.SourceTexture !=
-                        sourceTexture)
+                        sourceTexture ||
+                    runtime.SourceControlTexture !=
+                        sourceControlTexture)
                 {
                     return true;
                 }
@@ -315,6 +339,18 @@ namespace jcan.CelestialSystems
                     heightScaleMeters;
                 sourceFaceResolution =
                     faceRuntimes[0].SourceTexture.width;
+                hasTerrainLayerMaterial =
+                    !displayHeightMaps &&
+                    faceMapCache.HasTextureData;
+                renderedTerrainLayerCount =
+                    hasTerrainLayerMaterial
+                        ? faceMapCache.TerrainLayerCount
+                        : 0;
+                renderedControlResolution =
+                    hasTerrainLayerMaterial
+                        ? faceRuntimes[0]
+                            .SourceControlTexture.width
+                        : 0;
                 hasBuiltSurface = true;
                 lastError = string.Empty;
             }
@@ -345,7 +381,10 @@ namespace jcan.CelestialSystems
                     Face =
                         face,
                     SourceTexture =
-                        sourceTexture
+                        sourceTexture,
+                    SourceControlTexture =
+                        faceMapCache.GetControlMap(
+                            face)
                 };
             var meshObject =
                 new GameObject(
@@ -373,7 +412,9 @@ namespace jcan.CelestialSystems
             var material =
                 CreateFaceMaterial(
                     face,
-                    sourceTexture);
+                    sourceTexture,
+                    runtime.SourceControlTexture,
+                    planetRadiusMeters);
 
             meshFilter.sharedMesh =
                 mesh;
@@ -579,59 +620,407 @@ namespace jcan.CelestialSystems
                         triangles
                 };
             mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
             return mesh;
         }
 
         private Material CreateFaceMaterial(
             CubeSphereFace face,
-            Texture2D sourceTexture)
+            Texture2D sourceTexture,
+            Texture2D controlTexture,
+            double planetRadiusMeters)
         {
+            var templateMaterial =
+                ResolveTemplateMaterial();
             Material material;
 
-            if (meshMaterial != null)
+            if (!displayHeightMaps &&
+                CanAdaptTerrainLayers(
+                    controlTexture))
             {
                 material =
-                    new Material(
-                        meshMaterial);
+                    CreateTerrainLayerMaterial(
+                        templateMaterial);
+                ConfigureTerrainLayerMaterial(
+                    material,
+                    controlTexture,
+                    planetRadiusMeters);
             }
             else
             {
-                var shader =
-                    ResolveFallbackShader();
-
-                if (shader == null)
-                {
-                    throw new InvalidOperationException(
-                        "No compatible shader was found for the spherical far renderer.");
-                }
-
                 material =
-                    new Material(
-                        shader);
+                    CreateFallbackMaterial(
+                        templateMaterial);
+
+                if (displayHeightMaps)
+                {
+                    SetMaterialColor(
+                        material,
+                        Color.white);
+                    SetMaterialTexture(
+                        material,
+                        sourceTexture);
+                }
+                else
+                {
+                    SetMaterialColor(
+                        material,
+                        fallbackColor);
+                }
             }
 
             material.name =
                 $"MapMagic Far Surface {face} Material";
             material.hideFlags =
                 HideFlags.HideAndDontSave;
-
-            if (displayHeightMaps)
-            {
-                SetMaterialColor(
-                    material,
-                    Color.white);
-                SetMaterialTexture(
-                    material,
-                    sourceTexture);
-            }
-            else
-            {
-                SetMaterialColor(
-                    material,
-                    fallbackColor);
-            }
-
             return material;
+        }
+
+        private Material ResolveTemplateMaterial()
+        {
+            if (meshMaterial != null)
+            {
+                return meshMaterial;
+            }
+
+            if (surfaceSession == null)
+            {
+                return null;
+            }
+
+            var surfaceDefinition =
+                surfaceSession.ActiveSurfaceDefinition != null
+                    ? surfaceSession.ActiveSurfaceDefinition
+                    : surfaceSession.ConfiguredSurfaceDefinition;
+
+            return
+                surfaceDefinition != null
+                    ? surfaceDefinition.Material
+                    : null;
+        }
+
+        private bool CanAdaptTerrainLayers(
+            Texture2D controlTexture)
+        {
+            if (!faceMapCache.HasTextureData ||
+                controlTexture == null ||
+                faceMapCache.TerrainLayerCount < 1 ||
+                faceMapCache.TerrainLayerCount >
+                    MaximumAdaptedLayerCount)
+            {
+                return false;
+            }
+
+            for (var index = 0;
+                index < faceMapCache.TerrainLayerCount;
+                index++)
+            {
+                if (faceMapCache.GetTerrainLayer(
+                        index) == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static Material CreateTerrainLayerMaterial(
+            Material templateMaterial)
+        {
+            if (IsCompatibleLayerTemplate(
+                    templateMaterial))
+            {
+                return new Material(
+                    templateMaterial);
+            }
+
+            var shader =
+                Shader.Find(
+                    DefaultLayerShaderName);
+
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    $"Shader '{DefaultLayerShaderName}' was not found for the spherical far renderer.");
+            }
+
+            return new Material(
+                shader);
+        }
+
+        private static Material CreateFallbackMaterial(
+            Material templateMaterial)
+        {
+            if (templateMaterial != null)
+            {
+                return new Material(
+                    templateMaterial);
+            }
+
+            var shader =
+                ResolveFallbackShader();
+
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "No compatible shader was found for the spherical far renderer.");
+            }
+
+            return new Material(
+                shader);
+        }
+
+        private void ConfigureTerrainLayerMaterial(
+            Material material,
+            Texture2D controlTexture,
+            double planetRadiusMeters)
+        {
+            ApplyTexture(
+                material,
+                "_Control",
+                controlTexture,
+                Vector2.one,
+                Vector2.zero);
+            SetFloatIfPresent(
+                material,
+                "_LayerCount",
+                faceMapCache.TerrainLayerCount);
+            SetFloatIfPresent(
+                material,
+                "_TileFade",
+                1.0f);
+            SetFloatIfPresent(
+                material,
+                "_LodMaskMode",
+                0.0f);
+
+            for (var index = 0;
+                index < MaximumAdaptedLayerCount;
+                index++)
+            {
+                ConfigureTerrainLayer(
+                    material,
+                    index < faceMapCache.TerrainLayerCount
+                        ? faceMapCache.GetTerrainLayer(
+                            index)
+                        : null,
+                    index,
+                    planetRadiusMeters);
+            }
+        }
+
+        private static void ConfigureTerrainLayer(
+            Material material,
+            TerrainLayer terrainLayer,
+            int layerIndex,
+            double planetRadiusMeters)
+        {
+            var suffix =
+                layerIndex.ToString();
+
+            if (terrainLayer == null)
+            {
+                ApplyTexture(
+                    material,
+                    "_Splat" + suffix,
+                    Texture2D.whiteTexture,
+                    Vector2.one,
+                    Vector2.zero);
+                ApplyTexture(
+                    material,
+                    "_Normal" + suffix,
+                    null,
+                    Vector2.one,
+                    Vector2.zero);
+                ApplyTexture(
+                    material,
+                    "_Mask" + suffix,
+                    null,
+                    Vector2.one,
+                    Vector2.zero);
+                SetFloatIfPresent(
+                    material,
+                    "_HasNormal" + suffix,
+                    0.0f);
+                SetFloatIfPresent(
+                    material,
+                    "_HasMask" + suffix,
+                    0.0f);
+                return;
+            }
+
+            ResolveTextureTransform(
+                terrainLayer,
+                planetRadiusMeters,
+                out var textureScale,
+                out var textureOffset);
+            var layerDiffuse =
+                terrainLayer.diffuseTexture != null
+                    ? terrainLayer.diffuseTexture
+                    : Texture2D.whiteTexture;
+            var layerNormal =
+                terrainLayer.normalMapTexture;
+            var layerMask =
+                terrainLayer.maskMapTexture;
+
+            ApplyTexture(
+                material,
+                "_Splat" + suffix,
+                layerDiffuse,
+                textureScale,
+                textureOffset);
+            ApplyTexture(
+                material,
+                "_Normal" + suffix,
+                layerNormal,
+                textureScale,
+                textureOffset);
+            ApplyTexture(
+                material,
+                "_Mask" + suffix,
+                layerMask,
+                textureScale,
+                textureOffset);
+            SetFloatIfPresent(
+                material,
+                "_HasNormal" + suffix,
+                layerNormal != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_HasMask" + suffix,
+                layerMask != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_NormalScale" + suffix,
+                terrainLayer.normalScale);
+            SetFloatIfPresent(
+                material,
+                "_Metallic" + suffix,
+                terrainLayer.metallic);
+            SetFloatIfPresent(
+                material,
+                "_Smoothness" + suffix,
+                terrainLayer.smoothness);
+        }
+
+        private static void ResolveTextureTransform(
+            TerrainLayer terrainLayer,
+            double planetRadiusMeters,
+            out Vector2 scale,
+            out Vector2 offset)
+        {
+            var halfFaceSizeMeters =
+                CubeSphereMapping.FaceCoordinateToMeters(
+                    1.0,
+                    planetRadiusMeters);
+            var faceSizeMeters =
+                halfFaceSizeMeters *
+                2.0;
+            var tileSizeX =
+                SafeTileSize(
+                    terrainLayer.tileSize.x);
+            var tileSizeZ =
+                SafeTileSize(
+                    terrainLayer.tileSize.y);
+
+            scale =
+                new Vector2(
+                    (float)(
+                        faceSizeMeters /
+                        tileSizeX),
+                    (float)(
+                        faceSizeMeters /
+                        tileSizeZ));
+            offset =
+                new Vector2(
+                    Repeat01(
+                        (-halfFaceSizeMeters +
+                            terrainLayer.tileOffset.x) /
+                        tileSizeX),
+                    Repeat01(
+                        (-halfFaceSizeMeters +
+                            terrainLayer.tileOffset.y) /
+                        tileSizeZ));
+        }
+
+        private static bool IsCompatibleLayerTemplate(
+            Material material)
+        {
+            return
+                material != null &&
+                material.HasProperty(
+                    "_Control") &&
+                material.HasProperty(
+                    "_LayerCount") &&
+                material.HasProperty(
+                    "_Splat0");
+        }
+
+        private static void ApplyTexture(
+            Material material,
+            string propertyName,
+            Texture texture,
+            Vector2 scale,
+            Vector2 offset)
+        {
+            if (!material.HasProperty(
+                    propertyName))
+            {
+                return;
+            }
+
+            material.SetTexture(
+                propertyName,
+                texture);
+            material.SetTextureScale(
+                propertyName,
+                scale);
+            material.SetTextureOffset(
+                propertyName,
+                offset);
+        }
+
+        private static void SetFloatIfPresent(
+            Material material,
+            string propertyName,
+            float value)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetFloat(
+                    propertyName,
+                    value);
+            }
+        }
+
+        private static float SafeTileSize(
+            float value)
+        {
+            return
+                IsFinite(
+                    value) &&
+                Mathf.Abs(
+                    value) >
+                    Mathf.Epsilon
+                    ? Mathf.Abs(
+                        value)
+                    : 1.0f;
+        }
+
+        private static float Repeat01(
+            double value)
+        {
+            return
+                (float)(
+                    value -
+                    Math.Floor(
+                        value));
         }
 
         private static Shader ResolveFallbackShader()
@@ -784,6 +1173,12 @@ namespace jcan.CelestialSystems
                 faceMapCache =
                     GetComponent<RoundMapMagicSphericalFaceMapCache>();
             }
+
+            if (surfaceSession == null)
+            {
+                surfaceSession =
+                    GetComponent<RoundMapMagicSurfaceSession>();
+            }
         }
 
         private void SetError(
@@ -844,6 +1239,9 @@ namespace jcan.CelestialSystems
             generatedTriangleCount = default;
             sourceFaceResolution = default;
             resolvedHeightScaleMeters = default;
+            hasTerrainLayerMaterial = false;
+            renderedTerrainLayerCount = default;
+            renderedControlResolution = default;
             builtPlanetRadiusMeters = default;
             builtSurfaceOffsetMeters = default;
             builtHeightMultiplier = default;
