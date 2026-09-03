@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6da5c3b3028f45859d7947baff758e59, type: 3}
-  m_Name: Round Body Test Definition
+  m_Name: Earth-Like Body
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialBodyDefinition
-  definitionId: round-body-test
+  definitionId: earth-like-test
   massKilograms: 5.9722e+24
   referenceRadiusMeters: 6371000
   generationSeed: 12345
   northAxis: {x: 0, y: 1, z: 0}
   poleReferenceAxis: {x: 0, y: 0, z: 1}
   surfaceSystem: 0
-  roundMapMagicSurface: {fileID: 11400000, guid: bbc9fc12d0b6bce4780e04ded7249fa0, type: 2}
+  roundMapMagicSurface: {fileID: 11400000, guid: b1f16f79fa318094a8a148264b250ccb, type: 2}
