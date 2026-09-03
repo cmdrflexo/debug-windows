@@ -1,9 +1,9 @@
 /*
- * Moves a nonphysical universe anchor using camera-relative free-flight controls, with optional scene collision, without giving the camera origin authority.
+ * Moves a nonphysical universe anchor using camera-relative free-flight controls, with optional scene collision and planet-relative automatic speed.
  */
 
+using System;
 using CW.Common;
-using SpaceGraphicsToolkit;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -16,6 +16,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Transform movementReference;
 
+        [SerializeField]
+        private UniverseFrameController universeFrame;
+
         [Header("Movement")]
         [SerializeField]
         private bool listen = true;
@@ -24,17 +27,18 @@ namespace jcan.CelestialSystems
         private float damping = 10.0f;
 
         [SerializeField]
+        [Min(0.0f)]
         private float speedMin = 1.0f;
 
         [SerializeField]
+        [Min(0.0f)]
         private float speedMax = 10.0f;
 
         [SerializeField]
-        private float speedRange = 100.0f;
-
-        [SerializeField]
-        [Range(0.0f, 0.5f)]
-        private float speedWheel = 0.1f;
+        [Tooltip("Height above the nearest planet, measured as a fraction of its radius, where maximum speed is reached.")]
+        [Min(0.0001f)]
+        private float maxSpeedAltitudeRadiusFraction =
+            0.2f;
 
         [Header("Collision")]
         [SerializeField]
@@ -91,6 +95,26 @@ namespace jcan.CelestialSystems
                 KeyCode.None,
                 100.0f);
 
+        [Header("Runtime Speed")]
+        [SerializeField]
+        private bool hasNearestPlanet;
+
+        [SerializeField]
+        private CelestialBodyRuntimeContext nearestPlanet;
+
+        [SerializeField]
+        private double nearestPlanetAltitudeMeters;
+
+        [SerializeField]
+        private double nearestPlanetRadiusMeters;
+
+        [SerializeField]
+        [Range(0.0f, 1.0f)]
+        private float resolvedSpeedBlend = 1.0f;
+
+        [SerializeField]
+        private float resolvedSpeed;
+
         [Header("Runtime Collision")]
         [SerializeField]
         private bool hasCollision;
@@ -104,7 +128,13 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Vector3 lastCollisionNormal;
 
+        private GravityEngine gravityEngine;
         private Vector3 remainingDelta;
+
+        private void Awake()
+        {
+            ResolveUniverseFrame();
+        }
 
         private void OnEnable()
         {
@@ -113,17 +143,13 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            UpdateSpeedState();
+
             if (listen)
             {
-                AddToDelta(GetDelta(Time.deltaTime));
-            }
-
-            if (CwInput.GetMouseExists())
-            {
-                speedRange *=
-                    1.0f -
-                    Mathf.Clamp(CwInput.GetMouseWheelDelta(), -1.0f, 1.0f) *
-                    speedWheel;
+                AddToDelta(
+                    GetDelta(
+                        Time.deltaTime));
             }
         }
 
@@ -138,50 +164,78 @@ namespace jcan.CelestialSystems
         private Vector3 GetDelta(float deltaTime)
         {
             return new Vector3(
-                horizontalControls.GetValue(deltaTime),
-                verticalControls.GetValue(deltaTime),
-                depthControls.GetValue(deltaTime));
+                horizontalControls.GetValue(
+                    deltaTime),
+                verticalControls.GetValue(
+                    deltaTime),
+                depthControls.GetValue(
+                    deltaTime));
         }
 
         private void AddToDelta(Vector3 localDelta)
         {
-            var reference = movementReference;
+            var reference =
+                movementReference;
 
             if (reference == null)
             {
-                var mainCamera = Camera.main;
-                reference = mainCamera != null ? mainCamera.transform : transform;
+                var mainCamera =
+                    Camera.main;
+
+                reference =
+                    mainCamera != null
+                        ? mainCamera.transform
+                        : transform;
             }
 
             remainingDelta +=
-                reference.TransformDirection(localDelta) *
+                reference.TransformDirection(
+                    localDelta) *
                 GetSpeedMultiplier();
         }
 
         private void DampenDelta()
         {
-            var factor = CwHelper.DampenFactor(damping, Time.deltaTime);
-            var newDelta = Vector3.Lerp(remainingDelta, Vector3.zero, factor);
-            var requestedMovement = remainingDelta - newDelta;
-            var appliedMovement = ResolveCollisionMovement(requestedMovement);
+            var factor =
+                CwHelper.DampenFactor(
+                    damping,
+                    Time.deltaTime);
+            var newDelta =
+                Vector3.Lerp(
+                    remainingDelta,
+                    Vector3.zero,
+                    factor);
+            var requestedMovement =
+                remainingDelta -
+                newDelta;
+            var appliedMovement =
+                ResolveCollisionMovement(
+                    requestedMovement);
 
-            transform.position += appliedMovement;
+            transform.position +=
+                appliedMovement;
 
             if (hasCollision)
             {
-                newDelta = Vector3.ProjectOnPlane(newDelta, lastCollisionNormal);
+                newDelta =
+                    Vector3.ProjectOnPlane(
+                        newDelta,
+                        lastCollisionNormal);
             }
 
-            remainingDelta = newDelta;
+            remainingDelta =
+                newDelta;
         }
 
-        private Vector3 ResolveCollisionMovement(Vector3 requestedMovement)
+        private Vector3 ResolveCollisionMovement(
+            Vector3 requestedMovement)
         {
             ClearCollisionRuntime();
 
             if (!collideWithScene ||
                 collisionRadiusMeters <= 0.0f ||
-                requestedMovement.sqrMagnitude <= Mathf.Epsilon)
+                requestedMovement.sqrMagnitude <=
+                    Mathf.Epsilon)
             {
                 return requestedMovement;
             }
@@ -197,18 +251,26 @@ namespace jcan.CelestialSystems
                 return requestedMovement;
             }
 
-            RecordCollision(firstHit);
+            RecordCollision(
+                firstHit);
 
-            var remainingMovement = requestedMovement - firstMovement;
+            var remainingMovement =
+                requestedMovement -
+                firstMovement;
             var slideMovement =
-                Vector3.ProjectOnPlane(remainingMovement, firstHit.normal);
+                Vector3.ProjectOnPlane(
+                    remainingMovement,
+                    firstHit.normal);
 
-            if (slideMovement.sqrMagnitude <= Mathf.Epsilon)
+            if (slideMovement.sqrMagnitude <=
+                Mathf.Epsilon)
             {
                 return firstMovement;
             }
 
-            var slideOrigin = transform.position + firstMovement;
+            var slideOrigin =
+                transform.position +
+                firstMovement;
 
             if (TrySweep(
                     slideOrigin,
@@ -216,11 +278,15 @@ namespace jcan.CelestialSystems
                     out var allowedSlideMovement,
                     out var slideHit))
             {
-                RecordCollision(slideHit);
-                slideMovement = allowedSlideMovement;
+                RecordCollision(
+                    slideHit);
+                slideMovement =
+                    allowedSlideMovement;
             }
 
-            return firstMovement + slideMovement;
+            return
+                firstMovement +
+                slideMovement;
         }
 
         private bool TrySweep(
@@ -229,73 +295,317 @@ namespace jcan.CelestialSystems
             out Vector3 allowedMovement,
             out RaycastHit hit)
         {
-            var requestedDistance = requestedMovement.magnitude;
+            var requestedDistance =
+                requestedMovement.magnitude;
 
-            if (requestedDistance <= Mathf.Epsilon)
+            if (requestedDistance <=
+                Mathf.Epsilon)
             {
-                allowedMovement = Vector3.zero;
+                allowedMovement =
+                    Vector3.zero;
                 hit = default;
                 return false;
             }
 
-            var direction = requestedMovement / requestedDistance;
-            var radius = Mathf.Max(0.01f, collisionRadiusMeters);
-            var skin = Mathf.Max(0.0f, collisionSkinMeters);
+            var direction =
+                requestedMovement /
+                requestedDistance;
+            var radius =
+                Mathf.Max(
+                    0.01f,
+                    collisionRadiusMeters);
+            var skin =
+                Mathf.Max(
+                    0.0f,
+                    collisionSkinMeters);
 
             if (!Physics.SphereCast(
                     origin,
                     radius,
                     direction,
                     out hit,
-                    requestedDistance + skin,
+                    requestedDistance +
+                        skin,
                     collisionLayers,
                     QueryTriggerInteraction.Ignore))
             {
-                allowedMovement = requestedMovement;
+                allowedMovement =
+                    requestedMovement;
                 return false;
             }
 
             var allowedDistance =
-                Mathf.Clamp(hit.distance - skin, 0.0f, requestedDistance);
+                Mathf.Clamp(
+                    hit.distance -
+                        skin,
+                    0.0f,
+                    requestedDistance);
 
-            allowedMovement = direction * allowedDistance;
+            allowedMovement =
+                direction *
+                allowedDistance;
             return true;
         }
 
-        private void RecordCollision(RaycastHit hit)
+        private void RecordCollision(
+            RaycastHit hit)
         {
             hasCollision = true;
             lastCollisionObject =
-                hit.collider != null ? hit.collider.name : string.Empty;
-            lastCollisionDistanceMeters = hit.distance;
-            lastCollisionNormal = hit.normal;
+                hit.collider != null
+                    ? hit.collider.name
+                    : string.Empty;
+            lastCollisionDistanceMeters =
+                hit.distance;
+            lastCollisionNormal =
+                hit.normal;
         }
 
         private void ClearCollisionRuntime()
         {
             hasCollision = false;
-            lastCollisionObject = string.Empty;
-            lastCollisionDistanceMeters = 0.0f;
-            lastCollisionNormal = Vector3.zero;
+            lastCollisionObject =
+                string.Empty;
+            lastCollisionDistanceMeters =
+                0.0f;
+            lastCollisionNormal =
+                Vector3.zero;
+        }
+
+        private void UpdateSpeedState()
+        {
+            var minimumSpeed =
+                Mathf.Max(
+                    0.0f,
+                    speedMin);
+            var maximumSpeed =
+                Mathf.Max(
+                    minimumSpeed,
+                    speedMax);
+
+            if (!TryFindNearestPlanet(
+                    out var selectedPlanet,
+                    out var altitudeMeters,
+                    out var radiusMeters))
+            {
+                hasNearestPlanet = false;
+                nearestPlanet = null;
+                nearestPlanetAltitudeMeters =
+                    default;
+                nearestPlanetRadiusMeters =
+                    default;
+                resolvedSpeedBlend = 1.0f;
+                resolvedSpeed =
+                    maximumSpeed;
+                return;
+            }
+
+            hasNearestPlanet = true;
+            nearestPlanet =
+                selectedPlanet;
+            nearestPlanetAltitudeMeters =
+                altitudeMeters;
+            nearestPlanetRadiusMeters =
+                radiusMeters;
+
+            var maximumSpeedAltitudeMeters =
+                radiusMeters *
+                Math.Max(
+                    0.0001,
+                    maxSpeedAltitudeRadiusFraction);
+            var speedBlend =
+                maximumSpeedAltitudeMeters >
+                    double.Epsilon
+                    ? altitudeMeters /
+                        maximumSpeedAltitudeMeters
+                    : 1.0;
+
+            resolvedSpeedBlend =
+                Mathf.Clamp01(
+                    (float)speedBlend);
+            resolvedSpeed =
+                Mathf.Lerp(
+                    minimumSpeed,
+                    maximumSpeed,
+                    resolvedSpeedBlend);
+        }
+
+        private bool TryFindNearestPlanet(
+            out CelestialBodyRuntimeContext selectedPlanet,
+            out double altitudeMeters,
+            out double radiusMeters)
+        {
+            selectedPlanet = null;
+            altitudeMeters = default;
+            radiusMeters = default;
+
+            gravityEngine ??=
+                GravityEngine.Instance();
+
+            if (gravityEngine == null ||
+                !gravityEngine.IsSetup())
+            {
+                return false;
+            }
+
+            var physicalScale =
+                gravityEngine.GetPhysicalScale();
+
+            if (!IsFinite(
+                    physicalScale) ||
+                physicalScale <= 0.0f)
+            {
+                return false;
+            }
+
+            ResolveUniverseFrame();
+
+            var anchorPosition =
+                transform.position;
+            var nearestSurfaceDistanceMeters =
+                double.PositiveInfinity;
+
+            foreach (var bodyContext in
+                CelestialBodyRuntimeContext.ActiveContexts)
+            {
+                if (!IsEligiblePlanet(
+                        bodyContext))
+                {
+                    continue;
+                }
+
+                var gravityBody =
+                    bodyContext.GravityBody;
+                var planetRadiusMeters =
+                    bodyContext.ConfiguredReferenceRadiusMeters;
+                var physicsPosition =
+                    gravityEngine.GetPositionDoubleV3(
+                        gravityBody);
+                var deltaX =
+                    anchorPosition.x -
+                    physicsPosition.x *
+                        physicalScale;
+                var deltaY =
+                    anchorPosition.y -
+                    physicsPosition.y *
+                        physicalScale;
+                var deltaZ =
+                    anchorPosition.z -
+                    physicsPosition.z *
+                        physicalScale;
+                var radialDistanceMeters =
+                    Math.Sqrt(
+                        deltaX *
+                            deltaX +
+                        deltaY *
+                            deltaY +
+                        deltaZ *
+                            deltaZ);
+                var candidateAltitudeMeters =
+                    radialDistanceMeters -
+                    planetRadiusMeters;
+                var surfaceDistanceMeters =
+                    Math.Abs(
+                        candidateAltitudeMeters);
+
+                if (!IsFinite(
+                        surfaceDistanceMeters) ||
+                    surfaceDistanceMeters >=
+                        nearestSurfaceDistanceMeters)
+                {
+                    continue;
+                }
+
+                selectedPlanet =
+                    bodyContext;
+                altitudeMeters =
+                    candidateAltitudeMeters;
+                radiusMeters =
+                    planetRadiusMeters;
+                nearestSurfaceDistanceMeters =
+                    surfaceDistanceMeters;
+            }
+
+            return
+                selectedPlanet != null;
+        }
+
+        private bool IsEligiblePlanet(
+            CelestialBodyRuntimeContext bodyContext)
+        {
+            if (bodyContext == null ||
+                !bodyContext.HasValidConfiguration ||
+                bodyContext.ResolvedSurfaceSystem !=
+                    CelestialSurfaceSystem.RoundMapMagic ||
+                bodyContext.GravityBody == null ||
+                !IsFinite(
+                    bodyContext.ConfiguredReferenceRadiusMeters) ||
+                bodyContext.ConfiguredReferenceRadiusMeters <=
+                    0.0)
+            {
+                return false;
+            }
+
+            return
+                universeFrame == null ||
+                bodyContext.UniverseFrame ==
+                    universeFrame;
+        }
+
+        private void ResolveUniverseFrame()
+        {
+            if (universeFrame != null)
+            {
+                return;
+            }
+
+            var anchorSources =
+                GetComponents<
+                    UniverseAnchorSource>();
+
+            for (var index = 0;
+                index < anchorSources.Length;
+                index++)
+            {
+                var anchorSource =
+                    anchorSources[index];
+
+                if (anchorSource.UniverseFrame ==
+                    null)
+                {
+                    continue;
+                }
+
+                universeFrame =
+                    anchorSource.UniverseFrame;
+                return;
+            }
         }
 
         private float GetSpeedMultiplier()
         {
-            if (speedMax <= 0.0f)
-            {
-                return 0.0f;
-            }
+            return
+                resolvedSpeed;
+        }
 
-            var distance = float.PositiveInfinity;
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(
+                    value) &&
+                !double.IsInfinity(
+                    value);
+        }
 
-            SgtCommon.InvokeCalculateDistance(transform.position, ref distance);
-
-            var distance01 = Mathf.InverseLerp(
-                speedMin * speedRange,
-                speedMax * speedRange,
-                distance);
-
-            return Mathf.Lerp(speedMin, speedMax, distance01);
+        private static bool IsFinite(
+            float value)
+        {
+            return
+                !float.IsNaN(
+                    value) &&
+                !float.IsInfinity(
+                    value);
         }
     }
 }
