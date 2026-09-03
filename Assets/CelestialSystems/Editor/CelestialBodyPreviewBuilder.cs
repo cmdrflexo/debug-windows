@@ -155,6 +155,7 @@ namespace jcan.CelestialSystems.Editor
                     preview,
                     faceData,
                     surfaceDefinition,
+                    bodyDefinition.OceanDefinition,
                     planetRadiusMeters,
                     previewDiameter,
                     resolvedMeshResolution,
@@ -557,6 +558,7 @@ namespace jcan.CelestialSystems.Editor
             GameObject preview,
             FaceGenerationData[] faceData,
             RoundMapMagicSurfaceDefinition surfaceDefinition,
+            OceanDefinition oceanDefinition,
             double planetRadiusMeters,
             float previewDiameter,
             int meshResolution,
@@ -607,6 +609,7 @@ namespace jcan.CelestialSystems.Editor
                         data,
                         meshResolution,
                         planetRadiusMeters,
+                        surfaceDefinition.ElevationOffsetMeters,
                         displayScale,
                         heightMultiplier);
                 meshFilter.sharedMesh =
@@ -619,6 +622,86 @@ namespace jcan.CelestialSystems.Editor
                 meshRenderer.sharedMaterial =
                     material;
             }
+
+            BuildOcean(
+                preview,
+                oceanDefinition,
+                planetRadiusMeters,
+                previewDiameter);
+        }
+
+        private static void BuildOcean(
+            GameObject preview,
+            OceanDefinition oceanDefinition,
+            double planetRadiusMeters,
+            float previewDiameter)
+        {
+            if (oceanDefinition == null)
+            {
+                return;
+            }
+
+            if (!oceanDefinition.HasValidSettings)
+            {
+                throw new InvalidOperationException(
+                    "The body's ocean definition requires a material and a finite global surface elevation.");
+            }
+
+            var oceanRadiusMeters =
+                planetRadiusMeters +
+                oceanDefinition.GlobalSurfaceElevationMeters;
+
+            if (!IsFinite(
+                    oceanRadiusMeters) ||
+                oceanRadiusMeters <=
+                    0.0)
+            {
+                throw new InvalidOperationException(
+                    "The ocean's global surface elevation produces a non-positive or non-finite radius.");
+            }
+
+            var ocean = GameObject.CreatePrimitive(
+                PrimitiveType.Sphere);
+            ocean.name =
+                "Preview Ocean";
+            ocean.tag =
+                "EditorOnly";
+            ocean.hideFlags =
+                HideFlags.DontSaveInBuild;
+            ocean.transform.SetParent(
+                preview.transform,
+                false);
+            ocean.transform.localPosition =
+                Vector3.zero;
+            ocean.transform.localRotation =
+                Quaternion.identity;
+
+            var oceanDiameter =
+                previewDiameter *
+                (float)(
+                    oceanRadiusMeters /
+                    planetRadiusMeters);
+            ocean.transform.localScale =
+                Vector3.one *
+                oceanDiameter;
+
+            var collider =
+                ocean.GetComponent<Collider>();
+
+            if (collider != null)
+            {
+                UnityEngine.Object.DestroyImmediate(
+                    collider);
+            }
+
+            var renderer =
+                ocean.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial =
+                oceanDefinition.Material;
+            renderer.shadowCastingMode =
+                ShadowCastingMode.Off;
+            renderer.receiveShadows =
+                false;
         }
 
         private static void PositionFace(
@@ -649,6 +732,7 @@ namespace jcan.CelestialSystems.Editor
             FaceGenerationData data,
             int resolution,
             double planetRadiusMeters,
+            double elevationOffsetMeters,
             double displayScale,
             float heightMultiplier)
         {
@@ -723,8 +807,9 @@ namespace jcan.CelestialSystems.Editor
                             normalizedX,
                             normalizedZ);
                     var heightMeters =
-                        normalizedHeight *
-                        data.HeightScaleMeters *
+                        (normalizedHeight *
+                            data.HeightScaleMeters +
+                        elevationOffsetMeters) *
                         heightMultiplier;
                     var surfaceRadiusMeters =
                         planetRadiusMeters +
