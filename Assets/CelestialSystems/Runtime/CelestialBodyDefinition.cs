@@ -45,6 +45,9 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicSurfaceDefinition roundMapMagicSurface;
 
+        [SerializeField]
+        private OceanDefinition oceanDefinition;
+
         public string DefinitionId =>
             definitionId;
 
@@ -89,6 +92,9 @@ namespace jcan.CelestialSystems
 
         public RoundMapMagicSurfaceDefinition RoundMapMagicSurface =>
             roundMapMagicSurface;
+
+        public OceanDefinition OceanDefinition =>
+            oceanDefinition;
 
         public bool HasValidPhysicalSettings =>
             !string.IsNullOrWhiteSpace(
