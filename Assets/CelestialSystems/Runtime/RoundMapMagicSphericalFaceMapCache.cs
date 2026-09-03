@@ -1,5 +1,5 @@
 /*
- * Evaluates the active MapMagic graph into six coarse runtime height maps for a complete round body without creating Unity Terrains.
+ * Evaluates the active MapMagic graph into six coarse runtime height and surface-layer control maps without creating Unity Terrains.
  */
 
 using System;
@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Den.Tools;
 using Den.Tools.Matrices;
 using MapMagic.Core;
+using MapMagic.Nodes.MatrixGenerators;
 using MapMagic.Products;
 using MapMagic.Terrains;
 using UnityEngine;
@@ -18,6 +19,9 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicSphericalFaceMapCache :
         MonoBehaviour
     {
+        private const int MaximumCachedLayerCount =
+            4;
+
         private sealed class FaceGenerationResult
         {
             public int Version;
@@ -25,6 +29,8 @@ namespace jcan.CelestialSystems
             public int Resolution;
             public float[] NormalizedHeights;
             public float HeightScaleMeters;
+            public float[,,] ControlWeights;
+            public TerrainLayer[] TerrainLayers;
             public float MinimumHeightMeters;
             public float MaximumHeightMeters;
             public double Milliseconds;
@@ -115,6 +121,32 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Texture2D negativeZ;
 
+        [Header("Runtime Surface Layers")]
+        [SerializeField]
+        private int terrainLayerCount;
+
+        [SerializeField]
+        private TerrainLayer[] terrainLayers =
+            new TerrainLayer[0];
+
+        [SerializeField]
+        private Texture2D positiveXControl;
+
+        [SerializeField]
+        private Texture2D negativeXControl;
+
+        [SerializeField]
+        private Texture2D positiveYControl;
+
+        [SerializeField]
+        private Texture2D negativeYControl;
+
+        [SerializeField]
+        private Texture2D positiveZControl;
+
+        [SerializeField]
+        private Texture2D negativeZControl;
+
         private Task<FaceGenerationResult> generationTask;
         private StopToken generationStop;
         private bool generationRequested;
@@ -129,6 +161,36 @@ namespace jcan.CelestialSystems
 
         public float HeightScaleMeters =>
             heightScaleMeters;
+
+        public bool HasTextureData =>
+            isComplete &&
+            terrainLayerCount > 0 &&
+            terrainLayers != null &&
+            terrainLayers.Length ==
+                terrainLayerCount &&
+            positiveXControl != null &&
+            negativeXControl != null &&
+            positiveYControl != null &&
+            negativeYControl != null &&
+            positiveZControl != null &&
+            negativeZControl != null;
+
+        public int TerrainLayerCount =>
+            terrainLayerCount;
+
+        public TerrainLayer GetTerrainLayer(
+            int index)
+        {
+            if (terrainLayers == null ||
+                index < 0 ||
+                index >= terrainLayers.Length)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(index));
+            }
+
+            return terrainLayers[index];
+        }
 
         public Texture2D GetHeightMap(CubeSphereFace face)
         {
@@ -151,6 +213,36 @@ namespace jcan.CelestialSystems
 
                 case CubeSphereFace.NegativeZ:
                     return negativeZ;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(face),
+                        face,
+                        "Unknown cube-sphere face.");
+            }
+        }
+
+        public Texture2D GetControlMap(CubeSphereFace face)
+        {
+            switch (face)
+            {
+                case CubeSphereFace.PositiveX:
+                    return positiveXControl;
+
+                case CubeSphereFace.NegativeX:
+                    return negativeXControl;
+
+                case CubeSphereFace.PositiveY:
+                    return positiveYControl;
+
+                case CubeSphereFace.NegativeY:
+                    return negativeYControl;
+
+                case CubeSphereFace.PositiveZ:
+                    return positiveZControl;
+
+                case CubeSphereFace.NegativeZ:
+                    return negativeZControl;
 
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -219,6 +311,9 @@ namespace jcan.CelestialSystems
             minimumHeightMeters = 0.0f;
             maximumHeightMeters = 0.0f;
             heightScaleMeters = 0.0f;
+            terrainLayerCount = 0;
+            terrainLayers =
+                new TerrainLayer[0];
             lastFaceGenerationMilliseconds = 0.0;
             totalGenerationMilliseconds = 0.0;
             lastError = string.Empty;
@@ -404,6 +499,11 @@ namespace jcan.CelestialSystems
                             out var maximumHeight);
                     result.HeightScaleMeters =
                         data.heights.worldSize.y;
+                    CaptureTextureData(
+                        result,
+                        data.ApplyOfType<
+                            TexturesOutput200.ApplyData>(),
+                        resolution);
                     result.MinimumHeightMeters =
                         minimumHeight;
                     result.MaximumHeightMeters =
@@ -429,6 +529,46 @@ namespace jcan.CelestialSystems
             }
 
             return result;
+        }
+
+        private static void CaptureTextureData(
+            FaceGenerationResult result,
+            TexturesOutput200.ApplyData textureData,
+            int resolution)
+        {
+            if (textureData == null ||
+                textureData.splats == null ||
+                textureData.prototypes == null ||
+                textureData.prototypes.Length == 0)
+            {
+                return;
+            }
+
+            var layerCount =
+                textureData.prototypes.Length;
+
+            if (layerCount >
+                MaximumCachedLayerCount)
+            {
+                throw new InvalidOperationException(
+                    $"The spherical face-map cache currently supports up to {MaximumCachedLayerCount} terrain layers, but the graph produced {layerCount}.");
+            }
+
+            if (textureData.splats.GetLength(0) !=
+                    resolution ||
+                textureData.splats.GetLength(1) !=
+                    resolution ||
+                textureData.splats.GetLength(2) !=
+                    layerCount)
+            {
+                throw new InvalidOperationException(
+                    "The MapMagic texture control dimensions do not match the spherical face-map request.");
+            }
+
+            result.ControlWeights =
+                textureData.splats;
+            result.TerrainLayers =
+                textureData.prototypes;
         }
 
         private static float[] CopyActiveHeights(
@@ -536,6 +676,15 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (!TryAcceptTextureData(
+                    result,
+                    out var textureError))
+            {
+                FailGeneration(
+                    textureError);
+                return;
+            }
+
             SetHeightMap(
                 result.Face,
                 CreateHeightMapTexture(
@@ -577,6 +726,154 @@ namespace jcan.CelestialSystems
                 generationRequested = false;
                 isComplete = true;
             }
+        }
+
+        private bool TryAcceptTextureData(
+            FaceGenerationResult result,
+            out string error)
+        {
+            var resultHasTextureData =
+                result.ControlWeights != null &&
+                result.TerrainLayers != null &&
+                result.TerrainLayers.Length > 0;
+
+            if (completedFaceCount == 0)
+            {
+                if (resultHasTextureData)
+                {
+                    terrainLayers =
+                        result.TerrainLayers;
+                    terrainLayerCount =
+                        terrainLayers.Length;
+                }
+            }
+            else
+            {
+                var cacheHasTextureData =
+                    terrainLayerCount > 0;
+
+                if (cacheHasTextureData !=
+                    resultHasTextureData)
+                {
+                    error =
+                        "The MapMagic graph produced inconsistent texture outputs across spherical faces.";
+                    return false;
+                }
+
+                if (resultHasTextureData &&
+                    !TerrainLayersMatch(
+                        terrainLayers,
+                        result.TerrainLayers))
+                {
+                    error =
+                        "The MapMagic graph produced different terrain-layer prototypes across spherical faces.";
+                    return false;
+                }
+            }
+
+            if (resultHasTextureData)
+            {
+                SetControlMap(
+                    result.Face,
+                    CreateControlMapTexture(
+                        result));
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool TerrainLayersMatch(
+            TerrainLayer[] first,
+            TerrainLayer[] second)
+        {
+            if (first == null ||
+                second == null ||
+                first.Length !=
+                    second.Length)
+            {
+                return false;
+            }
+
+            for (var index = 0;
+                index < first.Length;
+                index++)
+            {
+                if (first[index] !=
+                    second[index])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static Texture2D CreateControlMapTexture(
+            FaceGenerationResult result)
+        {
+            var weights =
+                result.ControlWeights;
+            var height =
+                weights.GetLength(0);
+            var width =
+                weights.GetLength(1);
+            var layerCount =
+                weights.GetLength(2);
+            var pixels =
+                new Color[
+                    width *
+                    height];
+
+            for (var z = 0;
+                z < height;
+                z++)
+            {
+                for (var x = 0;
+                    x < width;
+                    x++)
+                {
+                    pixels[
+                        z *
+                        width +
+                        x] =
+                        new Color(
+                            layerCount > 0
+                                ? weights[z, x, 0]
+                                : 0.0f,
+                            layerCount > 1
+                                ? weights[z, x, 1]
+                                : 0.0f,
+                            layerCount > 2
+                                ? weights[z, x, 2]
+                                : 0.0f,
+                            layerCount > 3
+                                ? weights[z, x, 3]
+                                : 0.0f);
+                }
+            }
+
+            var texture =
+                new Texture2D(
+                    width,
+                    height,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name =
+                        $"Round MapMagic {result.Face} Control",
+                    wrapMode =
+                        TextureWrapMode.Clamp,
+                    filterMode =
+                        FilterMode.Bilinear
+                };
+            texture.SetPixels(
+                pixels);
+            texture.Apply(
+                updateMipmaps: false,
+                makeNoLongerReadable: false);
+            return texture;
         }
 
         private static Texture2D CreateHeightMapTexture(
@@ -634,6 +931,45 @@ namespace jcan.CelestialSystems
 
                 case CubeSphereFace.NegativeZ:
                     negativeZ = texture;
+                    break;
+
+                default:
+                    Destroy(texture);
+                    throw new ArgumentOutOfRangeException(
+                        nameof(face),
+                        face,
+                        "Unknown cube-sphere face.");
+            }
+        }
+
+        private void SetControlMap(
+            CubeSphereFace face,
+            Texture2D texture)
+        {
+            switch (face)
+            {
+                case CubeSphereFace.PositiveX:
+                    positiveXControl = texture;
+                    break;
+
+                case CubeSphereFace.NegativeX:
+                    negativeXControl = texture;
+                    break;
+
+                case CubeSphereFace.PositiveY:
+                    positiveYControl = texture;
+                    break;
+
+                case CubeSphereFace.NegativeY:
+                    negativeYControl = texture;
+                    break;
+
+                case CubeSphereFace.PositiveZ:
+                    positiveZControl = texture;
+                    break;
+
+                case CubeSphereFace.NegativeZ:
+                    negativeZControl = texture;
                     break;
 
                 default:
@@ -705,6 +1041,18 @@ namespace jcan.CelestialSystems
                 ref positiveZ);
             DestroyTexture(
                 ref negativeZ);
+            DestroyTexture(
+                ref positiveXControl);
+            DestroyTexture(
+                ref negativeXControl);
+            DestroyTexture(
+                ref positiveYControl);
+            DestroyTexture(
+                ref negativeYControl);
+            DestroyTexture(
+                ref positiveZControl);
+            DestroyTexture(
+                ref negativeZControl);
         }
 
         private static void DestroyTexture(
