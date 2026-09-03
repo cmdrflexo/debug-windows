@@ -40,14 +40,20 @@ namespace jcan.CelestialSystems.Editor
                 "Height Multiplier",
                 "Multiplies generated elevation before the full-scale body is reduced to the preview diameter.");
 
-        private static readonly string[] MeshResolutionLabels =
+        private static readonly GUIContent[] MeshResolutionLabels =
         {
-            "9",
-            "17",
-            "33",
-            "65",
-            "129",
-            "257"
+            new GUIContent(
+                "9"),
+            new GUIContent(
+                "17"),
+            new GUIContent(
+                "33"),
+            new GUIContent(
+                "65"),
+            new GUIContent(
+                "129"),
+            new GUIContent(
+                "257")
         };
 
         private static readonly int[] MeshResolutionValues =
@@ -60,14 +66,20 @@ namespace jcan.CelestialSystems.Editor
             257
         };
 
-        private static readonly string[] GraphResolutionLabels =
+        private static readonly GUIContent[] GraphResolutionLabels =
         {
-            "17",
-            "33",
-            "65",
-            "129",
-            "257",
-            "513"
+            new GUIContent(
+                "17"),
+            new GUIContent(
+                "33"),
+            new GUIContent(
+                "65"),
+            new GUIContent(
+                "129"),
+            new GUIContent(
+                "257"),
+            new GUIContent(
+                "513")
         };
 
         private static readonly int[] GraphResolutionValues =
@@ -87,7 +99,7 @@ namespace jcan.CelestialSystems.Editor
         private RoundMapMagicSurfaceDefinition surfaceDefinitionOverride;
 
         [SerializeField]
-        private Vector3 position;
+        private Vector3 previewPosition;
 
         [SerializeField]
         private float previewDiameter =
@@ -179,10 +191,10 @@ namespace jcan.CelestialSystems.Editor
             }
 
             EditorGUILayout.Space();
-            position =
+            previewPosition =
                 EditorGUILayout.Vector3Field(
                     "Position",
-                    position);
+                    previewPosition);
             previewDiameter =
                 EditorGUILayout.FloatField(
                     PreviewDiameterLabel,
@@ -283,7 +295,7 @@ namespace jcan.CelestialSystems.Editor
                     CelestialBodyPreviewBuilder.Generate(
                         bodyDefinition,
                         resolvedSurfaceDefinition,
-                        position,
+                        previewPosition,
                         previewDiameter,
                         meshResolution,
                         graphResolution,
@@ -361,11 +373,11 @@ namespace jcan.CelestialSystems.Editor
             }
 
             if (!IsFinite(
-                    position.x) ||
+                    previewPosition.x) ||
                 !IsFinite(
-                    position.y) ||
+                    previewPosition.y) ||
                 !IsFinite(
-                    position.z))
+                    previewPosition.z))
             {
                 error =
                     "Position must contain finite values.";
