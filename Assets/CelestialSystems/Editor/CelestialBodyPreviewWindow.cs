@@ -2,6 +2,8 @@
  * Provides an editor window for generating and deleting a scaled spherical preview of a celestial-body MapMagic graph.
  */
 
+using System.Globalization;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,6 +12,12 @@ namespace jcan.CelestialSystems.Editor
     public sealed class CelestialBodyPreviewWindow :
         EditorWindow
     {
+        private const double AutoUpdatePollIntervalSeconds =
+            0.25;
+
+        private const double AutoUpdateDebounceSeconds =
+            0.75;
+
         private static readonly GUIContent BodyDefinitionLabel =
             new GUIContent(
                 "Celestial Body Definition",
@@ -39,6 +47,11 @@ namespace jcan.CelestialSystems.Editor
             new GUIContent(
                 "Height Multiplier",
                 "Multiplies generated elevation before the full-scale body is reduced to the preview diameter.");
+
+        private static readonly GUIContent AutoUpdateLabel =
+            new GUIContent(
+                "Auto-update",
+                "Rebuilds an existing preview after the selected graph or preview settings stop changing.");
 
         private static readonly GUIContent[] MeshResolutionLabels =
         {
@@ -117,6 +130,20 @@ namespace jcan.CelestialSystems.Editor
         private float heightMultiplier =
             1.0f;
 
+        [SerializeField]
+        private bool autoUpdate =
+            true;
+
+        private double nextAutoUpdatePollTime;
+
+        private double pendingAutoUpdateTime;
+
+        private string observedPreviewSignature;
+
+        private string pendingPreviewSignature;
+
+        private bool isGenerating;
+
         [MenuItem(
             "Tools/Celestial Systems/Body Preview")]
         private static void OpenWindow()
@@ -129,7 +156,7 @@ namespace jcan.CelestialSystems.Editor
             window.minSize =
                 new Vector2(
                     390.0f,
-                    310.0f);
+                    335.0f);
             window.Show();
         }
 
@@ -146,6 +173,17 @@ namespace jcan.CelestialSystems.Editor
                 bodyDefinition =
                     selectedBody;
             }
+
+            EditorApplication.update -=
+                HandleEditorUpdate;
+            EditorApplication.update +=
+                HandleEditorUpdate;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.update -=
+                HandleEditorUpdate;
         }
 
         private void OnGUI()
@@ -223,6 +261,10 @@ namespace jcan.CelestialSystems.Editor
                 EditorGUILayout.FloatField(
                     HeightMultiplierLabel,
                     heightMultiplier);
+            autoUpdate =
+                EditorGUILayout.Toggle(
+                    AutoUpdateLabel,
+                    autoUpdate);
 
             EditorGUILayout.Space();
 
@@ -243,7 +285,8 @@ namespace jcan.CelestialSystems.Editor
                                 28.0f)))
                     {
                         GeneratePreview(
-                            resolvedSurfaceDefinition);
+                            resolvedSurfaceDefinition,
+                            true);
                     }
                 }
 
@@ -257,6 +300,10 @@ namespace jcan.CelestialSystems.Editor
                                 28.0f)))
                     {
                         CelestialBodyPreviewBuilder.DeletePreview();
+                        observedPreviewSignature =
+                            null;
+                        pendingPreviewSignature =
+                            null;
                         SceneView.RepaintAll();
                     }
                 }
@@ -283,19 +330,27 @@ namespace jcan.CelestialSystems.Editor
                     : null;
         }
 
-        private void GeneratePreview(
-            RoundMapMagicSurfaceDefinition resolvedSurfaceDefinition)
+        private bool GeneratePreview(
+            RoundMapMagicSurfaceDefinition resolvedSurfaceDefinition,
+            bool showDialogs)
         {
             if (!TryValidateInputs(
                     resolvedSurfaceDefinition,
                     out var error))
             {
-                EditorUtility.DisplayDialog(
-                    "Cannot Generate Body Preview",
-                    error,
-                    "OK");
-                return;
+                if (showDialogs)
+                {
+                    EditorUtility.DisplayDialog(
+                        "Cannot Generate Body Preview",
+                        error,
+                        "OK");
+                }
+
+                return false;
             }
+
+            isGenerating =
+                true;
 
             try
             {
@@ -309,21 +364,202 @@ namespace jcan.CelestialSystems.Editor
                         graphResolution,
                         heightMultiplier);
 
+                observedPreviewSignature =
+                    CreatePreviewSignature(
+                        resolvedSurfaceDefinition);
+                pendingPreviewSignature =
+                    null;
                 Selection.activeGameObject =
                     preview;
                 EditorGUIUtility.PingObject(
                     preview);
                 SceneView.RepaintAll();
+                return true;
             }
             catch (System.Exception exception)
             {
                 Debug.LogException(
                     exception);
-                EditorUtility.DisplayDialog(
-                    "Body Preview Generation Failed",
-                    exception.GetBaseException().Message,
-                    "OK");
+
+                if (showDialogs)
+                {
+                    EditorUtility.DisplayDialog(
+                        "Body Preview Generation Failed",
+                        exception.GetBaseException().Message,
+                        "OK");
+                }
+
+                return false;
             }
+            finally
+            {
+                isGenerating =
+                    false;
+            }
+        }
+
+        private void HandleEditorUpdate()
+        {
+            if (!autoUpdate ||
+                isGenerating ||
+                !CelestialBodyPreviewBuilder.HasPreview ||
+                EditorApplication.isPlayingOrWillChangePlaymode ||
+                EditorApplication.isCompiling ||
+                EditorApplication.timeSinceStartup <
+                    nextAutoUpdatePollTime)
+            {
+                return;
+            }
+
+            nextAutoUpdatePollTime =
+                EditorApplication.timeSinceStartup +
+                AutoUpdatePollIntervalSeconds;
+
+            var resolvedSurfaceDefinition =
+                ResolveSurfaceDefinition();
+            var currentSignature =
+                CreatePreviewSignature(
+                    resolvedSurfaceDefinition);
+
+            if (string.IsNullOrEmpty(
+                    observedPreviewSignature))
+            {
+                observedPreviewSignature =
+                    currentSignature;
+                return;
+            }
+
+            if (currentSignature ==
+                observedPreviewSignature)
+            {
+                pendingPreviewSignature =
+                    null;
+                return;
+            }
+
+            if (currentSignature !=
+                pendingPreviewSignature)
+            {
+                pendingPreviewSignature =
+                    currentSignature;
+                pendingAutoUpdateTime =
+                    EditorApplication.timeSinceStartup +
+                    AutoUpdateDebounceSeconds;
+                Repaint();
+                return;
+            }
+
+            if (EditorApplication.timeSinceStartup <
+                pendingAutoUpdateTime)
+            {
+                return;
+            }
+
+            observedPreviewSignature =
+                currentSignature;
+            pendingPreviewSignature =
+                null;
+            GeneratePreview(
+                resolvedSurfaceDefinition,
+                false);
+            Repaint();
+        }
+
+        private string CreatePreviewSignature(
+            RoundMapMagicSurfaceDefinition resolvedSurfaceDefinition)
+        {
+            var builder =
+                new StringBuilder();
+
+            AppendObjectState(
+                builder,
+                bodyDefinition);
+            AppendObjectState(
+                builder,
+                resolvedSurfaceDefinition);
+            AppendObjectState(
+                builder,
+                resolvedSurfaceDefinition != null
+                    ? resolvedSurfaceDefinition.Graph
+                    : null);
+            AppendObjectState(
+                builder,
+                bodyDefinition != null
+                    ? bodyDefinition.OceanDefinition
+                    : null);
+            AppendObjectState(
+                builder,
+                bodyDefinition != null &&
+                    bodyDefinition.OceanDefinition != null
+                    ? bodyDefinition.OceanDefinition.Material
+                    : null);
+            AppendFloat(
+                builder,
+                previewPosition.x);
+            AppendFloat(
+                builder,
+                previewPosition.y);
+            AppendFloat(
+                builder,
+                previewPosition.z);
+            AppendFloat(
+                builder,
+                previewDiameter);
+            builder.Append(
+                meshResolution);
+            builder.Append('|');
+            builder.Append(
+                graphResolution);
+            builder.Append('|');
+            AppendFloat(
+                builder,
+                heightMultiplier);
+            return Hash128.Compute(
+                builder.ToString()).ToString();
+        }
+
+        private static void AppendObjectState(
+            StringBuilder builder,
+            Object value)
+        {
+            if (value == null)
+            {
+                builder.Append(
+                    "<null>|");
+                return;
+            }
+
+            var assetPath =
+                AssetDatabase.GetAssetPath(
+                    value);
+            builder.Append(
+                assetPath);
+            builder.Append('|');
+
+            if (!string.IsNullOrEmpty(
+                    assetPath))
+            {
+                builder.Append(
+                    AssetDatabase.GetAssetDependencyHash(
+                        assetPath));
+                builder.Append('|');
+            }
+
+            builder.Append(
+                EditorJsonUtility.ToJson(
+                    value));
+            builder.Append('|');
+        }
+
+        private static void AppendFloat(
+            StringBuilder builder,
+            float value)
+        {
+            builder.Append(
+                value.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture));
+            builder.Append('|');
         }
 
         private bool TryValidateInputs(
