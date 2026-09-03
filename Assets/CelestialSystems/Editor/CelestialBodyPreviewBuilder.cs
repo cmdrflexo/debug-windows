@@ -627,14 +627,16 @@ namespace jcan.CelestialSystems.Editor
                 preview,
                 oceanDefinition,
                 planetRadiusMeters,
-                previewDiameter);
+                previewDiameter,
+                meshResolution);
         }
 
         private static void BuildOcean(
             GameObject preview,
             OceanDefinition oceanDefinition,
             double planetRadiusMeters,
-            float previewDiameter)
+            float previewDiameter,
+            int meshResolution)
         {
             if (oceanDefinition == null)
             {
@@ -660,48 +662,256 @@ namespace jcan.CelestialSystems.Editor
                     "The ocean's global surface elevation produces a non-positive or non-finite radius.");
             }
 
-            var ocean = GameObject.CreatePrimitive(
-                PrimitiveType.Sphere);
-            ocean.name =
-                "Preview Ocean";
-            ocean.tag =
-                "EditorOnly";
-            ocean.hideFlags =
-                HideFlags.DontSaveInBuild;
-            ocean.transform.SetParent(
+            var displayScale =
+                previewDiameter /
+                (planetRadiusMeters *
+                    2.0);
+            var previewRadius =
+                previewDiameter *
+                0.5f;
+            var oceanRoot =
+                new GameObject(
+                    "Preview Ocean")
+                {
+                    tag =
+                        "EditorOnly",
+                    hideFlags =
+                        HideFlags.DontSaveInBuild
+                };
+            oceanRoot.transform.SetParent(
                 preview.transform,
                 false);
-            ocean.transform.localPosition =
+            oceanRoot.transform.localPosition =
                 Vector3.zero;
-            ocean.transform.localRotation =
+            oceanRoot.transform.localRotation =
                 Quaternion.identity;
+            oceanRoot.transform.localScale =
+                Vector3.one;
 
-            var oceanDiameter =
-                previewDiameter *
-                (float)(
-                    oceanRadiusMeters /
-                    planetRadiusMeters);
-            ocean.transform.localScale =
-                Vector3.one *
-                oceanDiameter;
-
-            var collider =
-                ocean.GetComponent<Collider>();
-
-            if (collider != null)
+            for (var index = 0;
+                index < Faces.Length;
+                index++)
             {
-                UnityEngine.Object.DestroyImmediate(
-                    collider);
+                var face =
+                    Faces[index];
+                var child =
+                    new GameObject(
+                        $"Preview Ocean {face}")
+                    {
+                        tag =
+                            "EditorOnly",
+                        hideFlags =
+                            HideFlags.DontSaveInBuild
+                    };
+                child.transform.SetParent(
+                    oceanRoot.transform,
+                    false);
+                PositionFace(
+                    child.transform,
+                    face,
+                    previewRadius);
+
+                var meshFilter =
+                    child.AddComponent<MeshFilter>();
+                var meshRenderer =
+                    child.AddComponent<MeshRenderer>();
+                meshRenderer.shadowCastingMode =
+                    ShadowCastingMode.Off;
+                meshRenderer.receiveShadows =
+                    false;
+                meshFilter.sharedMesh =
+                    CreateOceanFaceMesh(
+                        face,
+                        meshResolution,
+                        planetRadiusMeters,
+                        oceanRadiusMeters,
+                        displayScale);
+                meshRenderer.sharedMaterial =
+                    oceanDefinition.Material;
+            }
+        }
+
+        private static Mesh CreateOceanFaceMesh(
+            CubeSphereFace face,
+            int resolution,
+            double planetRadiusMeters,
+            double oceanRadiusMeters,
+            double displayScale)
+        {
+            var faceNormal =
+                CubeSphereTopology.GetFaceNormal(
+                    face);
+            var faceUAxis =
+                CubeSphereTopology.GetFaceUAxis(
+                    face);
+            var faceVAxis =
+                CubeSphereTopology.GetFaceVAxis(
+                    face);
+            var referencePosition =
+                faceNormal *
+                planetRadiusMeters;
+            var vertices =
+                new Vector3[
+                    resolution *
+                    resolution];
+            var normals =
+                new Vector3[
+                    vertices.Length];
+            var uv =
+                new Vector2[
+                    vertices.Length];
+            var triangles =
+                new int[
+                    (resolution - 1) *
+                    (resolution - 1) *
+                    6];
+
+            for (var z = 0;
+                z < resolution;
+                z++)
+            {
+                var normalizedZ =
+                    z /
+                    (double)(
+                        resolution -
+                        1);
+                var faceV =
+                    1.0 -
+                    normalizedZ *
+                    2.0;
+
+                for (var x = 0;
+                    x < resolution;
+                    x++)
+                {
+                    var normalizedX =
+                        x /
+                        (double)(
+                            resolution -
+                            1);
+                    var faceU =
+                        normalizedX *
+                        2.0 -
+                        1.0;
+                    var address =
+                        new CubeSphereAddress(
+                            face,
+                            faceU,
+                            faceV,
+                            0.0);
+                    var direction =
+                        CubeSphereMapping.AddressToDirection(
+                            address);
+                    var delta =
+                        direction *
+                            oceanRadiusMeters -
+                        referencePosition;
+                    var vertexIndex =
+                        z *
+                        resolution +
+                        x;
+                    vertices[vertexIndex] =
+                        new Vector3(
+                            (float)(
+                                Dot(
+                                    delta,
+                                    faceUAxis) *
+                                displayScale),
+                            (float)(
+                                Dot(
+                                    delta,
+                                    faceNormal) *
+                                displayScale),
+                            (float)(
+                                -Dot(
+                                    delta,
+                                    faceVAxis) *
+                                displayScale));
+                    normals[vertexIndex] =
+                        new Vector3(
+                            (float)Dot(
+                                direction,
+                                faceUAxis),
+                            (float)Dot(
+                                direction,
+                                faceNormal),
+                            (float)-Dot(
+                                direction,
+                                faceVAxis)).normalized;
+                    uv[vertexIndex] =
+                        new Vector2(
+                            (float)normalizedX,
+                            (float)normalizedZ);
+                }
             }
 
-            var renderer =
-                ocean.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial =
-                oceanDefinition.Material;
-            renderer.shadowCastingMode =
-                ShadowCastingMode.Off;
-            renderer.receiveShadows =
-                false;
+            var triangleIndex =
+                0;
+
+            for (var z = 0;
+                z < resolution -
+                    1;
+                z++)
+            {
+                for (var x = 0;
+                    x < resolution -
+                        1;
+                    x++)
+                {
+                    var lowerLeft =
+                        z *
+                        resolution +
+                        x;
+                    var upperLeft =
+                        lowerLeft +
+                        resolution;
+                    var lowerRight =
+                        lowerLeft +
+                        1;
+                    var upperRight =
+                        upperLeft +
+                        1;
+                    triangles[triangleIndex++] =
+                        lowerLeft;
+                    triangles[triangleIndex++] =
+                        upperLeft;
+                    triangles[triangleIndex++] =
+                        lowerRight;
+                    triangles[triangleIndex++] =
+                        lowerRight;
+                    triangles[triangleIndex++] =
+                        upperLeft;
+                    triangles[triangleIndex++] =
+                        upperRight;
+                }
+            }
+
+            var mesh =
+                new Mesh
+                {
+                    name =
+                        PreviewResourcePrefix +
+                        face +
+                        " Ocean Mesh",
+                    hideFlags =
+                        HideFlags.HideAndDontSave,
+                    indexFormat =
+                        vertices.Length >
+                            65535
+                            ? IndexFormat.UInt32
+                            : IndexFormat.UInt16,
+                    vertices =
+                        vertices,
+                    normals =
+                        normals,
+                    uv =
+                        uv,
+                    triangles =
+                        triangles
+                };
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
+            return mesh;
         }
 
         private static void PositionFace(
