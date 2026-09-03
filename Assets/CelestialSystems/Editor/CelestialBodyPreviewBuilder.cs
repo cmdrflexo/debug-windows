@@ -71,7 +71,8 @@ namespace jcan.CelestialSystems.Editor
             float previewDiameter,
             int meshResolution,
             int graphResolution,
-            float heightMultiplier)
+            float heightMultiplier,
+            bool showOcean)
         {
             if (bodyDefinition == null)
             {
@@ -159,7 +160,8 @@ namespace jcan.CelestialSystems.Editor
                     planetRadiusMeters,
                     previewDiameter,
                     resolvedMeshResolution,
-                    heightMultiplier);
+                    heightMultiplier,
+                    showOcean);
             }
             catch
             {
@@ -562,7 +564,8 @@ namespace jcan.CelestialSystems.Editor
             double planetRadiusMeters,
             float previewDiameter,
             int meshResolution,
-            float heightMultiplier)
+            float heightMultiplier,
+            bool showOcean)
         {
             var displayScale =
                 previewDiameter /
@@ -623,12 +626,15 @@ namespace jcan.CelestialSystems.Editor
                     material;
             }
 
-            BuildOcean(
-                preview,
-                oceanDefinition,
-                planetRadiusMeters,
-                previewDiameter,
-                meshResolution);
+            if (showOcean)
+            {
+                BuildOcean(
+                    preview,
+                    oceanDefinition,
+                    planetRadiusMeters,
+                    previewDiameter,
+                    meshResolution);
+            }
         }
 
         private static void BuildOcean(
