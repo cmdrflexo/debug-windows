@@ -188,6 +188,14 @@ namespace jcan.CelestialSystems.Editor
                     typeof(
                         RoundMapMagicSurfaceDefinition),
                     false);
+                EditorGUILayout.ObjectField(
+                    "Ocean Definition",
+                    bodyDefinition != null
+                        ? bodyDefinition.OceanDefinition
+                        : null,
+                    typeof(
+                        OceanDefinition),
+                    false);
             }
 
             EditorGUILayout.Space();
