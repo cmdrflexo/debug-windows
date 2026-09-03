@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.RoundMapMagicSurfaceDefinition
   graph: {fileID: 11400000, guid: 06156f37f516baf47b1f9ed1a386fff3, type: 2}
   surfaceSeed: 12345
-  elevationOffsetMeters: -125
+  elevationOffsetMeters: 0
   tileSizeMeters: 1000
   adjacentPreloadDistanceMeters: 3000
   meshResolution: 65

@@ -20,3 +20,4 @@ MonoBehaviour:
   poleReferenceAxis: {x: 0, y: 0, z: 1}
   surfaceSystem: 0
   roundMapMagicSurface: {fileID: 11400000, guid: b1f16f79fa318094a8a148264b250ccb, type: 2}
+  oceanDefinition: {fileID: 11400000, guid: 12a6a06f2bda111479b798c39ee745ce, type: 2}

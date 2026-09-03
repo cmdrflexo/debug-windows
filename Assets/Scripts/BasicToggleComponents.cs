@@ -1,11 +1,10 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class BasicToggleComponents : BasicActionInput {
     
     [SerializeField] private Behaviour[] components;
 
-    protected override void OnToggle(InputAction.CallbackContext context) {
+    protected override void OnToggle() {
         foreach(Behaviour component in components)
             component.enabled = !component.enabled;
     }

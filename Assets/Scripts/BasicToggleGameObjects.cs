@@ -5,7 +5,7 @@ public class BasicToggleGameObjects : BasicActionInput {
     
     [SerializeField] private GameObject[] gameObjects;
 
-    protected override void OnToggle(InputAction.CallbackContext context) {
+    protected override void OnToggle() {
         foreach(GameObject _gameObject in gameObjects)
             _gameObject.SetActive(!_gameObject.activeSelf);
     }
