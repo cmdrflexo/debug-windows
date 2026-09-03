@@ -71,12 +71,17 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private SourceBinding[] sources = Array.Empty<SourceBinding>();
 
+        [Header("Header Code")]
+        [SerializeField]
+        [TextArea(3, 15)]
+        private string headerCode =
+            "<b>Celestial Debug</b>\n" +
+            "Altitude: {surface.AnchorAltitudeMeters:N1|--} m";
+
         [Header("Display Code")]
         [SerializeField]
         [TextArea(6, 30)]
         private string displayCode =
-            "<b>Celestial Debug</b>\n" +
-            "Altitude: {surface.AnchorAltitudeMeters:N1|--} m\n" +
             "Face: {surface.AnchorAddress.Face|--}";
 
         [Header("Runtime")]
@@ -86,9 +91,13 @@ namespace jcan.CelestialSystems
         private readonly List<Token> tokens = new List<Token>();
         private readonly StringBuilder outputBuilder = new StringBuilder(512);
 
+        private string compiledHeaderCode;
         private string compiledDisplayCode;
+        private string compiledTemplate;
         private int compiledSourceSignature;
         private double nextRefreshTime;
+
+        public string HeaderCode => headerCode;
 
         public string DisplayCode => displayCode;
 
@@ -120,6 +129,13 @@ namespace jcan.CelestialSystems
         public void SetDisplayCode(string newDisplayCode)
         {
             displayCode = newDisplayCode ?? string.Empty;
+            InvalidateTemplate();
+            RefreshText();
+        }
+
+        public void SetHeaderCode(string newHeaderCode)
+        {
+            headerCode = newHeaderCode ?? string.Empty;
             InvalidateTemplate();
             RefreshText();
         }
@@ -175,7 +191,8 @@ namespace jcan.CelestialSystems
         {
             var sourceSignature = CalculateSourceSignature();
 
-            if (compiledDisplayCode == displayCode &&
+            if (compiledHeaderCode == headerCode &&
+                compiledDisplayCode == displayCode &&
                 compiledSourceSignature == sourceSignature)
             {
                 return;
@@ -189,19 +206,23 @@ namespace jcan.CelestialSystems
             tokens.Clear();
             lastConfigurationError = string.Empty;
 
+            compiledHeaderCode = headerCode ?? string.Empty;
             compiledDisplayCode = displayCode ?? string.Empty;
+            compiledTemplate = BuildTemplate(
+                compiledHeaderCode,
+                compiledDisplayCode);
             compiledSourceSignature = sourceSignature;
 
             var bindings = BuildBindingLookup();
             var literal = new StringBuilder();
 
-            for (var index = 0; index < compiledDisplayCode.Length; index++)
+            for (var index = 0; index < compiledTemplate.Length; index++)
             {
-                var character = compiledDisplayCode[index];
+                var character = compiledTemplate[index];
 
                 if (character == '{' &&
-                    index + 1 < compiledDisplayCode.Length &&
-                    compiledDisplayCode[index + 1] == '{')
+                    index + 1 < compiledTemplate.Length &&
+                    compiledTemplate[index + 1] == '{')
                 {
                     literal.Append('{');
                     index++;
@@ -209,8 +230,8 @@ namespace jcan.CelestialSystems
                 }
 
                 if (character == '}' &&
-                    index + 1 < compiledDisplayCode.Length &&
-                    compiledDisplayCode[index + 1] == '}')
+                    index + 1 < compiledTemplate.Length &&
+                    compiledTemplate[index + 1] == '}')
                 {
                     literal.Append('}');
                     index++;
@@ -223,18 +244,18 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
-                var closingBrace = compiledDisplayCode.IndexOf('}', index + 1);
+                var closingBrace = compiledTemplate.IndexOf('}', index + 1);
 
                 if (closingBrace < 0)
                 {
-                    literal.Append(compiledDisplayCode, index, compiledDisplayCode.Length - index);
+                    literal.Append(compiledTemplate, index, compiledTemplate.Length - index);
                     RecordConfigurationError("Display code contains an unmatched opening brace.");
                     break;
                 }
 
                 AddLiteralToken(literal);
 
-                var expression = compiledDisplayCode.Substring(
+                var expression = compiledTemplate.Substring(
                     index + 1,
                     closingBrace - index - 1);
 
@@ -243,6 +264,31 @@ namespace jcan.CelestialSystems
             }
 
             AddLiteralToken(literal);
+        }
+
+        private static string BuildTemplate(
+            string header,
+            string display)
+        {
+            var hasHeader = !string.IsNullOrWhiteSpace(header);
+            var hasDisplay = !string.IsNullOrWhiteSpace(display);
+
+            if (!hasHeader)
+            {
+                return hasDisplay
+                    ? display
+                    : string.Empty;
+            }
+
+            if (!hasDisplay)
+            {
+                return header;
+            }
+
+            return
+                header.TrimEnd('\r', '\n') +
+                "\n" +
+                display.TrimStart('\r', '\n');
         }
 
         private Token CreateToken(
@@ -820,7 +866,9 @@ namespace jcan.CelestialSystems
 
         private void InvalidateTemplate()
         {
+            compiledHeaderCode = null;
             compiledDisplayCode = null;
+            compiledTemplate = null;
             compiledSourceSignature = 0;
         }
     }
