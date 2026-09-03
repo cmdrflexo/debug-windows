@@ -122,6 +122,61 @@ Session: <color=#FFD166>{session.HasActiveSession}</color>
 
 Whether a rich-text tag is displayed or interpreted depends on the target TMP component's rich-text settings.
 
+### Conditional colors
+
+A conditional color token chooses a TextMeshPro color from a live value and emits an opening `<color>` tag:
+
+```text
+{color:condition|true color|false color|unavailable color}
+```
+
+Close the colored section with a normal TextMeshPro `</color>` tag:
+
+```text
+{color:surface.AnchorAltitudeMeters < 0|#FF6060|#60E880|#AAAAAA}
+Altitude: {surface.AnchorAltitudeMeters:N1|--} m
+</color>
+```
+
+This displays the entire altitude line in red below zero altitude, green at or above zero, and gray when the altitude cannot be read.
+
+The unavailable color is optional and defaults to `#AAAAAA`:
+
+```text
+{color:surface.AnchorAltitudeMeters < 0|red|green}Altitude: {surface.AnchorAltitudeMeters:N1|--} m</color>
+```
+
+A Boolean property can be used directly:
+
+```text
+{color:session.HasActiveSession|#60E880|#FF6060|#AAAAAA}
+Session active: {session.HasActiveSession|--}
+</color>
+```
+
+Supported comparison operators are:
+
+| Operator | Meaning |
+| --- | --- |
+| `<` | Less than |
+| `<=` | Less than or equal |
+| `>` | Greater than |
+| `>=` | Greater than or equal |
+| `==` | Equal |
+| `!=` | Not equal |
+
+Ordered comparisons use numeric values. Equality comparisons also work with Booleans, strings, and enums, ignoring letter case:
+
+```text
+{color:surface.AnchorAddress.Face == PositiveY|yellow|white|gray}
+Face: {surface.AnchorAddress.Face|--}
+</color>
+```
+
+The selected color can cover one value, a whole line, or multiple lines. Conditional color tokens do not automatically insert `</color>`, allowing the recipe to choose the extent of the colored section.
+
+If the condition path is invalid, its source is unavailable, a direct condition is not Boolean, or an ordered comparison is not numeric, the unavailable color is used. **Last Configuration Error** reports syntax and path errors; runtime type or value failures simply select the unavailable color.
+
 ### Literal braces
 
 Double braces print a literal brace instead of starting or ending a token:
@@ -212,8 +267,8 @@ debugTextController.SetDisplayCode(
 
 ## Current limitations
 
-- Recipes display values but cannot perform calculations or comparisons.
-- Recipes do not currently contain conditional sections or custom true/false labels.
+- Comparisons are currently available only for conditional colors; recipes cannot perform general calculations.
+- Recipes do not currently contain conditional text sections or custom true/false labels.
 - Collection indexing and method calls are intentionally unsupported.
 - Values are refreshed by polling rather than events.
 - A source must be assigned explicitly before its data is available.

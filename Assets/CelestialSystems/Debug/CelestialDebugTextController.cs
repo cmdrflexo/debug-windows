@@ -15,6 +15,17 @@ namespace jcan.CelestialSystems
     [DisallowMultipleComponent]
     public sealed class CelestialDebugTextController : MonoBehaviour
     {
+        private enum ConditionOperator
+        {
+            Boolean,
+            LessThan,
+            LessThanOrEqual,
+            GreaterThan,
+            GreaterThanOrEqual,
+            Equal,
+            NotEqual
+        }
+
         [Serializable]
         private sealed class SourceBinding
         {
@@ -38,6 +49,12 @@ namespace jcan.CelestialSystems
             public SourceBinding Binding;
             public MemberInfo[] Members;
             public string Error;
+            public bool IsConditionalColor;
+            public ConditionOperator ConditionOperator;
+            public string ComparisonValue;
+            public string TrueColor;
+            public string FalseColor;
+            public string UnavailableColor;
 
             public bool IsLiteral => Literal != null;
         }
@@ -127,6 +144,14 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
+                if (token.IsConditionalColor)
+                {
+                    outputBuilder.Append("<color=");
+                    outputBuilder.Append(EvaluateConditionalColor(token));
+                    outputBuilder.Append('>');
+                    continue;
+                }
+
                 if (!TryEvaluate(token, out var value))
                 {
                     outputBuilder.Append(token.Fallback);
@@ -213,11 +238,90 @@ namespace jcan.CelestialSystems
                     index + 1,
                     closingBrace - index - 1);
 
-                tokens.Add(CreateValueToken(expression, bindings));
+                tokens.Add(CreateToken(expression, bindings));
                 index = closingBrace;
             }
 
             AddLiteralToken(literal);
+        }
+
+        private Token CreateToken(
+            string rawExpression,
+            Dictionary<string, SourceBinding> bindings)
+        {
+            const string ColorPrefix = "color:";
+            var expression = rawExpression.Trim();
+
+            if (expression.StartsWith(
+                    ColorPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateConditionalColorToken(
+                    rawExpression,
+                    expression.Substring(ColorPrefix.Length),
+                    bindings);
+            }
+
+            return CreateValueToken(rawExpression, bindings);
+        }
+
+        private Token CreateConditionalColorToken(
+            string rawExpression,
+            string colorExpression,
+            Dictionary<string, SourceBinding> bindings)
+        {
+            var token = new Token
+            {
+                Expression = rawExpression,
+                IsConditionalColor = true,
+                UnavailableColor = "#AAAAAA"
+            };
+
+            var parts = colorExpression.Split('|');
+
+            if (parts.Length < 3 ||
+                parts.Length > 4)
+            {
+                return SetTokenError(
+                    token,
+                    $"Conditional color token '{{{rawExpression}}}' requires a condition, true color, false color, and optional unavailable color.");
+            }
+
+            token.TrueColor = parts[1].Trim();
+            token.FalseColor = parts[2].Trim();
+
+            if (parts.Length == 4)
+            {
+                token.UnavailableColor = parts[3].Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(token.TrueColor) ||
+                string.IsNullOrWhiteSpace(token.FalseColor) ||
+                string.IsNullOrWhiteSpace(token.UnavailableColor))
+            {
+                return SetTokenError(
+                    token,
+                    $"Conditional color token '{{{rawExpression}}}' contains an empty color.");
+            }
+
+            if (!TryParseCondition(
+                    parts[0],
+                    out var memberPath,
+                    out var conditionOperator,
+                    out var comparisonValue))
+            {
+                return SetTokenError(
+                    token,
+                    $"Conditional color token '{{{rawExpression}}}' has an invalid condition.");
+            }
+
+            token.ConditionOperator = conditionOperator;
+            token.ComparisonValue = comparisonValue;
+
+            return ConfigureMemberPath(
+                token,
+                memberPath,
+                bindings);
         }
 
         private Dictionary<string, SourceBinding> BuildBindingLookup()
@@ -279,21 +383,32 @@ namespace jcan.CelestialSystems
                 expression = expression.Substring(0, formatSeparator).Trim();
             }
 
-            var pathParts = expression.Split('.');
+            return ConfigureMemberPath(
+                token,
+                expression,
+                bindings);
+        }
+
+        private Token ConfigureMemberPath(
+            Token token,
+            string memberPath,
+            Dictionary<string, SourceBinding> bindings)
+        {
+            var pathParts = memberPath.Split('.');
 
             if (pathParts.Length < 2 ||
                 string.IsNullOrWhiteSpace(pathParts[0]))
             {
                 return SetTokenError(
                     token,
-                    $"Token '{{{rawExpression}}}' must use alias.Member syntax.");
+                    $"Token '{{{token.Expression}}}' must use alias.Member syntax.");
             }
 
             if (!bindings.TryGetValue(pathParts[0].Trim(), out var binding))
             {
                 return SetTokenError(
                     token,
-                    $"Token '{{{rawExpression}}}' uses unknown source alias '{pathParts[0]}'.");
+                    $"Token '{{{token.Expression}}}' uses unknown source alias '{pathParts[0]}'.");
             }
 
             token.Binding = binding;
@@ -326,6 +441,193 @@ namespace jcan.CelestialSystems
 
             token.Members = members;
             return token;
+        }
+
+        private static bool TryParseCondition(
+            string rawCondition,
+            out string memberPath,
+            out ConditionOperator conditionOperator,
+            out string comparisonValue)
+        {
+            var condition = rawCondition.Trim();
+            var operators = new[]
+            {
+                ">=", "<=", "==", "!=", ">", "<"
+            };
+
+            for (var i = 0; i < operators.Length; i++)
+            {
+                var symbol = operators[i];
+                var separator = condition.IndexOf(
+                    symbol,
+                    StringComparison.Ordinal);
+
+                if (separator < 0)
+                {
+                    continue;
+                }
+
+                memberPath = condition.Substring(0, separator).Trim();
+                comparisonValue = condition.Substring(
+                    separator + symbol.Length).Trim();
+
+                if (string.IsNullOrWhiteSpace(memberPath) ||
+                    string.IsNullOrWhiteSpace(comparisonValue))
+                {
+                    conditionOperator = default;
+                    return false;
+                }
+
+                conditionOperator = GetConditionOperator(symbol);
+                return true;
+            }
+
+            memberPath = condition;
+            conditionOperator = ConditionOperator.Boolean;
+            comparisonValue = null;
+            return !string.IsNullOrWhiteSpace(memberPath);
+        }
+
+        private static ConditionOperator GetConditionOperator(string symbol)
+        {
+            switch (symbol)
+            {
+                case "<":
+                    return ConditionOperator.LessThan;
+
+                case "<=":
+                    return ConditionOperator.LessThanOrEqual;
+
+                case ">":
+                    return ConditionOperator.GreaterThan;
+
+                case ">=":
+                    return ConditionOperator.GreaterThanOrEqual;
+
+                case "==":
+                    return ConditionOperator.Equal;
+
+                case "!=":
+                    return ConditionOperator.NotEqual;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(symbol));
+            }
+        }
+
+        private static string EvaluateConditionalColor(Token token)
+        {
+            if (!TryEvaluate(token, out var value) ||
+                !TryEvaluateCondition(token, value, out var conditionIsTrue))
+            {
+                return token.UnavailableColor;
+            }
+
+            return conditionIsTrue
+                ? token.TrueColor
+                : token.FalseColor;
+        }
+
+        private static bool TryEvaluateCondition(
+            Token token,
+            object value,
+            out bool conditionIsTrue)
+        {
+            if (token.ConditionOperator == ConditionOperator.Boolean)
+            {
+                if (value is bool booleanValue)
+                {
+                    conditionIsTrue = booleanValue;
+                    return true;
+                }
+
+                conditionIsTrue = false;
+                return false;
+            }
+
+            if (TryConvertToDouble(value, out var numericValue) &&
+                double.TryParse(
+                    token.ComparisonValue,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var numericComparison))
+            {
+                conditionIsTrue = CompareNumbers(
+                    numericValue,
+                    numericComparison,
+                    token.ConditionOperator);
+                return true;
+            }
+
+            if (token.ConditionOperator != ConditionOperator.Equal &&
+                token.ConditionOperator != ConditionOperator.NotEqual)
+            {
+                conditionIsTrue = false;
+                return false;
+            }
+
+            var valuesAreEqual = string.Equals(
+                value.ToString(),
+                token.ComparisonValue,
+                StringComparison.OrdinalIgnoreCase);
+
+            conditionIsTrue = token.ConditionOperator == ConditionOperator.Equal
+                ? valuesAreEqual
+                : !valuesAreEqual;
+            return true;
+        }
+
+        private static bool TryConvertToDouble(object value, out double result)
+        {
+            if (value is bool ||
+                value is char ||
+                value is Enum ||
+                !(value is IConvertible convertible))
+            {
+                result = default;
+                return false;
+            }
+
+            try
+            {
+                result = convertible.ToDouble(CultureInfo.InvariantCulture);
+                return !double.IsNaN(result);
+            }
+            catch (Exception)
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        private static bool CompareNumbers(
+            double value,
+            double comparison,
+            ConditionOperator conditionOperator)
+        {
+            switch (conditionOperator)
+            {
+                case ConditionOperator.LessThan:
+                    return value < comparison;
+
+                case ConditionOperator.LessThanOrEqual:
+                    return value <= comparison;
+
+                case ConditionOperator.GreaterThan:
+                    return value > comparison;
+
+                case ConditionOperator.GreaterThanOrEqual:
+                    return value >= comparison;
+
+                case ConditionOperator.Equal:
+                    return value == comparison;
+
+                case ConditionOperator.NotEqual:
+                    return value != comparison;
+
+                default:
+                    return false;
+            }
         }
 
         private Token SetTokenError(Token token, string error)
