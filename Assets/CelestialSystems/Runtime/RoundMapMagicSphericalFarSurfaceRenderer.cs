@@ -101,6 +101,9 @@ namespace jcan.CelestialSystems
         private float resolvedHeightScaleMeters;
 
         [SerializeField]
+        private double resolvedElevationOffsetMeters;
+
+        [SerializeField]
         private bool hasTerrainLayerMaterial;
 
         [SerializeField]
@@ -120,6 +123,7 @@ namespace jcan.CelestialSystems
 
         private double builtPlanetRadiusMeters;
         private double builtSurfaceOffsetMeters;
+        private double builtElevationOffsetMeters;
         private float builtHeightMultiplier;
         private int builtMeshResolution;
         private bool builtDisplayHeightMaps;
@@ -145,7 +149,8 @@ namespace jcan.CelestialSystems
             if (!TryResolveBuildInputs(
                     out var planetCenterScenePosition,
                     out var planetRadiusMeters,
-                    out var heightScaleMeters))
+                    out var heightScaleMeters,
+                    out var elevationOffsetMeters))
             {
                 return;
             }
@@ -154,11 +159,13 @@ namespace jcan.CelestialSystems
 
             if (NeedsRebuild(
                     planetRadiusMeters,
-                    heightScaleMeters))
+                    heightScaleMeters,
+                    elevationOffsetMeters))
             {
                 BuildSurface(
                     planetRadiusMeters,
-                    heightScaleMeters);
+                    heightScaleMeters,
+                    elevationOffsetMeters);
             }
 
             if (hasBuiltSurface)
@@ -178,11 +185,13 @@ namespace jcan.CelestialSystems
         private bool TryResolveBuildInputs(
             out Vector3 planetCenterScenePosition,
             out double planetRadiusMeters,
-            out float heightScaleMeters)
+            out float heightScaleMeters,
+            out double elevationOffsetMeters)
         {
             planetCenterScenePosition = default;
             planetRadiusMeters = default;
             heightScaleMeters = default;
+            elevationOffsetMeters = default;
 
             if (surfaceFrame == null ||
                 faceMapCache == null)
@@ -195,6 +204,8 @@ namespace jcan.CelestialSystems
                 surfaceFrame.PlanetRadiusMeters;
             heightScaleMeters =
                 faceMapCache.HeightScaleMeters;
+            elevationOffsetMeters =
+                faceMapCache.ElevationOffsetMeters;
 
             if (!faceMapCache.IsComplete)
             {
@@ -209,12 +220,16 @@ namespace jcan.CelestialSystems
                     heightScaleMeters) ||
                 heightScaleMeters <= 0.0f ||
                 !IsFinite(
+                    elevationOffsetMeters) ||
+                !IsFinite(
                     heightMultiplier) ||
                 heightMultiplier < 0.0f ||
                 !IsFinite(
                     surfaceOffsetMeters) ||
                 planetRadiusMeters +
-                    surfaceOffsetMeters <= 0.0)
+                    surfaceOffsetMeters +
+                    elevationOffsetMeters *
+                        heightMultiplier <= 0.0)
             {
                 SetError(
                     "The spherical far renderer requires a positive planet radius and height scale with finite displacement settings.");
@@ -233,7 +248,8 @@ namespace jcan.CelestialSystems
 
         private bool NeedsRebuild(
             double planetRadiusMeters,
-            float heightScaleMeters)
+            float heightScaleMeters,
+            double elevationOffsetMeters)
         {
             if (!hasBuiltSurface ||
                 generatedFaceCount !=
@@ -242,6 +258,8 @@ namespace jcan.CelestialSystems
                     planetRadiusMeters ||
                 builtSurfaceOffsetMeters !=
                     surfaceOffsetMeters ||
+                builtElevationOffsetMeters !=
+                    elevationOffsetMeters ||
                 builtHeightMultiplier !=
                     heightMultiplier ||
                 builtMeshResolution !=
@@ -284,7 +302,8 @@ namespace jcan.CelestialSystems
 
         private void BuildSurface(
             double planetRadiusMeters,
-            float heightScaleMeters)
+            float heightScaleMeters,
+            double elevationOffsetMeters)
         {
             ClearSurface();
             var stopwatch =
@@ -319,7 +338,8 @@ namespace jcan.CelestialSystems
                             sourceTexture,
                             resolvedMeshResolution,
                             planetRadiusMeters,
-                            heightScaleMeters);
+                            heightScaleMeters,
+                            elevationOffsetMeters);
                     generatedFaceCount++;
                 }
 
@@ -327,6 +347,8 @@ namespace jcan.CelestialSystems
                     planetRadiusMeters;
                 builtSurfaceOffsetMeters =
                     surfaceOffsetMeters;
+                builtElevationOffsetMeters =
+                    elevationOffsetMeters;
                 builtHeightMultiplier =
                     heightMultiplier;
                 builtMeshResolution =
@@ -337,6 +359,8 @@ namespace jcan.CelestialSystems
                     meshMaterial;
                 resolvedHeightScaleMeters =
                     heightScaleMeters;
+                resolvedElevationOffsetMeters =
+                    elevationOffsetMeters;
                 sourceFaceResolution =
                     faceRuntimes[0].SourceTexture.width;
                 hasTerrainLayerMaterial =
@@ -373,7 +397,8 @@ namespace jcan.CelestialSystems
             Texture2D sourceTexture,
             int resolution,
             double planetRadiusMeters,
-            float heightScaleMeters)
+            float heightScaleMeters,
+            double elevationOffsetMeters)
         {
             var runtime =
                 new FaceRuntime
@@ -408,7 +433,8 @@ namespace jcan.CelestialSystems
                     sourceTexture,
                     resolution,
                     planetRadiusMeters,
-                    heightScaleMeters);
+                    heightScaleMeters,
+                    elevationOffsetMeters);
             var material =
                 CreateFaceMaterial(
                     face,
@@ -441,7 +467,8 @@ namespace jcan.CelestialSystems
             Texture2D sourceTexture,
             int resolution,
             double planetRadiusMeters,
-            float heightScaleMeters)
+            float heightScaleMeters,
+            double elevationOffsetMeters)
         {
             var faceNormal =
                 CubeSphereTopology.GetFaceNormal(
@@ -514,9 +541,12 @@ namespace jcan.CelestialSystems
                         sourceTexture.GetPixelBilinear(
                             (float)normalizedX,
                             (float)normalizedZ).r;
-                    var heightMeters =
+                    var generatedHeightMeters =
                         normalizedHeight *
-                        heightScaleMeters *
+                        heightScaleMeters;
+                    var heightMeters =
+                        (generatedHeightMeters +
+                            elevationOffsetMeters) *
                         heightMultiplier;
                     var surfaceRadiusMeters =
                         baseRadiusMeters +
@@ -1239,11 +1269,13 @@ namespace jcan.CelestialSystems
             generatedTriangleCount = default;
             sourceFaceResolution = default;
             resolvedHeightScaleMeters = default;
+            resolvedElevationOffsetMeters = default;
             hasTerrainLayerMaterial = false;
             renderedTerrainLayerCount = default;
             renderedControlResolution = default;
             builtPlanetRadiusMeters = default;
             builtSurfaceOffsetMeters = default;
+            builtElevationOffsetMeters = default;
             builtHeightMultiplier = default;
             builtMeshResolution = default;
             builtDisplayHeightMaps = default;

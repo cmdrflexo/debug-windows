@@ -29,6 +29,7 @@ namespace jcan.CelestialSystems
             public int Resolution;
             public float[] NormalizedHeights;
             public float HeightScaleMeters;
+            public double ElevationOffsetMeters;
             public float[,,] ControlWeights;
             public TerrainLayer[] TerrainLayers;
             public float MinimumHeightMeters;
@@ -92,6 +93,9 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private float heightScaleMeters;
+
+        [SerializeField]
+        private double elevationOffsetMeters;
 
         [SerializeField]
         private double lastFaceGenerationMilliseconds;
@@ -161,6 +165,9 @@ namespace jcan.CelestialSystems
 
         public float HeightScaleMeters =>
             heightScaleMeters;
+
+        public double ElevationOffsetMeters =>
+            elevationOffsetMeters;
 
         public bool HasTextureData =>
             isComplete &&
@@ -311,6 +318,7 @@ namespace jcan.CelestialSystems
             minimumHeightMeters = 0.0f;
             maximumHeightMeters = 0.0f;
             heightScaleMeters = 0.0f;
+            elevationOffsetMeters = 0.0;
             terrainLayerCount = 0;
             terrainLayers =
                 new TerrainLayer[0];
@@ -339,14 +347,20 @@ namespace jcan.CelestialSystems
                 surfaceFrame != null
                     ? surfaceFrame.PlanetRadiusMeters
                     : 0.0;
+            var resolvedElevationOffsetMeters =
+                surfaceDefinition != null
+                    ? surfaceDefinition.ElevationOffsetMeters
+                    : 0.0;
 
             if (generationSource == null ||
                 graph == null ||
                 !IsFinite(planetRadiusMeters) ||
-                planetRadiusMeters <= 0.0)
+                planetRadiusMeters <= 0.0 ||
+                !IsFinite(
+                    resolvedElevationOffsetMeters))
             {
                 FailGeneration(
-                    "A valid surface frame and MapMagic generation source are required.");
+                    "A valid surface frame, MapMagic generation source, and finite elevation datum are required.");
                 return;
             }
 
@@ -444,6 +458,7 @@ namespace jcan.CelestialSystems
                         stop,
                         face,
                         resolvedResolution,
+                        resolvedElevationOffsetMeters,
                         requestVersion));
         }
 
@@ -453,6 +468,7 @@ namespace jcan.CelestialSystems
             StopToken stop,
             CubeSphereFace face,
             int resolution,
+            double elevationOffsetMeters,
             int requestVersion)
         {
             var result =
@@ -463,7 +479,9 @@ namespace jcan.CelestialSystems
                     Face =
                         face,
                     Resolution =
-                        resolution
+                        resolution,
+                    ElevationOffsetMeters =
+                        elevationOffsetMeters
                 };
             var stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
@@ -495,6 +513,7 @@ namespace jcan.CelestialSystems
                         CopyActiveHeights(
                             data,
                             resolution,
+                            elevationOffsetMeters,
                             out var minimumHeight,
                             out var maximumHeight);
                     result.HeightScaleMeters =
@@ -574,6 +593,7 @@ namespace jcan.CelestialSystems
         private static float[] CopyActiveHeights(
             RoundMapMagicSphericalTileData data,
             int resolution,
+            double elevationOffsetMeters,
             out float minimumHeightMeters,
             out float maximumHeightMeters)
         {
@@ -609,7 +629,8 @@ namespace jcan.CelestialSystems
                             pixelZ];
                     var heightMeters =
                         normalizedHeight *
-                        heightScaleMeters;
+                        heightScaleMeters +
+                        (float)elevationOffsetMeters;
                     var index =
                         z *
                         resolution +
@@ -701,6 +722,8 @@ namespace jcan.CelestialSystems
             {
                 heightScaleMeters =
                     result.HeightScaleMeters;
+                elevationOffsetMeters =
+                    result.ElevationOffsetMeters;
                 minimumHeightMeters =
                     result.MinimumHeightMeters;
                 maximumHeightMeters =

@@ -20,6 +20,10 @@ namespace jcan.CelestialSystems
         private int surfaceSeed = 12345;
 
         [SerializeField]
+        [Tooltip("Offsets generated MapMagic heights relative to the body's reference-radius datum. Negative values place terrain below the datum.")]
+        private double elevationOffsetMeters;
+
+        [SerializeField]
         private double tileSizeMeters =
             1000.0;
 
@@ -40,6 +44,9 @@ namespace jcan.CelestialSystems
         public int SurfaceSeed =>
             surfaceSeed;
 
+        public double ElevationOffsetMeters =>
+            elevationOffsetMeters;
+
         public double TileSizeMeters =>
             tileSizeMeters;
 
@@ -54,6 +61,7 @@ namespace jcan.CelestialSystems
 
         public bool HasValidSettings =>
             graph != null &&
+            IsFinite(elevationOffsetMeters) &&
             IsFinite(tileSizeMeters) &&
             tileSizeMeters > 0.0 &&
             IsFinite(

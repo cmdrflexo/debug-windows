@@ -1235,6 +1235,10 @@ namespace jcan.CelestialSystems
                 activeSurfaceDefinition != null
                     ? activeSurfaceDefinition
                     : configuredSurfaceDefinition;
+            var elevationOffsetMeters =
+                surfaceDefinition != null
+                    ? surfaceDefinition.ElevationOffsetMeters
+                    : 0.0;
             var data =
                 new RoundMapMagicSphericalTileData
                 {
@@ -1315,6 +1319,7 @@ namespace jcan.CelestialSystems
                         stop,
                         key,
                         resolution,
+                        elevationOffsetMeters,
                         requestVersion));
         }
 
@@ -1324,6 +1329,7 @@ namespace jcan.CelestialSystems
             StopToken stop,
             SampleKey key,
             int resolution,
+            double elevationOffsetMeters,
             int requestVersion)
         {
             var result =
@@ -1367,6 +1373,7 @@ namespace jcan.CelestialSystems
                             data.heights,
                             data.ApplyOfType<
                                 TexturesOutput200.ApplyData>(),
+                            elevationOffsetMeters,
                             resolution);
                 }
                 finally
@@ -1455,6 +1462,7 @@ namespace jcan.CelestialSystems
             Area area,
             MatrixWorld heightMatrix,
             TexturesOutput200.ApplyData textureData,
+            double elevationOffsetMeters,
             int resolution)
         {
             var heightsMeters =
@@ -1507,7 +1515,8 @@ namespace jcan.CelestialSystems
                         heightMatrix.GetWorldInterpolatedValue(
                             (float)worldX,
                             (float)worldZ) *
-                        heightScaleMeters;
+                        heightScaleMeters +
+                        (float)elevationOffsetMeters;
                     var index =
                         z *
                         resolution +
