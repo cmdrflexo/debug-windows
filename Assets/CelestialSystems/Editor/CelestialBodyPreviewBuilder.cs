@@ -32,9 +32,6 @@ namespace jcan.CelestialSystems.Editor
         private const string PreviewResourcePrefix =
             "Celestial Body Preview ";
 
-        private const string PreviewSessionKey =
-            "jcan.CelestialSystems.BodyPreviewInstanceId";
-
         private const string DefaultLayerShaderName =
             "jcan/Celestial Systems/Curved MapMagic Terrain Layers";
 
@@ -178,10 +175,6 @@ namespace jcan.CelestialSystems.Editor
 
             preview.name =
                 PreviewRootName;
-            SessionState.SetInt(
-                PreviewSessionKey,
-                preview.GetInstanceID());
-
             Undo.RegisterCreatedObjectUndo(
                 preview,
                 "Generate Celestial Body Preview");
@@ -1494,34 +1487,15 @@ namespace jcan.CelestialSystems.Editor
 
             if (preview == null)
             {
-                SessionState.EraseInt(
-                    PreviewSessionKey);
                 return;
             }
 
             DestroyPreviewObject(
                 preview);
-
-            SessionState.EraseInt(
-                PreviewSessionKey);
         }
 
         private static GameObject FindPreview()
         {
-            var instanceId =
-                SessionState.GetInt(
-                    PreviewSessionKey,
-                    0);
-
-            if (instanceId != 0 &&
-                EditorUtility.InstanceIDToObject(
-                    instanceId) is
-                    GameObject sessionPreview &&
-                sessionPreview != null)
-            {
-                return sessionPreview;
-            }
-
             var objects =
                 Resources.FindObjectsOfTypeAll<
                     GameObject>();
@@ -1543,9 +1517,6 @@ namespace jcan.CelestialSystems.Editor
                     continue;
                 }
 
-                SessionState.SetInt(
-                    PreviewSessionKey,
-                    candidate.GetInstanceID());
                 return candidate;
             }
 
