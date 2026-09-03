@@ -48,6 +48,11 @@ namespace jcan.CelestialSystems.Editor
                 "Height Multiplier",
                 "Multiplies generated elevation before the full-scale body is reduced to the preview diameter.");
 
+        private static readonly GUIContent ShowOceanLabel =
+            new GUIContent(
+                "Show Ocean",
+                "Includes the body's assigned global ocean in the generated preview.");
+
         private static readonly GUIContent AutoUpdateLabel =
             new GUIContent(
                 "Auto-update",
@@ -129,6 +134,10 @@ namespace jcan.CelestialSystems.Editor
         [SerializeField]
         private float heightMultiplier =
             1.0f;
+
+        [SerializeField]
+        private bool showOcean =
+            true;
 
         [SerializeField]
         private bool autoUpdate =
@@ -261,6 +270,10 @@ namespace jcan.CelestialSystems.Editor
                 EditorGUILayout.FloatField(
                     HeightMultiplierLabel,
                     heightMultiplier);
+            showOcean =
+                EditorGUILayout.Toggle(
+                    ShowOceanLabel,
+                    showOcean);
             autoUpdate =
                 EditorGUILayout.Toggle(
                     AutoUpdateLabel,
@@ -362,7 +375,8 @@ namespace jcan.CelestialSystems.Editor
                         previewDiameter,
                         meshResolution,
                         graphResolution,
-                        heightMultiplier);
+                        heightMultiplier,
+                        showOcean);
 
                 observedPreviewSignature =
                     CreatePreviewSignature(
@@ -514,6 +528,9 @@ namespace jcan.CelestialSystems.Editor
             AppendFloat(
                 builder,
                 heightMultiplier);
+            builder.Append(
+                showOcean);
+            builder.Append('|');
             return Hash128.Compute(
                 builder.ToString()).ToString();
         }
