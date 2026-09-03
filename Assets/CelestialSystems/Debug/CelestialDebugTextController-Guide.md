@@ -11,7 +11,8 @@ The controller is intended for runtime diagnostics while developing Celestial Sy
 3. Set **Refresh Interval Seconds**. The default `0.1` updates the display ten times per second.
 4. Expand **Sources** and add every component or asset the recipe should be allowed to read.
 5. Give each source a short alias and assign its Unity object.
-6. Paste a recipe into **Display Code**.
+6. Put information that should remain across tests in **Header Code**.
+7. Paste temporary, test-specific recipe text into **Display Code**.
 
 Example source list:
 
@@ -27,6 +28,31 @@ Example source list:
 Aliases are case-insensitive. Member names are case-sensitive and must match their C# names.
 
 Only one script should write to a particular TMP text component. Disable `GePlanetSurfaceAltitudeDebugText` if it targets the same text.
+
+## Header and display code
+
+Both text areas use the same recipe syntax and have access to the same sources:
+
+- **Header Code** is for common information that should remain visible across tests, such as the body name or current altitude.
+- **Display Code** is for temporary diagnostics that can be replaced whenever a test needs different information.
+
+When both fields contain text, the controller prints Header Code first, inserts one newline, and then prints Display Code. Leading or trailing line breaks at that boundary are normalized so replacing Display Code does not gradually add blank lines.
+
+Example Header Code:
+
+```text
+<b>Celestial Debug</b>
+Altitude: {surface.AnchorAltitudeMeters:N1|--} m
+```
+
+Example Display Code:
+
+```text
+Face: {surface.AnchorAddress.Face|--}
+Tile: ({tiles.PrimaryTileAddress.TileU|--}, {tiles.PrimaryTileAddress.TileV|--})
+```
+
+Either field can be left empty. Keeping test-specific recipes in Display Code allows them to be replaced without disturbing the common header.
 
 ## Recipe syntax
 
@@ -254,15 +280,18 @@ Tile {tiles.PrimaryTileAddress.TileU|--}, {tiles.PrimaryTileAddress.TileV|--}
 
 ## Runtime behavior and diagnostics
 
-The recipe is parsed when the component starts and whenever its text or source assignments change. Member paths are resolved and cached at that time. Values are then read at the configured refresh interval.
+Header Code and Display Code are combined and parsed when the component starts and whenever either field or the source assignments change. Member paths are resolved and cached at that time. Values are then read at the configured refresh interval.
 
 **Last Configuration Error** shows the first problem found while compiling the current recipe. It should remain empty for a valid configuration. Invalid tokens use their fallback, allowing the rest of the display to continue updating.
 
 Changing the recipe through another script is also supported:
 
 ```csharp
-debugTextController.SetDisplayCode(
+debugTextController.SetHeaderCode(
     "Altitude: {surface.AnchorAltitudeMeters:N1|--} m");
+
+debugTextController.SetDisplayCode(
+    "Face: {surface.AnchorAddress.Face|--}");
 ```
 
 ## Current limitations
