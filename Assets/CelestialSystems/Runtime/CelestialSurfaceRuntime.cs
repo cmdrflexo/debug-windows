@@ -46,6 +46,12 @@ namespace jcan.CelestialSystems
         private CelestialSurfaceLodPolicy lodPolicy;
 
         [SerializeField]
+        private CelestialSurfacePatchGenerator patchGenerator;
+
+        [SerializeField]
+        private CelestialSurfaceQuadtreeRenderer adaptiveRenderer;
+
+        [SerializeField]
         private int rootPatchCount;
 
         [SerializeField]
@@ -75,6 +81,12 @@ namespace jcan.CelestialSystems
         public CelestialSurfaceLodPolicy LodPolicy =>
             lodPolicy;
 
+        public CelestialSurfacePatchGenerator PatchGenerator =>
+            patchGenerator;
+
+        public CelestialSurfaceQuadtreeRenderer AdaptiveRenderer =>
+            adaptiveRenderer;
+
         public int PatchResolution =>
             lodPolicy.PatchResolution;
 
@@ -95,6 +107,8 @@ namespace jcan.CelestialSystems
         {
             foundationReady = false;
             lastError = string.Empty;
+            patchGenerator = null;
+            adaptiveRenderer = null;
             body = newBody;
             bodyDefinition =
                 body != null
@@ -191,6 +205,16 @@ namespace jcan.CelestialSystems
                     lodPolicy.PatchResolution,
                     out request,
                     out error);
+        }
+
+        internal void AttachAdaptivePipeline(
+            CelestialSurfacePatchGenerator newPatchGenerator,
+            CelestialSurfaceQuadtreeRenderer newAdaptiveRenderer)
+        {
+            patchGenerator =
+                newPatchGenerator;
+            adaptiveRenderer =
+                newAdaptiveRenderer;
         }
 
         private bool Fail(

@@ -37,6 +37,26 @@ namespace jcan.CelestialSystems
         [Range(0.0f, 0.95f)]
         private double adaptiveLodHysteresisFraction = 0.15;
 
+        [SerializeField]
+        [Range(16, 4096)]
+        private int adaptiveMaximumPatchCount = 768;
+
+        [SerializeField]
+        [Range(1, 32)]
+        private int adaptiveMaximumMeshBuildsPerFrame = 4;
+
+        [SerializeField]
+        [Range(0, 16)]
+        private int adaptiveGenerationMargins = 2;
+
+        [SerializeField]
+        [Range(0.001f, 0.25f)]
+        private float adaptiveSkirtDepthCellFraction = 0.02f;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float adaptiveMinimumSkirtDepthMeters = 1.0f;
+
         [Header("Local Detail")]
         [SerializeField]
         [Range(3, 257)]
@@ -123,6 +143,21 @@ namespace jcan.CelestialSystems
                 adaptiveLodHysteresisFraction,
                 1);
 
+        public int AdaptiveMaximumPatchCount =>
+            adaptiveMaximumPatchCount;
+
+        public int AdaptiveMaximumMeshBuildsPerFrame =>
+            adaptiveMaximumMeshBuildsPerFrame;
+
+        public int AdaptiveGenerationMargins =>
+            adaptiveGenerationMargins;
+
+        public float AdaptiveSkirtDepthCellFraction =>
+            adaptiveSkirtDepthCellFraction;
+
+        public float AdaptiveMinimumSkirtDepthMeters =>
+            adaptiveMinimumSkirtDepthMeters;
+
         public int LocalMeshResolution =>
             localMeshResolution;
 
@@ -176,6 +211,17 @@ namespace jcan.CelestialSystems
 
         public bool HasValidSettings =>
             AdaptiveLodPolicy.IsValid &&
+            adaptiveMaximumPatchCount >= 16 &&
+            adaptiveMaximumMeshBuildsPerFrame >= 1 &&
+            adaptiveGenerationMargins >= 0 &&
+            adaptiveGenerationMargins <= 16 &&
+            IsFinite(
+                adaptiveSkirtDepthCellFraction) &&
+            adaptiveSkirtDepthCellFraction >= 0.001f &&
+            adaptiveSkirtDepthCellFraction <= 0.25f &&
+            IsFinite(
+                adaptiveMinimumSkirtDepthMeters) &&
+            adaptiveMinimumSkirtDepthMeters >= 0.01f &&
             HasPowerOfTwoIntervals(
                 localMeshResolution) &&
             IsFinite(
