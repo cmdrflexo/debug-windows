@@ -356,6 +356,50 @@ namespace jcan.CelestialSystems
                         : initializationError);
             }
 
+            var surfaceRuntime =
+                hierarchy.SurfaceRoot.GetComponent<
+                    CelestialSurfaceRuntime>();
+
+            if (surfaceRuntime == null)
+            {
+                surfaceRuntime =
+                    hierarchy.SurfaceRoot.gameObject.AddComponent<
+                        CelestialSurfaceRuntime>();
+            }
+
+            if (!surfaceRuntime.Initialize(
+                    instance))
+            {
+                var surfaceError =
+                    surfaceRuntime.LastError;
+
+                gravityEngine.RemoveBody(
+                    instance.gameObject);
+                Destroy(
+                    instance.gameObject);
+                return RecordSpawnFailure(
+                    string.IsNullOrWhiteSpace(
+                        surfaceError)
+                        ? "The celestial surface foundation failed to initialize."
+                        : surfaceError);
+            }
+
+            var foundationDiagnostics =
+                hierarchy.DevelopmentRoot.GetComponent<
+                    CelestialSurfaceFoundationDiagnostics>();
+
+            if (foundationDiagnostics == null)
+            {
+                foundationDiagnostics =
+                    hierarchy.DevelopmentRoot.gameObject.AddComponent<
+                        CelestialSurfaceFoundationDiagnostics>();
+            }
+
+            instance.AttachSurfaceFoundationDiagnostics(
+                foundationDiagnostics);
+            foundationDiagnostics.Initialize(
+                surfaceRuntime);
+
             spawnedBodies.Add(
                 request.InstanceId,
                 instance);

@@ -12,6 +12,31 @@ namespace jcan.CelestialSystems
     public sealed class RoundMapMagicSurfaceQualityProfile :
         ScriptableObject
     {
+        [Header("Unified Adaptive Surface")]
+        [SerializeField]
+        [Range(3, 257)]
+        private int adaptivePatchResolution = 33;
+
+        [SerializeField]
+        [Range(0, CubeSpherePatchAddress.MaximumLevel)]
+        private int adaptiveMinimumLevel;
+
+        [SerializeField]
+        [Range(0, CubeSpherePatchAddress.MaximumLevel)]
+        private int adaptiveMaximumLevel = 20;
+
+        [SerializeField]
+        [Range(0, CubeSpherePatchAddress.MaximumLevel)]
+        private int adaptiveCollisionMaximumLevel = 20;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private double adaptiveMaximumScreenErrorPixels = 2.0;
+
+        [SerializeField]
+        [Range(0.0f, 0.95f)]
+        private double adaptiveLodHysteresisFraction = 0.15;
+
         [Header("Local Detail")]
         [SerializeField]
         [Range(3, 257)]
@@ -88,6 +113,16 @@ namespace jcan.CelestialSystems
         private double customSurfaceReleaseAltitudeMeters =
             1000.0;
 
+        public CelestialSurfaceLodPolicy AdaptiveLodPolicy =>
+            new CelestialSurfaceLodPolicy(
+                adaptivePatchResolution,
+                adaptiveMinimumLevel,
+                adaptiveMaximumLevel,
+                adaptiveCollisionMaximumLevel,
+                adaptiveMaximumScreenErrorPixels,
+                adaptiveLodHysteresisFraction,
+                1);
+
         public int LocalMeshResolution =>
             localMeshResolution;
 
@@ -140,6 +175,7 @@ namespace jcan.CelestialSystems
             customSurfaceReleaseAltitudeMeters;
 
         public bool HasValidSettings =>
+            AdaptiveLodPolicy.IsValid &&
             HasPowerOfTwoIntervals(
                 localMeshResolution) &&
             IsFinite(
