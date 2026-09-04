@@ -80,6 +80,7 @@ Shader "jcan/Celestial Systems/Celestial Body Ocean"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceData.hlsl"
             #include "CelestialBodyShaderCommon.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
