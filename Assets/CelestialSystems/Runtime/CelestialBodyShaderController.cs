@@ -64,6 +64,10 @@ namespace jcan.CelestialSystems
         private CelestialBodyRuntimeContext bodyContext;
 
         [SerializeField]
+        [Tooltip("Optional transform that defines the body's center and orientation. Defaults to the runtime context's Visual Root.")]
+        private Transform bodyFrameOverride;
+
+        [SerializeField]
         [Tooltip("Root searched for renderers using the custom celestial shaders. Defaults to this transform.")]
         private Transform rendererRoot;
 
@@ -137,6 +141,9 @@ namespace jcan.CelestialSystems
 
         public CelestialBodyRuntimeContext BodyContext =>
             bodyContext;
+
+        public Transform BodyFrame =>
+            ResolveBodyFrame();
 
         public int CachedRendererCount =>
             cachedRendererCount;
@@ -387,9 +394,7 @@ namespace jcan.CelestialSystems
             }
 
             var orientation =
-                bodyContext.VisualRoot != null
-                    ? bodyContext.VisualRoot
-                    : bodyContext.transform;
+                ResolveBodyFrame();
             resolvedBodyCenter =
                 orientation.position;
             bodyNorthDirection =
@@ -399,6 +404,25 @@ namespace jcan.CelestialSystems
                 orientation.TransformDirection(
                     definition.PoleReferenceAxis).normalized;
             return true;
+        }
+
+        private Transform ResolveBodyFrame()
+        {
+            if (bodyFrameOverride != null)
+            {
+                return bodyFrameOverride;
+            }
+
+            if (bodyContext != null &&
+                bodyContext.VisualRoot != null)
+            {
+                return bodyContext.VisualRoot;
+            }
+
+            return
+                bodyContext != null
+                    ? bodyContext.transform
+                    : transform;
         }
 
         private static bool TryResolveSurfaceType(
