@@ -48,6 +48,14 @@ namespace jcan.CelestialSystems
             Shader.PropertyToID(
                 "_ElevationDebugMaxMeters");
 
+        private static readonly int SlopeDebugMinimumDegreesId =
+            Shader.PropertyToID(
+                "_SlopeDebugMinDegrees");
+
+        private static readonly int SlopeDebugMaximumDegreesId =
+            Shader.PropertyToID(
+                "_SlopeDebugMaxDegrees");
+
         private static readonly int CoordinateDebugScaleId =
             Shader.PropertyToID(
                 "_CoordinateDebugScaleMeters");
@@ -94,6 +102,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private float elevationDebugMaximumMeters =
             5000.0f;
+
+        [SerializeField]
+        [Range(0.0f, 180.0f)]
+        private float slopeDebugMinimumDegrees;
+
+        [SerializeField]
+        [Range(0.0f, 180.0f)]
+        private float slopeDebugMaximumDegrees =
+            20.0f;
 
         [SerializeField]
         [Min(0.001f)]
@@ -182,6 +199,12 @@ namespace jcan.CelestialSystems
         public CelestialBodyShaderDebugMode OceanDebugMode =>
             oceanDebugMode;
 
+        public float SlopeDebugMinimumDegrees =>
+            slopeDebugMinimumDegrees;
+
+        public float SlopeDebugMaximumDegrees =>
+            slopeDebugMaximumDegrees;
+
         public string LastError =>
             lastError;
 
@@ -225,6 +248,17 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.05f,
                     rendererRefreshIntervalSeconds);
+            slopeDebugMinimumDegrees =
+                Mathf.Clamp(
+                    slopeDebugMinimumDegrees,
+                    0.0f,
+                    179.99f);
+            slopeDebugMaximumDegrees =
+                Mathf.Clamp(
+                    slopeDebugMaximumDegrees,
+                    slopeDebugMinimumDegrees +
+                        0.01f,
+                    180.0f);
             coordinateDebugScaleMeters =
                 Mathf.Max(
                     0.001f,
@@ -326,6 +360,12 @@ namespace jcan.CelestialSystems
                 propertyBlock.SetFloat(
                     ElevationDebugMaximumId,
                     elevationDebugMaximumMeters);
+                propertyBlock.SetFloat(
+                    SlopeDebugMinimumDegreesId,
+                    slopeDebugMinimumDegrees);
+                propertyBlock.SetFloat(
+                    SlopeDebugMaximumDegreesId,
+                    slopeDebugMaximumDegrees);
                 propertyBlock.SetFloat(
                     CoordinateDebugScaleId,
                     coordinateDebugScaleMeters);

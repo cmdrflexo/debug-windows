@@ -5,12 +5,15 @@
 #ifndef JCAN_CELESTIAL_BODY_SHADER_COMMON_INCLUDED
 #define JCAN_CELESTIAL_BODY_SHADER_COMMON_INCLUDED
 
+float _SlopeDebugMinDegrees;
+float _SlopeDebugMaxDegrees;
+
 struct CelestialBodySurfaceCoordinates
 {
     float3 bodyOffsetWS;
     float3 radialNormalWS;
     float elevationMeters;
-    half slope;
+    float slopeDegrees;
     half latitude;
 };
 
@@ -56,16 +59,21 @@ CelestialBodySurfaceCoordinates CelestialBuildSurfaceCoordinates(
     coordinates.elevationMeters =
         radialDistance -
         datumRadiusMeters;
-    half3 resolvedMeshNormal =
-        (half3)CelestialSafeNormalize(
+    float3 resolvedMeshNormal =
+        CelestialSafeNormalize(
             meshNormalWS,
             coordinates.radialNormalWS);
-    coordinates.slope =
-        1.0h -
-        saturate(
+    float radialAlignment =
+        clamp(
             dot(
                 resolvedMeshNormal,
-                (half3)coordinates.radialNormalWS));
+                coordinates.radialNormalWS),
+            -1.0,
+            1.0);
+    coordinates.slopeDegrees =
+        degrees(
+            acos(
+                radialAlignment));
     float3 resolvedNorth =
         CelestialSafeNormalize(
             bodyNorthDirectionWS,
@@ -169,8 +177,18 @@ half3 CelestialResolveDebugColor(
     if (debugMode <
         4.5)
     {
+        float slopeRangeDegrees =
+            max(
+                _SlopeDebugMaxDegrees -
+                    _SlopeDebugMinDegrees,
+                0.001);
+        half slope01 =
+            saturate(
+                (coordinates.slopeDegrees -
+                    _SlopeDebugMinDegrees) /
+                slopeRangeDegrees);
         return
-            coordinates.slope.xxx;
+            slope01.xxx;
     }
 
     if (debugMode <
