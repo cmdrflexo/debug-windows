@@ -50,6 +50,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Transform spawnedBodyParent;
 
+        [Header("Adaptive Surface Transition")]
+        [SerializeField]
+        [Tooltip("Hidden leaves the working Far/Mid/Local renderer untouched. Select Surface or LOD Debug to compare the Milestone 3 renderer.")]
+        private CelestialAdaptiveSurfaceRenderMode adaptiveSurfaceRenderMode;
+
+        [SerializeField]
+        [Tooltip("Optional camera used by generated adaptive surfaces. Camera.main is used when this is empty.")]
+        private Camera adaptiveSurfaceObserver;
+
         [Header("Optional Startup Body")]
         [SerializeField]
         private bool spawnOnStart;
@@ -110,6 +119,12 @@ namespace jcan.CelestialSystems
 
         public Transform SpawnedBodyParent =>
             spawnedBodyParent;
+
+        public CelestialAdaptiveSurfaceRenderMode AdaptiveSurfaceRenderMode =>
+            adaptiveSurfaceRenderMode;
+
+        public Camera AdaptiveSurfaceObserver =>
+            adaptiveSurfaceObserver;
 
         public bool CanSpawnBodies
         {
@@ -399,6 +414,50 @@ namespace jcan.CelestialSystems
                 foundationDiagnostics);
             foundationDiagnostics.Initialize(
                 surfaceRuntime);
+
+            var patchGenerator =
+                hierarchy.SurfaceRoot.GetComponent<
+                    CelestialSurfacePatchGenerator>();
+
+            if (patchGenerator == null)
+            {
+                patchGenerator =
+                    hierarchy.SurfaceRoot.gameObject.AddComponent<
+                        CelestialSurfacePatchGenerator>();
+            }
+
+            var generationMargins =
+                surfaceRuntime.QualityProfile != null
+                    ? surfaceRuntime.QualityProfile
+                        .AdaptiveGenerationMargins
+                    : 2;
+            var generatorReady =
+                patchGenerator.Initialize(
+                    surfaceRuntime,
+                    generationMargins);
+            var adaptiveRenderer =
+                hierarchy.SurfaceRoot.GetComponent<
+                    CelestialSurfaceQuadtreeRenderer>();
+
+            if (adaptiveRenderer == null)
+            {
+                adaptiveRenderer =
+                    hierarchy.SurfaceRoot.gameObject.AddComponent<
+                        CelestialSurfaceQuadtreeRenderer>();
+            }
+
+            if (generatorReady)
+            {
+                adaptiveRenderer.Initialize(
+                    surfaceRuntime,
+                    patchGenerator,
+                    adaptiveSurfaceRenderMode,
+                    adaptiveSurfaceObserver);
+            }
+
+            surfaceRuntime.AttachAdaptivePipeline(
+                patchGenerator,
+                adaptiveRenderer);
 
             spawnedBodies.Add(
                 request.InstanceId,

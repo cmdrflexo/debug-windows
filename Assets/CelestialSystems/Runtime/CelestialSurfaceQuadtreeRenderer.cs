@@ -1,0 +1,2556 @@
+/*
+ * Renders one MapMagic-authored celestial surface as a pooled, culled, neighbor-balanced cube-sphere quadtree.
+ */
+
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace jcan.CelestialSystems
+{
+    [DefaultExecutionOrder(300)]
+    [DisallowMultipleComponent]
+    public sealed class CelestialSurfaceQuadtreeRenderer :
+        MonoBehaviour
+    {
+        private const string DefaultTerrainShaderName =
+            "jcan/Celestial Systems/Celestial Body Terrain";
+        private const double DefaultHeightEnvelopeMeters =
+            20000.0;
+        private const double CurvatureErrorFraction =
+            0.25;
+        private const int MaximumAdaptedLayerCount =
+            4;
+
+        private static readonly CubeSphereEdge[] Edges =
+        {
+            CubeSphereEdge.NegativeU,
+            CubeSphereEdge.PositiveU,
+            CubeSphereEdge.NegativeV,
+            CubeSphereEdge.PositiveV
+        };
+
+        private sealed class PatchNode
+        {
+            public CubeSpherePatchAddress Address;
+            public PatchNode[] Children;
+            public PatchVisual Visual;
+            public CelestialSurfacePatchData Data;
+            public DoubleVector3 CenterDirection;
+            public double AngularRadiusRadians;
+            public Vector3 LocalCenter;
+            public double BoundingRadiusMeters;
+            public double DistanceMeters;
+            public double ProjectedErrorPixels;
+            public bool PotentiallyVisible;
+            public bool DesiredSplit;
+        }
+
+        private sealed class PatchVisual
+        {
+            public GameObject GameObject;
+            public MeshFilter MeshFilter;
+            public MeshRenderer MeshRenderer;
+            public Mesh Mesh;
+            public MaterialPropertyBlock PropertyBlock;
+            public Texture2D ControlTexture;
+            public PatchNode Owner;
+        }
+
+        [Header("Runtime Ownership")]
+        [SerializeField]
+        private CelestialSurfaceRuntime surfaceRuntime;
+
+        [SerializeField]
+        private CelestialSurfacePatchGenerator patchGenerator;
+
+        [Header("Transition")]
+        [SerializeField]
+        [Tooltip("Hidden preserves the existing renderer. Surface and LOD Debug enable the new adaptive renderer for comparison.")]
+        private CelestialAdaptiveSurfaceRenderMode renderMode;
+
+        [SerializeField]
+        private Camera observerCamera;
+
+        [Header("Adaptive Limits")]
+        [SerializeField]
+        [Range(16, 4096)]
+        private int maximumDesiredPatchCount =
+            768;
+
+        [SerializeField]
+        [Range(1, 32)]
+        private int maximumMeshBuildsPerFrame =
+            4;
+
+        [SerializeField]
+        [Range(0.001f, 0.25f)]
+        private float skirtDepthCellFraction =
+            0.02f;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float minimumSkirtDepthMeters =
+            1.0f;
+
+        [Header("Rendering")]
+        [SerializeField]
+        private bool castShadows;
+
+        [SerializeField]
+        private bool receiveShadows =
+            true;
+
+        [Header("Runtime")]
+        [SerializeField]
+        private bool initialized;
+
+        [SerializeField]
+        private bool hasObserver;
+
+        [SerializeField]
+        private bool coarseSurfaceReady;
+
+        [SerializeField]
+        private bool visibleSurfaceReady;
+
+        [SerializeField]
+        private int desiredLeafCount;
+
+        [SerializeField]
+        private int activePatchCount;
+
+        [SerializeField]
+        private int pooledVisualCount;
+
+        [SerializeField]
+        private int createdVisualCount;
+
+        [SerializeField]
+        private int culledPatchCount;
+
+        [SerializeField]
+        private int heldParentCount;
+
+        [SerializeField]
+        private int maximumActiveLevel;
+
+        [SerializeField]
+        private int maximumNeighborLevelDifference;
+
+        [SerializeField]
+        private bool neighborBalanceValid;
+
+        [SerializeField]
+        private double observerAltitudeMeters;
+
+        [SerializeField]
+        private string lastError;
+
+        private readonly PatchNode[] roots =
+            new PatchNode[6];
+        private readonly Stack<PatchVisual> visualPool =
+            new Stack<PatchVisual>();
+        private readonly List<PatchNode> desiredLeaves =
+            new List<PatchNode>();
+        private readonly Dictionary<int, Material> debugMaterials =
+            new Dictionary<int, Material>();
+
+        private Material surfaceMaterial;
+        private int configuredTerrainLayerCount =
+            -1;
+        private Plane[] frustumPlanes;
+        private CelestialSurfaceObserverState observerState;
+        private DoubleVector3 observerLocalPosition;
+        private int remainingMeshBuilds;
+        private bool coverageInvariantValid;
+
+        public CelestialSurfaceRuntime SurfaceRuntime =>
+            surfaceRuntime;
+
+        public CelestialSurfacePatchGenerator PatchGenerator =>
+            patchGenerator;
+
+        public CelestialAdaptiveSurfaceRenderMode RenderMode =>
+            renderMode;
+
+        public Camera ObserverCamera =>
+            observerCamera;
+
+        public bool Initialized =>
+            initialized;
+
+        public bool HasObserver =>
+            hasObserver;
+
+        public bool CoarseSurfaceReady =>
+            coarseSurfaceReady;
+
+        public bool VisibleSurfaceReady =>
+            visibleSurfaceReady;
+
+        public int DesiredLeafCount =>
+            desiredLeafCount;
+
+        public int ActivePatchCount =>
+            activePatchCount;
+
+        public int PooledVisualCount =>
+            pooledVisualCount;
+
+        public int CreatedVisualCount =>
+            createdVisualCount;
+
+        public int CulledPatchCount =>
+            culledPatchCount;
+
+        public int HeldParentCount =>
+            heldParentCount;
+
+        public int MaximumActiveLevel =>
+            maximumActiveLevel;
+
+        public int MaximumNeighborLevelDifference =>
+            maximumNeighborLevelDifference;
+
+        public bool NeighborBalanceValid =>
+            neighborBalanceValid;
+
+        public bool CoverageInvariantValid =>
+            coverageInvariantValid;
+
+        public double ObserverAltitudeMeters =>
+            observerAltitudeMeters;
+
+        public string LastError =>
+            lastError;
+
+        public bool Initialize(
+            CelestialSurfaceRuntime newSurfaceRuntime,
+            CelestialSurfacePatchGenerator newPatchGenerator,
+            CelestialAdaptiveSurfaceRenderMode initialRenderMode,
+            Camera initialObserverCamera)
+        {
+            ReleaseAllNodes();
+
+            surfaceRuntime =
+                newSurfaceRuntime;
+            patchGenerator =
+                newPatchGenerator;
+            renderMode =
+                initialRenderMode;
+            observerCamera =
+                initialObserverCamera;
+            initialized =
+                surfaceRuntime != null &&
+                surfaceRuntime.FoundationReady &&
+                patchGenerator != null &&
+                patchGenerator.Initialized;
+
+            if (!initialized)
+            {
+                lastError =
+                    "The adaptive renderer requires an initialized surface runtime and patch generator.";
+                return false;
+            }
+
+            ApplyQualityProfile();
+            BuildRoots();
+            lastError = string.Empty;
+            return true;
+        }
+
+        public void SetRenderMode(
+            CelestialAdaptiveSurfaceRenderMode newRenderMode)
+        {
+            if (renderMode ==
+                newRenderMode)
+            {
+                return;
+            }
+
+            renderMode =
+                newRenderMode;
+            RefreshVisualMaterials();
+
+            if (renderMode ==
+                CelestialAdaptiveSurfaceRenderMode.Hidden)
+            {
+                SetAllNodesActive(
+                    false);
+                ReportReadiness(
+                    false,
+                    false);
+            }
+        }
+
+        [ContextMenu("Show Adaptive Surface")]
+        private void ShowAdaptiveSurface()
+        {
+            SetRenderMode(
+                CelestialAdaptiveSurfaceRenderMode.Surface);
+        }
+
+        [ContextMenu("Show Adaptive LOD Debug")]
+        private void ShowAdaptiveLodDebug()
+        {
+            SetRenderMode(
+                CelestialAdaptiveSurfaceRenderMode.LodDebug);
+        }
+
+        [ContextMenu("Hide Adaptive Surface")]
+        private void HideAdaptiveSurface()
+        {
+            SetRenderMode(
+                CelestialAdaptiveSurfaceRenderMode.Hidden);
+        }
+
+        private void LateUpdate()
+        {
+            if (!initialized)
+            {
+                return;
+            }
+
+            if (renderMode ==
+                CelestialAdaptiveSurfaceRenderMode.Hidden)
+            {
+                SetAllNodesActive(
+                    false);
+                ClearFrameStatistics();
+                ReportReadiness(
+                    false,
+                    false);
+                return;
+            }
+
+            ResolveObserverCamera();
+
+            if (observerCamera == null ||
+                !observerCamera.isActiveAndEnabled)
+            {
+                hasObserver = false;
+                lastError =
+                    "Waiting for an enabled adaptive-surface observer camera.";
+                SetAllNodesActive(
+                    false);
+                ReportReadiness(
+                    false,
+                    false);
+                return;
+            }
+
+            if (!TryBuildObserverState())
+            {
+                hasObserver = false;
+                lastError =
+                    "The adaptive-surface observer state is invalid.";
+                SetAllNodesActive(
+                    false);
+                ReportReadiness(
+                    false,
+                    false);
+                return;
+            }
+
+            hasObserver = true;
+            lastError = string.Empty;
+            frustumPlanes =
+                GeometryUtility.CalculateFrustumPlanes(
+                    observerCamera);
+            remainingMeshBuilds =
+                Mathf.Max(
+                    1,
+                    maximumMeshBuildsPerFrame);
+            ClearFrameStatistics();
+            desiredLeafCount =
+                roots.Length;
+
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                PrepareDesiredTree(
+                    roots[index]);
+            }
+
+            BalanceDesiredTree();
+            EvaluateNeighborBalance();
+
+            try
+            {
+                EnsureRenderMaterials();
+            }
+            catch (Exception exception)
+            {
+                lastError =
+                    exception.GetBaseException().Message;
+                SetAllNodesActive(
+                    false);
+                ReportReadiness(
+                    false,
+                    false);
+                return;
+            }
+
+            coverageInvariantValid = true;
+
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                ApplyDesiredTree(
+                    roots[index]);
+            }
+
+            pooledVisualCount =
+                visualPool.Count;
+            coarseSurfaceReady =
+                AreAllRootsReady();
+            visibleSurfaceReady =
+                activePatchCount > 0;
+            ReportReadiness(
+                coarseSurfaceReady,
+                visibleSurfaceReady);
+        }
+
+        private void ApplyQualityProfile()
+        {
+            var quality =
+                surfaceRuntime.QualityProfile;
+
+            if (quality == null)
+            {
+                return;
+            }
+
+            maximumDesiredPatchCount =
+                Mathf.Max(
+                    16,
+                    quality.AdaptiveMaximumPatchCount);
+            maximumMeshBuildsPerFrame =
+                Mathf.Max(
+                    1,
+                    quality.AdaptiveMaximumMeshBuildsPerFrame);
+            skirtDepthCellFraction =
+                Mathf.Clamp(
+                    quality.AdaptiveSkirtDepthCellFraction,
+                    0.001f,
+                    0.25f);
+            minimumSkirtDepthMeters =
+                Mathf.Max(
+                    0.01f,
+                    quality.AdaptiveMinimumSkirtDepthMeters);
+        }
+
+        private void BuildRoots()
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                if (!surfaceRuntime.TryGetRootPatch(
+                        index,
+                        out var address))
+                {
+                    continue;
+                }
+
+                roots[index] =
+                    CreateNode(
+                        address);
+            }
+        }
+
+        private PatchNode CreateNode(
+            CubeSpherePatchAddress address)
+        {
+            var centerAddress =
+                new CubeSphereAddress(
+                    address.Face,
+                    (address.MinimumU +
+                        address.MaximumU) *
+                        0.5,
+                    (address.MinimumV +
+                        address.MaximumV) *
+                        0.5,
+                    0.0);
+            var centerDirection =
+                CubeSphereMapping.AddressToDirection(
+                    centerAddress);
+            var angularRadius =
+                CalculateAngularRadius(
+                    address,
+                    centerDirection);
+
+            return new PatchNode
+            {
+                Address =
+                    address,
+                CenterDirection =
+                    centerDirection,
+                AngularRadiusRadians =
+                    angularRadius
+            };
+        }
+
+        private void PrepareDesiredTree(
+            PatchNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            RefreshPatchData(
+                node);
+            UpdateSpatialState(
+                node);
+
+            patchGenerator.RequestPatch(
+                node.Address,
+                ResolveGenerationPriority(
+                    node));
+
+            var wasSplit =
+                node.DesiredSplit;
+            var shouldSplit =
+                node.PotentiallyVisible &&
+                ShouldSubdivide(
+                    node,
+                    wasSplit) &&
+                desiredLeafCount + 3 <=
+                    Mathf.Max(
+                        16,
+                        maximumDesiredPatchCount);
+
+            node.DesiredSplit =
+                shouldSplit;
+
+            if (!shouldSplit)
+            {
+                return;
+            }
+
+            EnsureChildren(
+                node);
+            desiredLeafCount += 3;
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                PrepareDesiredTree(
+                    node.Children[index]);
+            }
+        }
+
+        private void RefreshPatchData(
+            PatchNode node)
+        {
+            if (node.Data == null &&
+                patchGenerator.TryGetPatchData(
+                    node.Address,
+                    out var data))
+            {
+                node.Data = data;
+            }
+        }
+
+        private void UpdateSpatialState(
+            PatchNode node)
+        {
+            var radius =
+                surfaceRuntime.BodyDefinition
+                    .ReferenceRadiusMeters;
+            var minimumElevation =
+                node.Data != null
+                    ? node.Data.MinimumElevationMeters
+                    : -DefaultHeightEnvelopeMeters;
+            var maximumElevation =
+                node.Data != null
+                    ? node.Data.MaximumElevationMeters
+                    : DefaultHeightEnvelopeMeters;
+            var centerElevation =
+                (minimumElevation +
+                    maximumElevation) *
+                0.5;
+            var centerRadius =
+                radius +
+                centerElevation;
+            var surfaceChordRadius =
+                2.0 *
+                Math.Max(
+                    1.0,
+                    radius +
+                        maximumElevation) *
+                Math.Sin(
+                    node.AngularRadiusRadians *
+                        0.5);
+            var elevationRadius =
+                Math.Abs(
+                    maximumElevation -
+                        minimumElevation) *
+                0.5;
+
+            node.LocalCenter =
+                ToVector3(
+                    node.CenterDirection *
+                        centerRadius);
+            node.BoundingRadiusMeters =
+                surfaceChordRadius +
+                elevationRadius +
+                ResolveSkirtDepthMeters(
+                    node.Address);
+
+            var offset =
+                observerLocalPosition -
+                ToDoubleVector3(
+                    node.LocalCenter);
+            node.DistanceMeters =
+                Math.Max(
+                    1.0,
+                    Magnitude(offset) -
+                        node.BoundingRadiusMeters);
+            var arcSize =
+                CubeSpherePatchGrid
+                    .GetApproximateArcSizeMeters(
+                        node.Address,
+                        radius);
+            var cellSize =
+                arcSize /
+                Math.Max(
+                    1,
+                    surfaceRuntime.PatchResolution -
+                        1);
+            var conservativeError =
+                cellSize *
+                CurvatureErrorFraction;
+
+            if (node.Data != null)
+            {
+                conservativeError =
+                    Math.Max(
+                        conservativeError,
+                        node.Data
+                            .GeometricErrorMeters);
+            }
+
+            node.ProjectedErrorPixels =
+                surfaceRuntime.LodPolicy
+                    .EstimateProjectedErrorPixels(
+                        conservativeError,
+                        node.DistanceMeters,
+                        observerState);
+            node.PotentiallyVisible =
+                IsInsideHorizon(
+                    node,
+                    radius) &&
+                IsInsideFrustum(
+                    node);
+
+            if (!node.PotentiallyVisible)
+            {
+                culledPatchCount++;
+            }
+        }
+
+        private bool ShouldSubdivide(
+            PatchNode node,
+            bool wasSplit)
+        {
+            var policy =
+                surfaceRuntime.LodPolicy;
+
+            if (node.Data == null ||
+                node.Address.Level >=
+                    policy.MaximumLevel)
+            {
+                return false;
+            }
+
+            if (node.Address.Level <
+                policy.MinimumLevel)
+            {
+                return true;
+            }
+
+            var threshold =
+                policy.MaximumScreenErrorPixels;
+
+            if (wasSplit)
+            {
+                threshold *=
+                    1.0 -
+                    policy.HysteresisFraction;
+            }
+
+            return
+                node.ProjectedErrorPixels >
+                threshold;
+        }
+
+        private void EnsureChildren(
+            PatchNode node)
+        {
+            if (node.Children != null)
+            {
+                return;
+            }
+
+            node.Children =
+                new PatchNode[4];
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                if (!node.Address.TryGetChild(
+                        (CubeSpherePatchQuadrant)index,
+                        out var childAddress))
+                {
+                    continue;
+                }
+
+                node.Children[index] =
+                    CreateNode(
+                        childAddress);
+            }
+        }
+
+        private void BalanceDesiredTree()
+        {
+            var maximumLeafCount =
+                Mathf.Max(
+                    16,
+                    maximumDesiredPatchCount);
+            var changed = true;
+
+            while (changed &&
+                desiredLeafCount + 3 <=
+                    maximumLeafCount)
+            {
+                changed = false;
+                CollectDesiredLeaves();
+
+                for (var leafIndex = 0;
+                    leafIndex < desiredLeaves.Count &&
+                    !changed;
+                    leafIndex++)
+                {
+                    var leaf =
+                        desiredLeaves[leafIndex];
+
+                    for (var edgeIndex = 0;
+                        edgeIndex < Edges.Length;
+                        edgeIndex++)
+                    {
+                        if (!CubeSpherePatchTopology.TryGetNeighbor(
+                                leaf.Address,
+                                Edges[edgeIndex],
+                                out var neighborAddress))
+                        {
+                            continue;
+                        }
+
+                        var coveringNeighbor =
+                            FindCoveringDesiredLeaf(
+                                neighborAddress);
+
+                        if (coveringNeighbor == null ||
+                            leaf.Address.Level -
+                                coveringNeighbor.Address.Level <=
+                                surfaceRuntime.LodPolicy
+                                    .MaximumNeighborLevelDifference)
+                        {
+                            continue;
+                        }
+
+                        ForceBalancedSplit(
+                            coveringNeighbor);
+                        desiredLeafCount += 3;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void ForceBalancedSplit(
+            PatchNode node)
+        {
+            node.DesiredSplit = true;
+            EnsureChildren(
+                node);
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                var child =
+                    node.Children[index];
+
+                if (child == null)
+                {
+                    continue;
+                }
+
+                child.DesiredSplit = false;
+                RefreshPatchData(
+                    child);
+                UpdateSpatialState(
+                    child);
+                patchGenerator.RequestPatch(
+                    child.Address,
+                    ResolveGenerationPriority(
+                        child));
+            }
+        }
+
+        private double ResolveGenerationPriority(
+            PatchNode node)
+        {
+            if (node.Address.IsRoot)
+            {
+                return
+                    1000000000.0 +
+                    (node.PotentiallyVisible
+                        ? 1000000.0
+                        : 0.0) -
+                    (int)node.Address.Face;
+            }
+
+            var projectedError =
+                IsFinite(
+                    node.ProjectedErrorPixels)
+                    ? Math.Min(
+                        100000.0,
+                        Math.Max(
+                            0.0,
+                            node.ProjectedErrorPixels))
+                    : 100000.0;
+            var radius =
+                surfaceRuntime.BodyDefinition
+                    .ReferenceRadiusMeters;
+
+            return
+                500000000.0 -
+                node.Address.Level *
+                    10000000.0 +
+                projectedError *
+                    10.0 +
+                node.DistanceMeters /
+                    Math.Max(
+                        1.0,
+                        radius);
+        }
+
+        private PatchNode FindCoveringDesiredLeaf(
+            CubeSpherePatchAddress target)
+        {
+            var node =
+                GetRoot(
+                    target.Face);
+
+            while (node != null &&
+                node.DesiredSplit &&
+                node.Children != null &&
+                node.Address.Level <
+                    target.Level)
+            {
+                var childLevel =
+                    node.Address.Level + 1;
+                var shift =
+                    target.Level -
+                    childLevel;
+                var positiveU =
+                    ((target.X >> shift) &
+                        1) != 0;
+                var positiveV =
+                    ((target.Y >> shift) &
+                        1) != 0;
+                var childIndex =
+                    ResolveChildIndex(
+                        positiveU,
+                        positiveV);
+                node =
+                    node.Children[childIndex];
+            }
+
+            return node;
+        }
+
+        private void EvaluateNeighborBalance()
+        {
+            CollectDesiredLeaves();
+            maximumNeighborLevelDifference = 0;
+
+            for (var leafIndex = 0;
+                leafIndex < desiredLeaves.Count;
+                leafIndex++)
+            {
+                var leaf =
+                    desiredLeaves[leafIndex];
+
+                for (var edgeIndex = 0;
+                    edgeIndex < Edges.Length;
+                    edgeIndex++)
+                {
+                    if (!CubeSpherePatchTopology.TryGetNeighbor(
+                            leaf.Address,
+                            Edges[edgeIndex],
+                            out var neighborAddress))
+                    {
+                        continue;
+                    }
+
+                    var neighbor =
+                        FindCoveringDesiredLeaf(
+                            neighborAddress);
+
+                    if (neighbor == null)
+                    {
+                        continue;
+                    }
+
+                    maximumNeighborLevelDifference =
+                        Math.Max(
+                            maximumNeighborLevelDifference,
+                            Math.Abs(
+                                leaf.Address.Level -
+                                neighbor.Address.Level));
+                }
+            }
+
+            neighborBalanceValid =
+                maximumNeighborLevelDifference <=
+                surfaceRuntime.LodPolicy
+                    .MaximumNeighborLevelDifference;
+        }
+
+        private void CollectDesiredLeaves()
+        {
+            desiredLeaves.Clear();
+
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                CollectDesiredLeaves(
+                    roots[index]);
+            }
+        }
+
+        private void CollectDesiredLeaves(
+            PatchNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            if (!node.DesiredSplit ||
+                node.Children == null)
+            {
+                desiredLeaves.Add(
+                    node);
+                return;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                CollectDesiredLeaves(
+                    node.Children[index]);
+            }
+        }
+
+        private void ApplyDesiredTree(
+            PatchNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            if (!node.PotentiallyVisible)
+            {
+                SetSubtreeActive(
+                    node,
+                    false);
+                return;
+            }
+
+            EnsureVisual(
+                node);
+
+            if (node.DesiredSplit &&
+                node.Children != null)
+            {
+                var childrenReady = true;
+
+                for (var index = 0;
+                    index < node.Children.Length;
+                    index++)
+                {
+                    var child =
+                        node.Children[index];
+                    RefreshPatchData(
+                        child);
+                    EnsureVisual(
+                        child);
+                    childrenReady &=
+                        child != null &&
+                        child.Visual != null;
+                }
+
+                if (childrenReady)
+                {
+                    SetVisualActive(
+                        node,
+                        false);
+
+                    for (var index = 0;
+                        index < node.Children.Length;
+                        index++)
+                    {
+                        ApplyDesiredTree(
+                            node.Children[index]);
+                    }
+
+                    return;
+                }
+
+                heldParentCount++;
+                coverageInvariantValid &=
+                    node.Visual != null;
+                SetVisualActive(
+                    node,
+                    true);
+
+                for (var index = 0;
+                    index < node.Children.Length;
+                    index++)
+                {
+                    SetSubtreeActive(
+                        node.Children[index],
+                        false);
+                }
+
+                return;
+            }
+
+            coverageInvariantValid &=
+                node.Visual != null;
+            SetVisualActive(
+                node,
+                true);
+            ReleaseChildren(
+                node);
+        }
+
+        private void EnsureVisual(
+            PatchNode node)
+        {
+            if (node == null ||
+                node.Visual != null ||
+                node.Data == null ||
+                remainingMeshBuilds <= 0)
+            {
+                return;
+            }
+
+            var visual =
+                AcquireVisual();
+
+            try
+            {
+                BuildPatchVisual(
+                    visual,
+                    node);
+                node.Visual =
+                    visual;
+                visual.Owner =
+                    node;
+                remainingMeshBuilds--;
+            }
+            catch (Exception exception)
+            {
+                ReleaseVisual(
+                    visual);
+                lastError =
+                    $"{node.Address}: {exception.GetBaseException().Message}";
+            }
+        }
+
+        private PatchVisual AcquireVisual()
+        {
+            if (visualPool.Count > 0)
+            {
+                return visualPool.Pop();
+            }
+
+            var patchObject =
+                new GameObject(
+                    "Adaptive Surface Patch");
+            patchObject.transform.SetParent(
+                transform,
+                false);
+            var meshFilter =
+                patchObject.AddComponent<MeshFilter>();
+            var meshRenderer =
+                patchObject.AddComponent<MeshRenderer>();
+            var mesh =
+                new Mesh
+                {
+                    name =
+                        "Adaptive Surface Patch Mesh",
+                    hideFlags =
+                        HideFlags.HideAndDontSave
+                };
+
+            meshFilter.sharedMesh =
+                mesh;
+            patchObject.SetActive(
+                false);
+            createdVisualCount++;
+
+            return new PatchVisual
+            {
+                GameObject =
+                    patchObject,
+                MeshFilter =
+                    meshFilter,
+                MeshRenderer =
+                    meshRenderer,
+                Mesh =
+                    mesh,
+                PropertyBlock =
+                    new MaterialPropertyBlock()
+            };
+        }
+
+        private void BuildPatchVisual(
+            PatchVisual visual,
+            PatchNode node)
+        {
+            var data =
+                node.Data;
+            var resolution =
+                data.Resolution;
+            var ringCount =
+                4 *
+                (resolution - 1);
+            var coreVertexCount =
+                resolution *
+                resolution;
+            var vertices =
+                new Vector3[
+                    coreVertexCount +
+                    ringCount];
+            var normals =
+                new Vector3[vertices.Length];
+            var uv =
+                new Vector2[vertices.Length];
+            var coreTriangleIndexCount =
+                (resolution - 1) *
+                (resolution - 1) *
+                6;
+            var skirtTriangleIndexCount =
+                ringCount *
+                6;
+            var triangles =
+                new int[
+                    coreTriangleIndexCount +
+                    skirtTriangleIndexCount];
+            var radius =
+                surfaceRuntime.BodyDefinition
+                    .ReferenceRadiusMeters;
+            var referencePosition =
+                node.CenterDirection *
+                radius;
+            var skirtDepth =
+                ResolveSkirtDepthMeters(
+                    node.Address);
+
+            for (var sampleY = 0;
+                sampleY < resolution;
+                sampleY++)
+            {
+                for (var sampleX = 0;
+                    sampleX < resolution;
+                    sampleX++)
+                {
+                    if (!CubeSpherePatchGrid.TryGetSampleDirection(
+                            node.Address,
+                            resolution,
+                            sampleX,
+                            sampleY,
+                            out var direction))
+                    {
+                        throw new InvalidOperationException(
+                            "Could not resolve an adaptive patch sample direction.");
+                    }
+
+                    var elevation =
+                        data.GetElevationMeters(
+                            sampleX,
+                            sampleY);
+                    var vertexIndex =
+                        sampleY *
+                            resolution +
+                        sampleX;
+                    var delta =
+                        direction *
+                            (radius +
+                                elevation) -
+                        referencePosition;
+
+                    vertices[vertexIndex] =
+                        ToVector3(
+                            delta);
+                    normals[vertexIndex] =
+                        ToVector3(
+                            direction).normalized;
+                    uv[vertexIndex] =
+                        new Vector2(
+                            sampleX /
+                                (float)(resolution - 1),
+                            sampleY /
+                                (float)(resolution - 1));
+                }
+            }
+
+            var triangleIndex = 0;
+
+            for (var sampleY = 0;
+                sampleY < resolution - 1;
+                sampleY++)
+            {
+                for (var sampleX = 0;
+                    sampleX < resolution - 1;
+                    sampleX++)
+                {
+                    var lowerLeft =
+                        sampleY *
+                            resolution +
+                        sampleX;
+                    var lowerRight =
+                        lowerLeft +
+                        1;
+                    var upperLeft =
+                        lowerLeft +
+                        resolution;
+                    var upperRight =
+                        upperLeft +
+                        1;
+
+                    triangles[triangleIndex++] =
+                        lowerLeft;
+                    triangles[triangleIndex++] =
+                        lowerRight;
+                    triangles[triangleIndex++] =
+                        upperLeft;
+                    triangles[triangleIndex++] =
+                        lowerRight;
+                    triangles[triangleIndex++] =
+                        upperRight;
+                    triangles[triangleIndex++] =
+                        upperLeft;
+                }
+            }
+
+            var boundary =
+                BuildBoundaryRing(
+                    resolution);
+
+            for (var ringIndex = 0;
+                ringIndex < boundary.Length;
+                ringIndex++)
+            {
+                var coreIndex =
+                    boundary[ringIndex];
+                var skirtIndex =
+                    coreVertexCount +
+                    ringIndex;
+                var corePosition =
+                    ToDoubleVector3(
+                        vertices[coreIndex]) +
+                    referencePosition;
+                var direction =
+                    Normalize(
+                        corePosition);
+                var skirtPosition =
+                    corePosition -
+                    direction *
+                        skirtDepth -
+                    referencePosition;
+
+                vertices[skirtIndex] =
+                    ToVector3(
+                        skirtPosition);
+                normals[skirtIndex] =
+                    normals[coreIndex];
+                uv[skirtIndex] =
+                    uv[coreIndex];
+            }
+
+            for (var ringIndex = 0;
+                ringIndex < boundary.Length;
+                ringIndex++)
+            {
+                var nextRingIndex =
+                    (ringIndex + 1) %
+                    boundary.Length;
+                var coreFirst =
+                    boundary[ringIndex];
+                var coreSecond =
+                    boundary[nextRingIndex];
+                var skirtFirst =
+                    coreVertexCount +
+                    ringIndex;
+                var skirtSecond =
+                    coreVertexCount +
+                    nextRingIndex;
+
+                triangles[triangleIndex++] =
+                    coreFirst;
+                triangles[triangleIndex++] =
+                    skirtFirst;
+                triangles[triangleIndex++] =
+                    coreSecond;
+                triangles[triangleIndex++] =
+                    coreSecond;
+                triangles[triangleIndex++] =
+                    skirtFirst;
+                triangles[triangleIndex++] =
+                    skirtSecond;
+            }
+
+            visual.Mesh.Clear();
+            visual.Mesh.name =
+                $"Adaptive {node.Address}";
+            visual.Mesh.indexFormat =
+                vertices.Length >
+                    65535
+                    ? IndexFormat.UInt32
+                    : IndexFormat.UInt16;
+            visual.Mesh.vertices =
+                vertices;
+            visual.Mesh.normals =
+                normals;
+            visual.Mesh.uv =
+                uv;
+            visual.Mesh.triangles =
+                triangles;
+            visual.Mesh.RecalculateBounds();
+            visual.Mesh.RecalculateTangents();
+
+            visual.GameObject.name =
+                $"Adaptive {node.Address}";
+            visual.GameObject.transform.localPosition =
+                ToVector3(
+                    referencePosition);
+            visual.GameObject.transform.localRotation =
+                Quaternion.identity;
+            visual.GameObject.transform.localScale =
+                Vector3.one;
+            visual.MeshRenderer.shadowCastingMode =
+                castShadows
+                    ? ShadowCastingMode.On
+                    : ShadowCastingMode.Off;
+            visual.MeshRenderer.receiveShadows =
+                receiveShadows;
+
+            ConfigureVisualMaterial(
+                visual,
+                node);
+        }
+
+        private static int[] BuildBoundaryRing(
+            int resolution)
+        {
+            var boundary =
+                new int[
+                    4 *
+                    (resolution - 1)];
+            var index = 0;
+
+            for (var x = 0;
+                x < resolution;
+                x++)
+            {
+                boundary[index++] = x;
+            }
+
+            for (var y = 1;
+                y < resolution;
+                y++)
+            {
+                boundary[index++] =
+                    y *
+                        resolution +
+                    resolution -
+                    1;
+            }
+
+            for (var x = resolution - 2;
+                x >= 0;
+                x--)
+            {
+                boundary[index++] =
+                    (resolution - 1) *
+                        resolution +
+                    x;
+            }
+
+            for (var y = resolution - 2;
+                y > 0;
+                y--)
+            {
+                boundary[index++] =
+                    y *
+                    resolution;
+            }
+
+            return boundary;
+        }
+
+        private void ConfigureVisualMaterial(
+            PatchVisual visual,
+            PatchNode node)
+        {
+            DestroyControlTexture(
+                visual);
+            visual.PropertyBlock.Clear();
+
+            if (renderMode ==
+                CelestialAdaptiveSurfaceRenderMode.LodDebug)
+            {
+                visual.MeshRenderer.sharedMaterial =
+                    GetDebugMaterial(
+                        node.Address);
+                visual.MeshRenderer.SetPropertyBlock(
+                    visual.PropertyBlock);
+                return;
+            }
+
+            visual.MeshRenderer.sharedMaterial =
+                surfaceMaterial;
+            var data =
+                node.Data;
+
+            if (data.HasSurfaceControlData)
+            {
+                visual.ControlTexture =
+                    CreateControlTexture(
+                        data);
+                visual.PropertyBlock.SetTexture(
+                    "_Control",
+                    visual.ControlTexture);
+                visual.PropertyBlock.SetFloat(
+                    "_LayerCount",
+                    data.SurfaceLayerCount);
+                ConfigurePatchTextureTransforms(
+                    visual.PropertyBlock,
+                    node.Address);
+            }
+            else
+            {
+                visual.PropertyBlock.SetFloat(
+                    "_LayerCount",
+                    0.0f);
+            }
+
+            visual.PropertyBlock.SetFloat(
+                "_TileFade",
+                1.0f);
+            visual.PropertyBlock.SetFloat(
+                "_LodMaskMode",
+                0.0f);
+            visual.MeshRenderer.SetPropertyBlock(
+                visual.PropertyBlock);
+        }
+
+        private Texture2D CreateControlTexture(
+            CelestialSurfacePatchData data)
+        {
+            var texture =
+                new Texture2D(
+                    data.Resolution,
+                    data.Resolution,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name =
+                        $"Adaptive Control {data.Address}",
+                    wrapMode =
+                        TextureWrapMode.Clamp,
+                    filterMode =
+                        FilterMode.Bilinear,
+                    hideFlags =
+                        HideFlags.HideAndDontSave
+                };
+            var colors =
+                new Color[
+                    data.SampleCount];
+
+            for (var y = 0;
+                y < data.Resolution;
+                y++)
+            {
+                for (var x = 0;
+                    x < data.Resolution;
+                    x++)
+                {
+                    var sampleIndex =
+                        y *
+                            data.Resolution +
+                        x;
+                    colors[sampleIndex] =
+                        new Color(
+                            GetControlWeight(
+                                data,
+                                x,
+                                y,
+                                0),
+                            GetControlWeight(
+                                data,
+                                x,
+                                y,
+                                1),
+                            GetControlWeight(
+                                data,
+                                x,
+                                y,
+                                2),
+                            GetControlWeight(
+                                data,
+                                x,
+                                y,
+                                3));
+                }
+            }
+
+            texture.SetPixels(
+                colors);
+            texture.Apply(
+                false,
+                false);
+            return texture;
+        }
+
+        private static float GetControlWeight(
+            CelestialSurfacePatchData data,
+            int x,
+            int y,
+            int layer)
+        {
+            return layer <
+                    data.SurfaceLayerCount
+                ? data.GetSurfaceControlWeight(
+                    x,
+                    y,
+                    layer)
+                : 0.0f;
+        }
+
+        private void ConfigurePatchTextureTransforms(
+            MaterialPropertyBlock block,
+            CubeSpherePatchAddress address)
+        {
+            if (!surfaceRuntime.TryCreateMapMagicRequest(
+                    address,
+                    out var request,
+                    out _))
+            {
+                return;
+            }
+
+            for (var layerIndex = 0;
+                layerIndex <
+                    Math.Min(
+                        patchGenerator.TerrainLayerCount,
+                        MaximumAdaptedLayerCount);
+                layerIndex++)
+            {
+                var layer =
+                    patchGenerator.GetTerrainLayer(
+                        layerIndex);
+
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                var tileSizeX =
+                    SafeTileSize(
+                        layer.tileSize.x);
+                var tileSizeZ =
+                    SafeTileSize(
+                        layer.tileSize.y);
+                var scaleX =
+                    request.MapWorldSizeXMeters /
+                    tileSizeX;
+                var scaleZ =
+                    -request.MapWorldSizeZMeters /
+                    tileSizeZ;
+                var offsetX =
+                    (request.MapWorldOriginXMeters +
+                        layer.tileOffset.x) /
+                    tileSizeX;
+                var offsetZ =
+                    (request.MapWorldOriginZMeters +
+                        request.MapWorldSizeZMeters +
+                        layer.tileOffset.y) /
+                    tileSizeZ;
+
+                block.SetVector(
+                    "_Splat" +
+                        layerIndex +
+                        "_ST",
+                    new Vector4(
+                        (float)scaleX,
+                        (float)scaleZ,
+                        Repeat01(
+                            offsetX),
+                        Repeat01(
+                            offsetZ)));
+            }
+        }
+
+        private void EnsureRenderMaterials()
+        {
+            if (renderMode !=
+                CelestialAdaptiveSurfaceRenderMode.Surface)
+            {
+                return;
+            }
+
+            var layerCount =
+                patchGenerator.TerrainLayerCount;
+
+            if (surfaceMaterial != null &&
+                configuredTerrainLayerCount ==
+                    layerCount)
+            {
+                return;
+            }
+
+            DestroyRuntimeMaterial(
+                ref surfaceMaterial);
+            surfaceMaterial =
+                CreateSurfaceMaterial(
+                    layerCount);
+            configuredTerrainLayerCount =
+                layerCount;
+            RefreshVisualMaterials();
+        }
+
+        private Material CreateSurfaceMaterial(
+            int layerCount)
+        {
+            var template =
+                surfaceRuntime.SurfaceDefinition
+                    .Material;
+            Material material;
+
+            if (layerCount > 0 &&
+                !IsCompatibleLayerTemplate(
+                    template))
+            {
+                var terrainShader =
+                    Shader.Find(
+                        DefaultTerrainShaderName);
+
+                if (terrainShader == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Shader '{DefaultTerrainShaderName}' was not found for the adaptive surface renderer.");
+                }
+
+                material =
+                    new Material(
+                        terrainShader);
+            }
+            else if (template != null)
+            {
+                material =
+                    new Material(
+                        template);
+            }
+            else
+            {
+                var fallbackShader =
+                    Shader.Find(
+                        DefaultTerrainShaderName) ??
+                    Shader.Find(
+                        "Standard") ??
+                    Shader.Find(
+                        "Unlit/Color");
+
+                if (fallbackShader == null)
+                {
+                    throw new InvalidOperationException(
+                        "No compatible terrain shader was found for the adaptive surface renderer.");
+                }
+
+                material =
+                    new Material(
+                        fallbackShader);
+            }
+
+            material.name =
+                "Adaptive Celestial Surface Material";
+            material.hideFlags =
+                HideFlags.HideAndDontSave;
+            SetFloatIfPresent(
+                material,
+                "_LayerCount",
+                layerCount);
+            SetFloatIfPresent(
+                material,
+                "_TileFade",
+                1.0f);
+            SetFloatIfPresent(
+                material,
+                "_LodMaskMode",
+                0.0f);
+
+            for (var index = 0;
+                index < MaximumAdaptedLayerCount;
+                index++)
+            {
+                ConfigureTerrainLayer(
+                    material,
+                    index < layerCount
+                        ? patchGenerator.GetTerrainLayer(
+                            index)
+                        : null,
+                    index);
+            }
+
+            return material;
+        }
+
+        private static void ConfigureTerrainLayer(
+            Material material,
+            TerrainLayer layer,
+            int index)
+        {
+            var suffix =
+                index.ToString();
+
+            if (layer == null)
+            {
+                SetTextureIfPresent(
+                    material,
+                    "_Splat" + suffix,
+                    Texture2D.whiteTexture);
+                SetTextureIfPresent(
+                    material,
+                    "_Normal" + suffix,
+                    null);
+                SetTextureIfPresent(
+                    material,
+                    "_Mask" + suffix,
+                    null);
+                SetFloatIfPresent(
+                    material,
+                    "_HasNormal" + suffix,
+                    0.0f);
+                SetFloatIfPresent(
+                    material,
+                    "_HasMask" + suffix,
+                    0.0f);
+                return;
+            }
+
+            SetTextureIfPresent(
+                material,
+                "_Splat" + suffix,
+                layer.diffuseTexture != null
+                    ? layer.diffuseTexture
+                    : Texture2D.whiteTexture);
+            SetTextureIfPresent(
+                material,
+                "_Normal" + suffix,
+                layer.normalMapTexture);
+            SetTextureIfPresent(
+                material,
+                "_Mask" + suffix,
+                layer.maskMapTexture);
+            SetFloatIfPresent(
+                material,
+                "_HasNormal" + suffix,
+                layer.normalMapTexture != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_HasMask" + suffix,
+                layer.maskMapTexture != null
+                    ? 1.0f
+                    : 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_NormalScale" + suffix,
+                layer.normalScale);
+            SetFloatIfPresent(
+                material,
+                "_Metallic" + suffix,
+                layer.metallic);
+            SetFloatIfPresent(
+                material,
+                "_Smoothness" + suffix,
+                layer.smoothness);
+        }
+
+        private Material GetDebugMaterial(
+            CubeSpherePatchAddress address)
+        {
+            var key =
+                (int)address.Face *
+                    100 +
+                address.Level;
+
+            if (debugMaterials.TryGetValue(
+                    key,
+                    out var material))
+            {
+                return material;
+            }
+
+            var shader =
+                Shader.Find(
+                    "Unlit/Color") ??
+                Shader.Find(
+                    "Standard");
+
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "No compatible debug shader was found for adaptive LOD coloring.");
+            }
+
+            material =
+                new Material(
+                    shader)
+                {
+                    name =
+                        $"Adaptive LOD {address.Face} L{address.Level}",
+                    hideFlags =
+                        HideFlags.HideAndDontSave
+                };
+            var hue =
+                Mathf.Repeat(
+                    address.Level *
+                        0.137f +
+                    (int)address.Face *
+                        0.067f,
+                    1.0f);
+            var color =
+                Color.HSVToRGB(
+                    hue,
+                    0.72f,
+                    0.95f);
+
+            if (material.HasProperty(
+                    "_Color"))
+            {
+                material.SetColor(
+                    "_Color",
+                    color);
+            }
+
+            if (material.HasProperty(
+                    "_BaseColor"))
+            {
+                material.SetColor(
+                    "_BaseColor",
+                    color);
+            }
+
+            debugMaterials.Add(
+                key,
+                material);
+            return material;
+        }
+
+        private void RefreshVisualMaterials()
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                RefreshVisualMaterials(
+                    roots[index]);
+            }
+        }
+
+        private void RefreshVisualMaterials(
+            PatchNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            if (node.Visual != null &&
+                node.Data != null)
+            {
+                ConfigureVisualMaterial(
+                    node.Visual,
+                    node);
+            }
+
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                RefreshVisualMaterials(
+                    node.Children[index]);
+            }
+        }
+
+        private void SetVisualActive(
+            PatchNode node,
+            bool active)
+        {
+            if (node == null ||
+                node.Visual == null)
+            {
+                return;
+            }
+
+            node.Visual.GameObject.SetActive(
+                active);
+
+            if (!active)
+            {
+                return;
+            }
+
+            activePatchCount++;
+            maximumActiveLevel =
+                Math.Max(
+                    maximumActiveLevel,
+                    node.Address.Level);
+        }
+
+        private void SetSubtreeActive(
+            PatchNode node,
+            bool active)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            SetVisualActive(
+                node,
+                active);
+
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                SetSubtreeActive(
+                    node.Children[index],
+                    active);
+            }
+        }
+
+        private void SetAllNodesActive(
+            bool active)
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                SetSubtreeActive(
+                    roots[index],
+                    active);
+            }
+        }
+
+        private void ReleaseChildren(
+            PatchNode node)
+        {
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                ReleaseNode(
+                    node.Children[index]);
+            }
+
+            node.Children = null;
+        }
+
+        private void ReleaseNode(
+            PatchNode node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            ReleaseChildren(
+                node);
+
+            if (node.Visual != null)
+            {
+                ReleaseVisual(
+                    node.Visual);
+                node.Visual = null;
+            }
+        }
+
+        private void ReleaseVisual(
+            PatchVisual visual)
+        {
+            if (visual == null)
+            {
+                return;
+            }
+
+            visual.GameObject.SetActive(
+                false);
+            visual.MeshRenderer.SetPropertyBlock(
+                null);
+            visual.MeshRenderer.sharedMaterial =
+                null;
+            DestroyControlTexture(
+                visual);
+            visual.Mesh.Clear();
+            visual.Owner = null;
+            visualPool.Push(
+                visual);
+        }
+
+        private static void DestroyControlTexture(
+            PatchVisual visual)
+        {
+            if (visual.ControlTexture == null)
+            {
+                return;
+            }
+
+            Destroy(
+                visual.ControlTexture);
+            visual.ControlTexture = null;
+        }
+
+        private void ResolveObserverCamera()
+        {
+            if (observerCamera == null)
+            {
+                observerCamera =
+                    Camera.main;
+            }
+        }
+
+        private bool TryBuildObserverState()
+        {
+            var localPosition =
+                transform.InverseTransformPoint(
+                    observerCamera.transform.position);
+            observerLocalPosition =
+                ToDoubleVector3(
+                    localPosition);
+            var distanceFromCenter =
+                Magnitude(
+                    observerLocalPosition);
+            observerAltitudeMeters =
+                distanceFromCenter -
+                surfaceRuntime.BodyDefinition
+                    .ReferenceRadiusMeters;
+            observerState =
+                new CelestialSurfaceObserverState(
+                    observerCamera.GetInstanceID()
+                        .ToString(),
+                    observerLocalPosition,
+                    observerCamera.fieldOfView,
+                    Mathf.Max(
+                        1,
+                        observerCamera.pixelHeight),
+                    true,
+                    false);
+            return observerState.IsValid;
+        }
+
+        private bool IsInsideHorizon(
+            PatchNode node,
+            double radius)
+        {
+            var observerDistance =
+                observerState
+                    .DistanceFromBodyCenterMeters;
+
+            if (observerDistance <=
+                radius)
+            {
+                return true;
+            }
+
+            var observerDirection =
+                Normalize(
+                    observerLocalPosition);
+            var centerDot =
+                Clamp(
+                    Dot(
+                        observerDirection,
+                        node.CenterDirection),
+                    -1.0,
+                    1.0);
+            var centerAngle =
+                Math.Acos(
+                    centerDot);
+            var horizonAngle =
+                Math.Acos(
+                    Clamp(
+                        radius /
+                            observerDistance,
+                        -1.0,
+                        1.0));
+
+            return
+                centerAngle <=
+                horizonAngle +
+                    node.AngularRadiusRadians +
+                    0.01;
+        }
+
+        private bool IsInsideFrustum(
+            PatchNode node)
+        {
+            var worldCenter =
+                transform.TransformPoint(
+                    node.LocalCenter);
+            var scale =
+                MaximumAbsoluteComponent(
+                    transform.lossyScale);
+            var diameter =
+                (float)Math.Min(
+                    float.MaxValue,
+                    node.BoundingRadiusMeters *
+                        2.0 *
+                        scale);
+            var bounds =
+                new Bounds(
+                    worldCenter,
+                    Vector3.one *
+                        diameter);
+
+            return
+                frustumPlanes == null ||
+                GeometryUtility.TestPlanesAABB(
+                    frustumPlanes,
+                    bounds);
+        }
+
+        private bool AreAllRootsReady()
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                if (roots[index] == null ||
+                    patchGenerator.GetPatchState(
+                        roots[index].Address) !=
+                    CelestialSurfacePatchGenerationState.Ready)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ReportReadiness(
+            bool coarseReady,
+            bool visibleReady)
+        {
+            coarseSurfaceReady =
+                coarseReady;
+            visibleSurfaceReady =
+                visibleReady;
+
+            if (surfaceRuntime != null &&
+                surfaceRuntime.Body != null)
+            {
+                surfaceRuntime.Body.ReportSurfaceReadiness(
+                    coarseReady,
+                    visibleReady,
+                    false);
+            }
+        }
+
+        private void ClearFrameStatistics()
+        {
+            desiredLeafCount = 0;
+            activePatchCount = 0;
+            culledPatchCount = 0;
+            heldParentCount = 0;
+            maximumActiveLevel = 0;
+            maximumNeighborLevelDifference = 0;
+            neighborBalanceValid = true;
+            coverageInvariantValid = true;
+        }
+
+        private PatchNode GetRoot(
+            CubeSphereFace face)
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                if (roots[index] != null &&
+                    roots[index].Address.Face ==
+                        face)
+                {
+                    return roots[index];
+                }
+            }
+
+            return null;
+        }
+
+        private double ResolveSkirtDepthMeters(
+            CubeSpherePatchAddress address)
+        {
+            var arcSize =
+                CubeSpherePatchGrid
+                    .GetApproximateArcSizeMeters(
+                        address,
+                        surfaceRuntime.BodyDefinition
+                            .ReferenceRadiusMeters);
+            var cellSize =
+                arcSize /
+                Math.Max(
+                    1,
+                    surfaceRuntime.PatchResolution -
+                        1);
+
+            return Math.Max(
+                minimumSkirtDepthMeters,
+                cellSize *
+                    skirtDepthCellFraction);
+        }
+
+        private static double CalculateAngularRadius(
+            CubeSpherePatchAddress address,
+            DoubleVector3 centerDirection)
+        {
+            var maximumAngle = 0.0;
+            var cornerU =
+                new[]
+                {
+                    address.MinimumU,
+                    address.MaximumU
+                };
+            var cornerV =
+                new[]
+                {
+                    address.MinimumV,
+                    address.MaximumV
+                };
+
+            for (var uIndex = 0;
+                uIndex < cornerU.Length;
+                uIndex++)
+            {
+                for (var vIndex = 0;
+                    vIndex < cornerV.Length;
+                    vIndex++)
+                {
+                    var direction =
+                        CubeSphereMapping.AddressToDirection(
+                            new CubeSphereAddress(
+                                address.Face,
+                                cornerU[uIndex],
+                                cornerV[vIndex],
+                                0.0));
+                    maximumAngle =
+                        Math.Max(
+                            maximumAngle,
+                            Math.Acos(
+                                Clamp(
+                                    Dot(
+                                        centerDirection,
+                                        direction),
+                                    -1.0,
+                                    1.0)));
+                }
+            }
+
+            return maximumAngle;
+        }
+
+        private static int ResolveChildIndex(
+            bool positiveU,
+            bool positiveV)
+        {
+            if (positiveV)
+            {
+                return positiveU
+                    ? (int)CubeSpherePatchQuadrant
+                        .PositiveUPositiveV
+                    : (int)CubeSpherePatchQuadrant
+                        .NegativeUPositiveV;
+            }
+
+            return positiveU
+                ? (int)CubeSpherePatchQuadrant
+                    .PositiveUNegativeV
+                : (int)CubeSpherePatchQuadrant
+                    .NegativeUNegativeV;
+        }
+
+        private void ReleaseAllNodes()
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                ReleaseNode(
+                    roots[index]);
+                roots[index] = null;
+            }
+        }
+
+        private void DestroyRuntimeResources()
+        {
+            ReleaseAllNodes();
+
+            while (visualPool.Count > 0)
+            {
+                var visual =
+                    visualPool.Pop();
+                DestroyControlTexture(
+                    visual);
+
+                if (visual.Mesh != null)
+                {
+                    Destroy(
+                        visual.Mesh);
+                }
+
+                if (visual.GameObject != null)
+                {
+                    Destroy(
+                        visual.GameObject);
+                }
+            }
+
+            DestroyRuntimeMaterial(
+                ref surfaceMaterial);
+
+            foreach (var material in
+                debugMaterials.Values)
+            {
+                if (material != null)
+                {
+                    Destroy(
+                        material);
+                }
+            }
+
+            debugMaterials.Clear();
+        }
+
+        private void OnDisable()
+        {
+            SetAllNodesActive(
+                false);
+            ReportReadiness(
+                false,
+                false);
+        }
+
+        private void OnDestroy()
+        {
+            DestroyRuntimeResources();
+        }
+
+        private static bool IsCompatibleLayerTemplate(
+            Material material)
+        {
+            return
+                material != null &&
+                material.HasProperty(
+                    "_Control") &&
+                material.HasProperty(
+                    "_LayerCount") &&
+                material.HasProperty(
+                    "_Splat0");
+        }
+
+        private static void SetTextureIfPresent(
+            Material material,
+            string propertyName,
+            Texture texture)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetTexture(
+                    propertyName,
+                    texture);
+            }
+        }
+
+        private static void SetFloatIfPresent(
+            Material material,
+            string propertyName,
+            float value)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetFloat(
+                    propertyName,
+                    value);
+            }
+        }
+
+        private static void DestroyRuntimeMaterial(
+            ref Material material)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            Destroy(
+                material);
+            material = null;
+        }
+
+        private static float SafeTileSize(
+            float value)
+        {
+            return
+                IsFinite(value) &&
+                Mathf.Abs(value) >
+                    Mathf.Epsilon
+                    ? Mathf.Abs(value)
+                    : 1.0f;
+        }
+
+        private static float Repeat01(
+            double value)
+        {
+            return
+                (float)(
+                    value -
+                    Math.Floor(value));
+        }
+
+        private static float MaximumAbsoluteComponent(
+            Vector3 value)
+        {
+            return Mathf.Max(
+                Mathf.Abs(value.x),
+                Mathf.Abs(value.y),
+                Mathf.Abs(value.z));
+        }
+
+        private static DoubleVector3 Normalize(
+            DoubleVector3 value)
+        {
+            var magnitude =
+                Magnitude(value);
+
+            return magnitude > 0.0
+                ? value *
+                    (1.0 /
+                        magnitude)
+                : default;
+        }
+
+        private static double Magnitude(
+            DoubleVector3 value)
+        {
+            return Math.Sqrt(
+                value.x * value.x +
+                value.y * value.y +
+                value.z * value.z);
+        }
+
+        private static double Dot(
+            DoubleVector3 first,
+            DoubleVector3 second)
+        {
+            return
+                first.x * second.x +
+                first.y * second.y +
+                first.z * second.z;
+        }
+
+        private static double Clamp(
+            double value,
+            double minimum,
+            double maximum)
+        {
+            return Math.Max(
+                minimum,
+                Math.Min(
+                    maximum,
+                    value));
+        }
+
+        private static Vector3 ToVector3(
+            DoubleVector3 value)
+        {
+            return new Vector3(
+                (float)value.x,
+                (float)value.y,
+                (float)value.z);
+        }
+
+        private static DoubleVector3 ToDoubleVector3(
+            Vector3 value)
+        {
+            return new DoubleVector3(
+                value.x,
+                value.y,
+                value.z);
+        }
+
+        private static bool IsFinite(
+            float value)
+        {
+            return
+                !float.IsNaN(value) &&
+                !float.IsInfinity(value);
+        }
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
+        }
+    }
+}
