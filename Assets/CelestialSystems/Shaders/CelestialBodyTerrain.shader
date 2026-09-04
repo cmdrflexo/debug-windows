@@ -122,33 +122,20 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
             TEXTURE2D(_NormalMap);
-            SAMPLER(sampler_NormalMap);
             TEXTURE2D(_Control);
             SAMPLER(sampler_Control);
             TEXTURE2D(_Splat0);
-            SAMPLER(sampler_Splat0);
             TEXTURE2D(_Splat1);
-            SAMPLER(sampler_Splat1);
             TEXTURE2D(_Splat2);
-            SAMPLER(sampler_Splat2);
             TEXTURE2D(_Splat3);
-            SAMPLER(sampler_Splat3);
             TEXTURE2D(_Normal0);
-            SAMPLER(sampler_Normal0);
             TEXTURE2D(_Normal1);
-            SAMPLER(sampler_Normal1);
             TEXTURE2D(_Normal2);
-            SAMPLER(sampler_Normal2);
             TEXTURE2D(_Normal3);
-            SAMPLER(sampler_Normal3);
             TEXTURE2D(_Mask0);
-            SAMPLER(sampler_Mask0);
             TEXTURE2D(_Mask1);
-            SAMPLER(sampler_Mask1);
             TEXTURE2D(_Mask2);
-            SAMPLER(sampler_Mask2);
             TEXTURE2D(_Mask3);
-            SAMPLER(sampler_Mask3);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -473,7 +460,7 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                     UnpackNormalScale(
                         SAMPLE_TEXTURE2D(
                             _NormalMap,
-                            sampler_NormalMap,
+                            sampler_BaseMap,
                             baseUv),
                         _NormalScale);
                 half3 normal0 =
@@ -485,7 +472,7 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                         UnpackNormalScale(
                             SAMPLE_TEXTURE2D(
                                 _Normal0,
-                                sampler_Normal0,
+                                sampler_BaseMap,
                                 uv0),
                             _NormalScale0),
                         _HasNormal0);
@@ -498,7 +485,7 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                         UnpackNormalScale(
                             SAMPLE_TEXTURE2D(
                                 _Normal1,
-                                sampler_Normal1,
+                                sampler_BaseMap,
                                 uv1),
                             _NormalScale1),
                         _HasNormal1);
@@ -511,7 +498,7 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                         UnpackNormalScale(
                             SAMPLE_TEXTURE2D(
                                 _Normal2,
-                                sampler_Normal2,
+                                sampler_BaseMap,
                                 uv2),
                             _NormalScale2),
                         _HasNormal2);
@@ -524,7 +511,7 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                         UnpackNormalScale(
                             SAMPLE_TEXTURE2D(
                                 _Normal3,
-                                sampler_Normal3,
+                                sampler_BaseMap,
                                 uv3),
                             _NormalScale3),
                         _HasNormal3);
@@ -581,22 +568,22 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                 half4 diffuse0 =
                     SAMPLE_TEXTURE2D(
                         _Splat0,
-                        sampler_Splat0,
+                        sampler_BaseMap,
                         uv0);
                 half4 diffuse1 =
                     SAMPLE_TEXTURE2D(
                         _Splat1,
-                        sampler_Splat1,
+                        sampler_BaseMap,
                         uv1);
                 half4 diffuse2 =
                     SAMPLE_TEXTURE2D(
                         _Splat2,
-                        sampler_Splat2,
+                        sampler_BaseMap,
                         uv2);
                 half4 diffuse3 =
                     SAMPLE_TEXTURE2D(
                         _Splat3,
-                        sampler_Splat3,
+                        sampler_BaseMap,
                         uv3);
                 half3 layerAlbedo =
                     diffuse0.rgb *
@@ -610,22 +597,22 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                 half4 mask0 =
                     SAMPLE_TEXTURE2D(
                         _Mask0,
-                        sampler_Mask0,
+                        sampler_BaseMap,
                         uv0);
                 half4 mask1 =
                     SAMPLE_TEXTURE2D(
                         _Mask1,
-                        sampler_Mask1,
+                        sampler_BaseMap,
                         uv1);
                 half4 mask2 =
                     SAMPLE_TEXTURE2D(
                         _Mask2,
-                        sampler_Mask2,
+                        sampler_BaseMap,
                         uv2);
                 half4 mask3 =
                     SAMPLE_TEXTURE2D(
                         _Mask3,
-                        sampler_Mask3,
+                        sampler_BaseMap,
                         uv3);
                 half layerMetallic =
                     lerp(
