@@ -61,6 +61,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Transform developmentRoot;
 
+        [SerializeField]
+        private CelestialSurfaceRuntime surfaceRuntime;
+
+        [SerializeField]
+        private CelestialSurfaceFoundationDiagnostics surfaceFoundationDiagnostics;
+
         [Header("Resolved Runtime State")]
         [SerializeField]
         private CelestialBodyLifecycleState lifecycleState;
@@ -123,6 +129,12 @@ namespace jcan.CelestialSystems
         public Transform DevelopmentRoot =>
             developmentRoot;
 
+        public CelestialSurfaceRuntime SurfaceRuntime =>
+            surfaceRuntime;
+
+        public CelestialSurfaceFoundationDiagnostics SurfaceFoundationDiagnostics =>
+            surfaceFoundationDiagnostics;
+
         public RoundMapMagicSurfaceQualityProfile QualityProfile =>
             qualityProfile;
 
@@ -155,6 +167,10 @@ namespace jcan.CelestialSystems
         public bool HasRuntimeHierarchy =>
             HasReadiness(
                 CelestialBodyReadiness.RuntimeHierarchy);
+
+        public bool HasSurfaceFoundation =>
+            HasReadiness(
+                CelestialBodyReadiness.SurfaceFoundation);
 
         public bool HasCoarseSurface =>
             HasReadiness(
@@ -393,6 +409,21 @@ namespace jcan.CelestialSystems
                 CelestialBodyLifecycleState.Destroying);
         }
 
+        internal void AttachSurfaceRuntime(
+            CelestialSurfaceRuntime newSurfaceRuntime)
+        {
+            surfaceRuntime =
+                newSurfaceRuntime;
+            RefreshReadiness();
+        }
+
+        internal void AttachSurfaceFoundationDiagnostics(
+            CelestialSurfaceFoundationDiagnostics diagnostics)
+        {
+            surfaceFoundationDiagnostics =
+                diagnostics;
+        }
+
         private bool FinishInitialization()
         {
             RefreshRuntimeState();
@@ -539,6 +570,13 @@ namespace jcan.CelestialSystems
             {
                 updatedReadiness |=
                     CelestialBodyReadiness.Motion;
+            }
+
+            if (surfaceRuntime != null &&
+                surfaceRuntime.FoundationReady)
+            {
+                updatedReadiness |=
+                    CelestialBodyReadiness.SurfaceFoundation;
             }
 
             if (coarseSurfaceReady)

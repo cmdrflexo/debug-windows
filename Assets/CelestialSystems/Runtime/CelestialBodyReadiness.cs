@@ -17,6 +17,7 @@ namespace jcan.CelestialSystems
         CoarseSurface = 1 << 4,
         VisibleSurface = 1 << 5,
         CollisionSurface = 1 << 6,
-        Ocean = 1 << 7
+        Ocean = 1 << 7,
+        SurfaceFoundation = 1 << 8
     }
 }

@@ -266,13 +266,23 @@ Readiness: {factory.LastSpawnedBody.Readiness|--}
 Package ready: {color:factory.LastSpawnedBody.IsReady|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.IsReady|--}</color>
 Hierarchy: {factory.LastSpawnedBody.HasRuntimeHierarchy|--}
 Motion: {factory.LastSpawnedBody.IsMotionReady|--}
+Surface foundation: {color:factory.LastSpawnedBody.HasSurfaceFoundation|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.HasSurfaceFoundation|--}</color>
 Coarse surface: {factory.LastSpawnedBody.HasCoarseSurface|--}
 Visible surface: {factory.LastSpawnedBody.HasVisibleSurface|--}
 Collision surface: {factory.LastSpawnedBody.HasCollisionSurface|--}
 Ocean: {factory.LastSpawnedBody.HasOcean|--}
+
+Patch grid: {factory.LastSpawnedBody.SurfaceRuntime.PatchResolution|--} × {factory.LastSpawnedBody.SurfaceRuntime.PatchResolution|--}
+LOD range: {factory.LastSpawnedBody.SurfaceRuntime.MinimumLevel|--}–{factory.LastSpawnedBody.SurfaceRuntime.MaximumLevel|--}
+Root patches: {factory.LastSpawnedBody.SurfaceRuntime.RootPatchCount|--}
+Foundation test: {color:factory.LastSpawnedBody.SurfaceFoundationDiagnostics.Passed|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceFoundationDiagnostics.Passed|--}</color>
+Samples tested: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.TestedSampleCount:N0|--}
+MapMagic coordinates: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.MapMagicCoordinatesMatch|--}
+Max seam gap: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.LargestDirectionGapMeters:E3|--} m
+Foundation error: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.LastError|None}
 ```
 
-During Milestone 1, the surface and ocean readiness values remain false. Their generated hierarchy roots exist, but later milestones will own and report those data states.
+From Milestone 2 onward, `Surface foundation` and `Foundation test` should be true. Coarse, visible, collision, and ocean readiness remain independent and become true only when those later subsystems have usable data.
 
 ### Body definition
 
