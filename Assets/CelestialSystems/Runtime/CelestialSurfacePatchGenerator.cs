@@ -760,8 +760,8 @@ namespace jcan.CelestialSystems
                                 layerCount +
                             layer] =
                                 textureData.splats[
-                                    sampleX,
                                     mapPixelZ,
+                                    sampleX,
                                     layer];
                     }
                 }
