@@ -68,6 +68,10 @@ namespace jcan.CelestialSystems
         private Transform bodyFrameOverride;
 
         [SerializeField]
+        [Tooltip("Optional floating-origin surface frame used to resolve the current scene-space planet center.")]
+        private GePlanetSurfaceFrame surfaceFrameOverride;
+
+        [SerializeField]
         [Tooltip("Root searched for renderers using the custom celestial shaders. Defaults to this transform.")]
         private Transform rendererRoot;
 
@@ -144,6 +148,9 @@ namespace jcan.CelestialSystems
 
         public Transform BodyFrame =>
             ResolveBodyFrame();
+
+        public GePlanetSurfaceFrame SurfaceFrame =>
+            surfaceFrameOverride;
 
         public int CachedRendererCount =>
             cachedRendererCount;
@@ -397,6 +404,15 @@ namespace jcan.CelestialSystems
                 ResolveBodyFrame();
             resolvedBodyCenter =
                 orientation.position;
+
+            if (surfaceFrameOverride != null &&
+                surfaceFrameOverride
+                    .TryGetPlanetCenterScenePosition(
+                        out var surfaceFrameCenter))
+            {
+                resolvedBodyCenter =
+                    surfaceFrameCenter;
+            }
             bodyNorthDirection =
                 orientation.TransformDirection(
                     definition.NorthAxis).normalized;
@@ -485,6 +501,14 @@ namespace jcan.CelestialSystems
                 bodyContext =
                     GetComponentInParent<
                         CelestialBodyRuntimeContext>();
+            }
+
+            if (surfaceFrameOverride == null)
+            {
+                surfaceFrameOverride =
+                    GetComponentInChildren<
+                        GePlanetSurfaceFrame>(
+                        true);
             }
         }
 
