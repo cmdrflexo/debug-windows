@@ -67,6 +67,12 @@ namespace jcan.CelestialSystems
         private const float OceanSurfaceType =
             1.0f;
 
+        private const string TerrainShaderName =
+            "jcan/Celestial Systems/Celestial Body Terrain";
+
+        private const string OceanShaderName =
+            "jcan/Celestial Systems/Celestial Body Ocean";
+
         [Header("Configuration")]
         [SerializeField]
         private CelestialBodyRuntimeContext bodyContext;
@@ -496,8 +502,31 @@ namespace jcan.CelestialSystems
             var material =
                 targetRenderer.sharedMaterial;
 
-            if (material == null ||
-                !material.HasProperty(
+            if (material == null)
+            {
+                return false;
+            }
+
+            var shaderName =
+                material.shader != null
+                    ? material.shader.name
+                    : string.Empty;
+
+            if (shaderName ==
+                OceanShaderName)
+            {
+                isOcean =
+                    true;
+                return true;
+            }
+
+            if (shaderName ==
+                TerrainShaderName)
+            {
+                return true;
+            }
+
+            if (!material.HasProperty(
                     SurfaceTypeId))
             {
                 return false;
