@@ -26,6 +26,8 @@ Shader "jcan/Celestial Systems/Celestial Body Ocean"
         [HideInInspector] _BodyPoleReferenceDirection ("Body Pole Reference Direction", Vector) = (0, 0, 1, 0)
         [HideInInspector] _ElevationDebugMinMeters ("Elevation Debug Minimum", Float) = -5000
         [HideInInspector] _ElevationDebugMaxMeters ("Elevation Debug Maximum", Float) = 5000
+        [HideInInspector] _SlopeDebugMinDegrees ("Slope Debug Minimum Degrees", Float) = 0
+        [HideInInspector] _SlopeDebugMaxDegrees ("Slope Debug Maximum Degrees", Float) = 20
         [HideInInspector] _CoordinateDebugScaleMeters ("Coordinate Debug Scale", Float) = 1000
         [HideInInspector] _DebugMode ("Debug Mode", Float) = 0
     }
