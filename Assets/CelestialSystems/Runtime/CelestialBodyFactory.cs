@@ -1,5 +1,5 @@
 /*
- * Creates definition-driven celestial-body instances and registers their NBody components with Gravity Engine at runtime.
+ * Creates packaged, definition-driven celestial bodies and connects their motion to Gravity Engine through an adapter.
  */
 
 using System;
@@ -13,6 +13,33 @@ namespace jcan.CelestialSystems
     public sealed class CelestialBodyFactory :
         MonoBehaviour
     {
+        private readonly struct RuntimeHierarchy
+        {
+            public Transform MotionRoot { get; }
+
+            public Transform VisualRoot { get; }
+
+            public Transform SurfaceRoot { get; }
+
+            public Transform OceanRoot { get; }
+
+            public Transform DevelopmentRoot { get; }
+
+            public RuntimeHierarchy(
+                Transform motionRoot,
+                Transform visualRoot,
+                Transform surfaceRoot,
+                Transform oceanRoot,
+                Transform developmentRoot)
+            {
+                MotionRoot = motionRoot;
+                VisualRoot = visualRoot;
+                SurfaceRoot = surfaceRoot;
+                OceanRoot = oceanRoot;
+                DevelopmentRoot = developmentRoot;
+            }
+        }
+
         [Header("Configuration")]
         [SerializeField]
         private UniverseFrameController universeFrame;
@@ -31,6 +58,9 @@ namespace jcan.CelestialSystems
         private CelestialBodyDefinition startupDefinition;
 
         [SerializeField]
+        private RoundMapMagicSurfaceQualityProfile startupQualityProfile;
+
+        [SerializeField]
         private string startupInstanceId =
             "spawned-body-01";
 
@@ -40,9 +70,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private DoubleVector3 startupVelocityMetersPerSecond;
 
+        [SerializeField]
+        private Vector3 startupRotationEulerDegrees;
+
         [Header("Runtime")]
         [SerializeField]
         private bool waitingForGravityEngine;
+
+        [SerializeField]
+        private bool motionBackendReady;
 
         [SerializeField]
         private bool lastSpawnSucceeded;
@@ -52,6 +88,9 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private CelestialBodyRuntimeContext lastSpawnedBody;
+
+        [SerializeField]
+        private string lastError;
 
         private readonly Dictionary<
             string,
@@ -69,35 +108,86 @@ namespace jcan.CelestialSystems
         public CelestialBodyRuntimeContext BodyPrefab =>
             bodyPrefab;
 
+        public Transform SpawnedBodyParent =>
+            spawnedBodyParent;
+
+        public bool CanSpawnBodies
+        {
+            get
+            {
+                RefreshMotionBackendState();
+                return
+                    Application.isPlaying &&
+                    motionBackendReady;
+            }
+        }
+
+        public bool WaitingForGravityEngine =>
+            waitingForGravityEngine;
+
+        public bool MotionBackendReady =>
+            motionBackendReady;
+
+        public bool LastSpawnSucceeded =>
+            lastSpawnSucceeded;
+
         public int ActiveBodyCount =>
             activeBodyCount;
 
         public CelestialBodyRuntimeContext LastSpawnedBody =>
             lastSpawnedBody;
 
+        public string LastError =>
+            lastError;
+
         public event Action<CelestialBodyRuntimeContext> BodySpawned;
+
+        public event Action<CelestialBodyRuntimeContext> BodyDespawned;
+
+        public event Action<string> BodySpawnFailed;
 
         private void Start()
         {
+            gravityEngine =
+                GravityEngine.Instance();
+            RefreshMotionBackendState();
+
             if (!spawnOnStart)
             {
                 return;
             }
 
-            gravityEngine =
-                GravityEngine.Instance();
-
             if (gravityEngine == null)
             {
-                Debug.LogError(
-                    "Cannot spawn the configured startup body because no Gravity Engine exists in the scene.",
-                    this);
+                RecordSpawnFailure(
+                    "Cannot spawn the configured startup body because no Gravity Engine exists in the scene.");
                 return;
             }
 
             waitingForGravityEngine = true;
             gravityEngine.AddGEStartCallback(
                 SpawnConfiguredStartupBody);
+        }
+
+        private void Update()
+        {
+            RefreshMotionBackendState();
+        }
+
+        private void OnDestroy()
+        {
+            foreach (var body in
+                spawnedBodies.Values)
+            {
+                if (body != null)
+                {
+                    body.Destroying -=
+                        HandleSpawnedBodyDestroying;
+                }
+            }
+
+            spawnedBodies.Clear();
+            activeBodyCount = 0;
         }
 
         public bool TrySpawnBody(
@@ -107,39 +197,54 @@ namespace jcan.CelestialSystems
             DoubleVector3 initialVelocityMetersPerSecond,
             out CelestialBodyRuntimeContext spawnedBody)
         {
-            spawnedBody = null;
-            lastSpawnSucceeded = false;
-
-            if (!Application.isPlaying)
-            {
-                Debug.LogError(
-                    "Celestial bodies can only be spawned while the application is playing.",
-                    this);
-                return false;
-            }
-
-            if (!TryValidateSpawn(
+            var request =
+                new CelestialBodySpawnRequest(
                     newInstanceId,
                     newDefinition,
                     initialPositionMetersFromFrameOrigin,
                     initialVelocityMetersPerSecond,
+                    Quaternion.identity);
+
+            return TrySpawnBody(
+                request,
+                out spawnedBody);
+        }
+
+        public bool TrySpawnBody(
+            CelestialBodySpawnRequest request,
+            out CelestialBodyRuntimeContext spawnedBody)
+        {
+            spawnedBody = null;
+            lastSpawnSucceeded = false;
+            lastError = string.Empty;
+
+            if (!Application.isPlaying)
+            {
+                return RecordSpawnFailure(
+                    "Celestial bodies can only be spawned while the application is playing.");
+            }
+
+            if (!TryValidateSpawn(
+                    request,
                     out var positionMetersPerPhysicsUnit,
                     out var velocityMetersPerSecondPerPhysicsUnit))
             {
                 return false;
             }
 
+            var parent =
+                request.ParentOverride != null
+                    ? request.ParentOverride
+                    : spawnedBodyParent;
             var instance =
                 Instantiate(
                     bodyPrefab,
-                    spawnedBodyParent);
+                    parent);
 
             if (instance == null)
             {
-                Debug.LogError(
-                    "The celestial body factory could not instantiate its body prefab.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "The celestial body factory could not instantiate its body prefab.");
             }
 
             var gravityBody =
@@ -153,26 +258,36 @@ namespace jcan.CelestialSystems
 
             if (gravityBody == null)
             {
-                Debug.LogError(
-                    "The celestial body prefab requires an NBody assigned to its runtime context or attached to the same GameObject.",
-                    instance);
                 Destroy(
                     instance.gameObject);
-                return false;
+                return RecordSpawnFailure(
+                    "The celestial body prefab requires an NBody assigned to its runtime context or attached to the same GameObject.");
             }
 
             var massKilograms =
-                newDefinition.MassKilograms;
+                request.Definition.MassKilograms;
 
             if (massKilograms >
                 float.MaxValue)
             {
-                Debug.LogError(
-                    "The celestial body definition's mass exceeds Gravity Engine's NBody mass range.",
-                    newDefinition);
                 Destroy(
                     instance.gameObject);
-                return false;
+                return RecordSpawnFailure(
+                    "The celestial body definition's mass exceeds Gravity Engine's NBody mass range.");
+            }
+
+            var hierarchy =
+                EnsureRuntimeHierarchy(
+                    instance);
+            var motionProvider =
+                hierarchy.MotionRoot.GetComponent<
+                    GravityEngineCelestialBodyMotionProvider>();
+
+            if (motionProvider == null)
+            {
+                motionProvider =
+                    hierarchy.MotionRoot.gameObject.AddComponent<
+                        GravityEngineCelestialBodyMotionProvider>();
             }
 
             gravityBody.mass =
@@ -180,36 +295,72 @@ namespace jcan.CelestialSystems
 
             gravityBody.SetPosVel3d(
                 new Vector3d(
-                    initialPositionMetersFromFrameOrigin.x /
+                    request.InitialPositionMetersFromFrameOrigin.x /
                         positionMetersPerPhysicsUnit,
-                    initialPositionMetersFromFrameOrigin.y /
+                    request.InitialPositionMetersFromFrameOrigin.y /
                         positionMetersPerPhysicsUnit,
-                    initialPositionMetersFromFrameOrigin.z /
+                    request.InitialPositionMetersFromFrameOrigin.z /
                         positionMetersPerPhysicsUnit),
                 new Vector3d(
-                    initialVelocityMetersPerSecond.x /
+                    request.InitialVelocityMetersPerSecond.x /
                         velocityMetersPerSecondPerPhysicsUnit,
-                    initialVelocityMetersPerSecond.y /
+                    request.InitialVelocityMetersPerSecond.y /
                         velocityMetersPerSecondPerPhysicsUnit,
-                    initialVelocityMetersPerSecond.z /
+                    request.InitialVelocityMetersPerSecond.z /
                         velocityMetersPerSecondPerPhysicsUnit));
 
+            instance.transform.rotation =
+                request.InitialRotation;
             instance.name =
-                $"{newDefinition.DefinitionId} ({newInstanceId})";
+                $"{request.Definition.DefinitionId} ({request.InstanceId})";
 
-            instance.Initialize(
-                newInstanceId,
-                newDefinition,
+            try
+            {
+                gravityEngine.AddBody(
+                    instance.gameObject);
+            }
+            catch (Exception exception)
+            {
+                Destroy(
+                    instance.gameObject);
+                return RecordSpawnFailure(
+                    $"Gravity Engine rejected the spawned celestial body: {exception.Message}");
+            }
+
+            motionProvider.Initialize(
                 universeFrame,
-                gravityBody,
-                instance.VisualRoot);
+                gravityBody);
 
-            gravityEngine.AddBody(
-                instance.gameObject);
+            if (!instance.InitializePackage(
+                    request,
+                    universeFrame,
+                    gravityBody,
+                    motionProvider,
+                    hierarchy.MotionRoot,
+                    hierarchy.VisualRoot,
+                    hierarchy.SurfaceRoot,
+                    hierarchy.OceanRoot,
+                    hierarchy.DevelopmentRoot))
+            {
+                var initializationError =
+                    instance.LastError;
+
+                gravityEngine.RemoveBody(
+                    instance.gameObject);
+                Destroy(
+                    instance.gameObject);
+                return RecordSpawnFailure(
+                    string.IsNullOrWhiteSpace(
+                        initializationError)
+                        ? "The celestial body runtime package failed to initialize."
+                        : initializationError);
+            }
 
             spawnedBodies.Add(
-                newInstanceId,
+                request.InstanceId,
                 instance);
+            instance.Destroying +=
+                HandleSpawnedBodyDestroying;
             activeBodyCount =
                 spawnedBodies.Count;
             lastSpawnedBody =
@@ -223,6 +374,54 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        public bool TryGetSpawnedBody(
+            string instanceId,
+            out CelestialBodyRuntimeContext body)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    instanceId))
+            {
+                body = null;
+                return false;
+            }
+
+            return spawnedBodies.TryGetValue(
+                instanceId,
+                out body) &&
+                body != null;
+        }
+
+        public bool TryDespawnBody(
+            string instanceId)
+        {
+            if (!TryGetSpawnedBody(
+                    instanceId,
+                    out var body))
+            {
+                return false;
+            }
+
+            body.BeginDespawn();
+
+            gravityEngine ??=
+                GravityEngine.Instance();
+
+            if (gravityEngine != null &&
+                gravityEngine.IsSetup() &&
+                body.GravityBody != null)
+            {
+                gravityEngine.RemoveBody(
+                    body.gameObject);
+            }
+
+            UnregisterSpawnedBody(
+                body,
+                true);
+            Destroy(
+                body.gameObject);
+            return true;
+        }
+
         private void SpawnConfiguredStartupBody()
         {
             waitingForGravityEngine = false;
@@ -233,20 +432,24 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            lastSpawnSucceeded =
-                TrySpawnBody(
+            var request =
+                new CelestialBodySpawnRequest(
                     startupInstanceId,
                     startupDefinition,
                     startupPositionMetersFromFrameOrigin,
                     startupVelocityMetersPerSecond,
+                    Quaternion.Euler(
+                        startupRotationEulerDegrees),
+                    startupQualityProfile);
+
+            lastSpawnSucceeded =
+                TrySpawnBody(
+                    request,
                     out _);
         }
 
         private bool TryValidateSpawn(
-            string newInstanceId,
-            CelestialBodyDefinition newDefinition,
-            DoubleVector3 initialPositionMetersFromFrameOrigin,
-            DoubleVector3 initialVelocityMetersPerSecond,
+            CelestialBodySpawnRequest request,
             out double positionMetersPerPhysicsUnit,
             out double velocityMetersPerSecondPerPhysicsUnit)
         {
@@ -255,99 +458,91 @@ namespace jcan.CelestialSystems
 
             if (universeFrame == null)
             {
-                Debug.LogError(
-                    "The celestial body factory requires a universe frame controller.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "The celestial body factory requires a universe frame controller.");
             }
 
             if (bodyPrefab == null)
             {
-                Debug.LogError(
-                    "The celestial body factory requires a body prefab.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "The celestial body factory requires a body prefab.");
+            }
+
+            if (request == null)
+            {
+                return RecordSpawnFailure(
+                    "The celestial body factory requires a spawn request.");
             }
 
             if (string.IsNullOrWhiteSpace(
-                    newInstanceId))
+                    request.InstanceId))
             {
-                Debug.LogError(
-                    "A spawned celestial body requires a unique instance ID.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "A spawned celestial body requires a unique instance ID.");
             }
 
             if (HasExistingInstanceId(
-                    newInstanceId))
+                    request.InstanceId))
             {
-                Debug.LogError(
-                    $"A celestial body with instance ID '{newInstanceId}' already exists.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    $"A celestial body with instance ID '{request.InstanceId}' already exists.");
             }
 
-            if (newDefinition == null)
+            if (request.Definition == null)
             {
-                Debug.LogError(
-                    "A spawned celestial body requires a body definition.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "A spawned celestial body requires a body definition.");
             }
 
-            if (!newDefinition.HasValidPhysicalSettings)
+            if (!request.Definition.HasValidPhysicalSettings)
             {
-                Debug.LogError(
-                    "The body definition has invalid physical settings.",
-                    newDefinition);
-                return false;
+                return RecordSpawnFailure(
+                    "The body definition has invalid physical settings.");
             }
 
-            if (!newDefinition.HasValidResolvedSurfaceSettings)
+            if (!request.Definition.HasValidResolvedSurfaceSettings)
             {
-                Debug.LogError(
-                    "The body definition does not have valid settings for its resolved surface system.",
-                    newDefinition);
-                return false;
+                return RecordSpawnFailure(
+                    "The body definition does not have valid settings for its resolved surface system.");
+            }
+
+            if (request.QualityProfile != null &&
+                !request.QualityProfile.HasValidSettings)
+            {
+                return RecordSpawnFailure(
+                    "The requested surface quality profile has invalid settings.");
             }
 
             if (!IsFinite(
-                    initialPositionMetersFromFrameOrigin) ||
+                    request.InitialPositionMetersFromFrameOrigin) ||
                 !IsFinite(
-                    initialVelocityMetersPerSecond))
+                    request.InitialVelocityMetersPerSecond) ||
+                !IsFinite(
+                    request.InitialRotation))
             {
-                Debug.LogError(
-                    "The spawned body's starting position and velocity must contain finite values.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "The spawned body's starting position, velocity, and rotation must contain finite values.");
             }
 
-            gravityEngine ??=
-                GravityEngine.Instance();
+            RefreshMotionBackendState();
 
             if (gravityEngine == null)
             {
-                Debug.LogError(
-                    "Cannot spawn a celestial body because no Gravity Engine exists in the scene.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "Cannot spawn a celestial body because no Gravity Engine exists in the scene.");
             }
 
             if (!gravityEngine.IsSetup())
             {
-                Debug.LogError(
-                    "Cannot spawn a celestial body before Gravity Engine has completed setup.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "Cannot spawn a celestial body before Gravity Engine has completed setup.");
             }
 
             if (gravityEngine.units !=
                 GravityScaler.Units.SI)
             {
-                Debug.LogError(
-                    "Definition-driven body spawning currently requires Gravity Engine to use SI units.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "Definition-driven body spawning currently requires Gravity Engine to use SI units.");
             }
 
             positionMetersPerPhysicsUnit =
@@ -362,13 +557,80 @@ namespace jcan.CelestialSystems
                     velocityMetersPerSecondPerPhysicsUnit) ||
                 velocityMetersPerSecondPerPhysicsUnit <= 0.0)
             {
-                Debug.LogError(
-                    "Gravity Engine returned invalid SI position or velocity scaling.",
-                    this);
-                return false;
+                return RecordSpawnFailure(
+                    "Gravity Engine returned invalid SI position or velocity scaling.");
             }
 
             return true;
+        }
+
+        private RuntimeHierarchy EnsureRuntimeHierarchy(
+            CelestialBodyRuntimeContext body)
+        {
+            var bodyRoot =
+                body.transform;
+            var motionRoot =
+                GetOrCreateDirectChild(
+                    bodyRoot,
+                    "Motion");
+            var visualRoot =
+                body.VisualRoot != null
+                    ? body.VisualRoot
+                    : GetOrCreateDirectChild(
+                        bodyRoot,
+                        "Visuals");
+            var surfaceRoot =
+                GetOrCreateDirectChild(
+                    visualRoot,
+                    "Surface");
+            var oceanRoot =
+                GetOrCreateDirectChild(
+                    visualRoot,
+                    "Ocean");
+            var developmentRoot =
+                GetOrCreateDirectChild(
+                    bodyRoot,
+                    "Development");
+
+            return new RuntimeHierarchy(
+                motionRoot,
+                visualRoot,
+                surfaceRoot,
+                oceanRoot,
+                developmentRoot);
+        }
+
+        private static Transform GetOrCreateDirectChild(
+            Transform parent,
+            string childName)
+        {
+            for (var index = 0;
+                index < parent.childCount;
+                index++)
+            {
+                var child =
+                    parent.GetChild(
+                        index);
+
+                if (string.Equals(
+                        child.name,
+                        childName,
+                        StringComparison.Ordinal))
+                {
+                    return child;
+                }
+            }
+
+            var childObject =
+                new GameObject(
+                    childName);
+            var childTransform =
+                childObject.transform;
+
+            childTransform.SetParent(
+                parent,
+                false);
+            return childTransform;
         }
 
         private bool HasExistingInstanceId(
@@ -402,6 +664,80 @@ namespace jcan.CelestialSystems
             return false;
         }
 
+        private void HandleSpawnedBodyDestroying(
+            CelestialBodyRuntimeContext body)
+        {
+            gravityEngine ??=
+                GravityEngine.Instance();
+
+            if (gravityEngine != null &&
+                gravityEngine.IsSetup() &&
+                body != null &&
+                body.GravityBody != null)
+            {
+                gravityEngine.RemoveBody(
+                    body.gameObject);
+            }
+
+            UnregisterSpawnedBody(
+                body,
+                true);
+        }
+
+        private void UnregisterSpawnedBody(
+            CelestialBodyRuntimeContext body,
+            bool notify)
+        {
+            if (body == null ||
+                string.IsNullOrWhiteSpace(
+                    body.InstanceId) ||
+                !spawnedBodies.Remove(
+                    body.InstanceId))
+            {
+                return;
+            }
+
+            body.Destroying -=
+                HandleSpawnedBodyDestroying;
+            activeBodyCount =
+                spawnedBodies.Count;
+
+            if (lastSpawnedBody ==
+                body)
+            {
+                lastSpawnedBody = null;
+            }
+
+            if (notify)
+            {
+                BodyDespawned?.Invoke(
+                    body);
+            }
+        }
+
+        private void RefreshMotionBackendState()
+        {
+            gravityEngine ??=
+                GravityEngine.Instance();
+            motionBackendReady =
+                gravityEngine != null &&
+                gravityEngine.IsSetup();
+        }
+
+        private bool RecordSpawnFailure(
+            string error)
+        {
+            lastSpawnSucceeded = false;
+            lastError = error;
+
+            Debug.LogError(
+                error,
+                this);
+            BodySpawnFailed?.Invoke(
+                error);
+            return false;
+        }
+
         private static bool IsFinite(
             DoubleVector3 value)
         {
@@ -409,6 +745,16 @@ namespace jcan.CelestialSystems
                 IsFinite(value.x) &&
                 IsFinite(value.y) &&
                 IsFinite(value.z);
+        }
+
+        private static bool IsFinite(
+            Quaternion value)
+        {
+            return
+                IsFinite(value.x) &&
+                IsFinite(value.y) &&
+                IsFinite(value.z) &&
+                IsFinite(value.w);
         }
 
         private static bool IsFinite(

@@ -24,8 +24,12 @@ Example source list:
 | `frame` | `UniverseFrameController` component |
 | `body` | `CelestialBodyRuntimeContext` component |
 | `definition` | `CelestialBodyDefinition` asset |
+| `factory` | `CelestialBodyFactory` component |
+| `spawner` | `CelestialBodySpawner` component |
 
 Aliases are case-insensitive. Member names are case-sensitive and must match their C# names.
+
+Factory-created bodies can be inspected without assigning a runtime-created object in the Inspector. Assign the scene factory with alias `factory`, then follow its `LastSpawnedBody` property in the recipe.
 
 Only one script should write to a particular TMP text component. Disable `GePlanetSurfaceAltitudeDebugText` if it targets the same text.
 
@@ -244,6 +248,31 @@ Adjacent V loaded: {tiles.HasVAdjacentTileAddress}
 ```
 
 ## Additional recipe examples
+
+### Body runtime package
+
+Assign `CelestialBodyFactory` with the alias `factory`:
+
+```text
+<b>BODY RUNTIME PACKAGE</b>
+Backend: {color:factory.MotionBackendReady|#60E880|#FF6060|#AAAAAA}{factory.MotionBackendReady|--}</color>
+Spawned bodies: {factory.ActiveBodyCount|--}
+Last spawn: {color:factory.LastSpawnSucceeded|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnSucceeded|--}</color>
+Factory error: {factory.LastError|None}
+
+Body: {factory.LastSpawnedBody.InstanceId|--}
+Lifecycle: {factory.LastSpawnedBody.LifecycleState|--}
+Readiness: {factory.LastSpawnedBody.Readiness|--}
+Package ready: {color:factory.LastSpawnedBody.IsReady|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.IsReady|--}</color>
+Hierarchy: {factory.LastSpawnedBody.HasRuntimeHierarchy|--}
+Motion: {factory.LastSpawnedBody.IsMotionReady|--}
+Coarse surface: {factory.LastSpawnedBody.HasCoarseSurface|--}
+Visible surface: {factory.LastSpawnedBody.HasVisibleSurface|--}
+Collision surface: {factory.LastSpawnedBody.HasCollisionSurface|--}
+Ocean: {factory.LastSpawnedBody.HasOcean|--}
+```
+
+During Milestone 1, the surface and ocean readiness values remain false. Their generated hierarchy roots exist, but later milestones will own and report those data states.
 
 ### Body definition
 
