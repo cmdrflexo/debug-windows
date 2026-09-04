@@ -126,8 +126,7 @@ namespace jcan.CelestialSystems
         private readonly List<Renderer> rendererCache =
             new List<Renderer>();
 
-        private readonly MaterialPropertyBlock propertyBlock =
-            new MaterialPropertyBlock();
+        private MaterialPropertyBlock propertyBlock;
 
         private float nextRendererRefreshTime;
         private bool rendererCacheDirty =
@@ -181,6 +180,7 @@ namespace jcan.CelestialSystems
 
         private void Awake()
         {
+            EnsurePropertyBlock();
             ResolveLocalReferences();
             ResolveRendererRoot();
         }
@@ -230,6 +230,7 @@ namespace jcan.CelestialSystems
 
         private void BindShaderData()
         {
+            EnsurePropertyBlock();
             ClearBindingCounts();
 
             if (!TryResolveBodyData(
@@ -332,6 +333,15 @@ namespace jcan.CelestialSystems
                 {
                     terrainRendererCount++;
                 }
+            }
+        }
+
+        private void EnsurePropertyBlock()
+        {
+            if (propertyBlock == null)
+            {
+                propertyBlock =
+                    new MaterialPropertyBlock();
             }
         }
 
