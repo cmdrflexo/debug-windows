@@ -131,7 +131,7 @@ namespace jcan.CelestialSystems
         private sealed class ClientRecord
         {
             public int Id;
-            public CelestialSurfacePatchGenerator Owner;
+            public MonoBehaviour Owner;
             public CelestialSurfaceRuntime Runtime;
             public SurfaceVariantKey Surface;
             public bool RequestFrameOpen;
@@ -272,10 +272,10 @@ namespace jcan.CelestialSystems
         private readonly Dictionary<int, ClientRecord> clients =
             new Dictionary<int, ClientRecord>();
         private readonly Dictionary<
-            CelestialSurfacePatchGenerator,
+            MonoBehaviour,
             int> clientIdsByOwner =
                 new Dictionary<
-                    CelestialSurfacePatchGenerator,
+                    MonoBehaviour,
                     int>();
         private readonly Dictionary<
             SurfaceVariantKey,
@@ -397,7 +397,7 @@ namespace jcan.CelestialSystems
         }
 
         public bool RegisterClient(
-            CelestialSurfacePatchGenerator owner,
+            MonoBehaviour owner,
             CelestialSurfaceRuntime surfaceRuntime,
             int generationMargins,
             bool requestBackgroundRoots,
