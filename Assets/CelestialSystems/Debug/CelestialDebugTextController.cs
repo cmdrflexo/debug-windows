@@ -1,5 +1,5 @@
 /*
- * Builds configurable TextMeshPro runtime diagnostics from a pasted template and explicitly assigned Celestial Systems objects.
+ * Builds configurable TextMeshPro runtime diagnostics from a pasted template, built-in runtime stats, and explicitly assigned Celestial Systems objects.
  */
 
 using System;
@@ -9,12 +9,17 @@ using System.Reflection;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Profiling;
+using UnityEngine.SceneManagement;
 
 namespace jcan.CelestialSystems
 {
     [DisallowMultipleComponent]
     public sealed class CelestialDebugTextController : MonoBehaviour
     {
+        private const string BuiltInStatsAlias =
+            "stats";
+
         private enum ConditionOperator
         {
             Boolean,
@@ -24,6 +29,84 @@ namespace jcan.CelestialSystems
             GreaterThanOrEqual,
             Equal,
             NotEqual
+        }
+
+        private sealed class RuntimeStats
+        {
+            private float smoothedUnscaledDeltaTime;
+
+            public float Fps =>
+                smoothedUnscaledDeltaTime >
+                    Mathf.Epsilon
+                    ? 1.0f /
+                        smoothedUnscaledDeltaTime
+                    : 0.0f;
+
+            public float FrameTimeMilliseconds =>
+                smoothedUnscaledDeltaTime *
+                1000.0f;
+
+            public int FrameCount =>
+                Time.frameCount;
+
+            public double UptimeSeconds =>
+                Time.realtimeSinceStartupAsDouble;
+
+            public float TimeScale =>
+                Time.timeScale;
+
+            public float AllocatedMemoryMegabytes =>
+                Profiler.GetTotalAllocatedMemoryLong() /
+                (1024.0f *
+                    1024.0f);
+
+            public string SceneName =>
+                SceneManager.GetActiveScene().name;
+
+            public int ScreenWidth =>
+                Screen.width;
+
+            public int ScreenHeight =>
+                Screen.height;
+
+            public RuntimePlatform Platform =>
+                Application.platform;
+
+            public string ApplicationVersion =>
+                Application.version;
+
+            public void SampleFrame(
+                float unscaledDeltaTime,
+                float smoothingSeconds)
+            {
+                if (unscaledDeltaTime <=
+                    Mathf.Epsilon)
+                {
+                    return;
+                }
+
+                if (smoothedUnscaledDeltaTime <=
+                    Mathf.Epsilon)
+                {
+                    smoothedUnscaledDeltaTime =
+                        unscaledDeltaTime;
+                    return;
+                }
+
+                var blend =
+                    1.0f -
+                    Mathf.Exp(
+                        -unscaledDeltaTime /
+                        Mathf.Max(
+                            0.01f,
+                            smoothingSeconds));
+
+                smoothedUnscaledDeltaTime =
+                    Mathf.Lerp(
+                        smoothedUnscaledDeltaTime,
+                        unscaledDeltaTime,
+                        blend);
+            }
         }
 
         [Serializable]
@@ -47,6 +130,7 @@ namespace jcan.CelestialSystems
             public string Format;
             public string Fallback;
             public SourceBinding Binding;
+            public object Root;
             public MemberInfo[] Members;
             public string Error;
             public bool IsConditionalColor;
@@ -66,6 +150,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Min(0.0f)]
         private float refreshIntervalSeconds = 0.1f;
+
+        [Header("Built-in Stats")]
+        [SerializeField]
+        [Tooltip("Time constant used to smooth the built-in FPS and frame-time values.")]
+        [Min(0.01f)]
+        private float fpsSmoothingSeconds = 0.5f;
 
         [Header("Available Sources")]
         [SerializeField]
@@ -90,6 +180,7 @@ namespace jcan.CelestialSystems
 
         private readonly List<Token> tokens = new List<Token>();
         private readonly StringBuilder outputBuilder = new StringBuilder(512);
+        private readonly RuntimeStats runtimeStats = new RuntimeStats();
 
         private string compiledHeaderCode;
         private string compiledDisplayCode;
@@ -114,6 +205,10 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            runtimeStats.SampleFrame(
+                Time.unscaledDeltaTime,
+                fpsSmoothingSeconds);
+
             if (Time.unscaledTimeAsDouble < nextRefreshTime)
             {
                 return;
@@ -392,6 +487,16 @@ namespace jcan.CelestialSystems
 
                 var alias = binding.Alias.Trim();
 
+                if (string.Equals(
+                        alias,
+                        BuiltInStatsAlias,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    RecordConfigurationError(
+                        $"Source alias '{alias}' is reserved for built-in runtime stats.");
+                    continue;
+                }
+
                 if (!bindings.TryAdd(alias, binding))
                 {
                     RecordConfigurationError(
@@ -450,24 +555,49 @@ namespace jcan.CelestialSystems
                     $"Token '{{{token.Expression}}}' must use alias.Member syntax.");
             }
 
-            if (!bindings.TryGetValue(pathParts[0].Trim(), out var binding))
+            var rootAlias =
+                pathParts[0].Trim();
+            Type currentType;
+
+            if (string.Equals(
+                    rootAlias,
+                    BuiltInStatsAlias,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                return SetTokenError(
-                    token,
-                    $"Token '{{{token.Expression}}}' uses unknown source alias '{pathParts[0]}'.");
+                token.Root = runtimeStats;
+                currentType =
+                    typeof(RuntimeStats);
+            }
+            else
+            {
+                if (!bindings.TryGetValue(
+                        rootAlias,
+                        out var binding))
+                {
+                    return SetTokenError(
+                        token,
+                        $"Token '{{{token.Expression}}}' uses unknown source alias '{pathParts[0]}'.");
+                }
+
+                token.Binding = binding;
+
+                if (binding.Source == null)
+                {
+                    return SetTokenError(
+                        token,
+                        $"Source alias '{binding.Alias}' has no assigned object.");
+                }
+
+                token.Root =
+                    binding.Source;
+                currentType =
+                    binding.Source.GetType();
             }
 
-            token.Binding = binding;
-
-            if (binding.Source == null)
-            {
-                return SetTokenError(
-                    token,
-                    $"Source alias '{binding.Alias}' has no assigned object.");
-            }
-
-            var members = new MemberInfo[pathParts.Length - 1];
-            var currentType = binding.Source.GetType();
+            var members =
+                new MemberInfo[
+                    pathParts.Length -
+                    1];
 
             for (var i = 1; i < pathParts.Length; i++)
             {
@@ -724,14 +854,14 @@ namespace jcan.CelestialSystems
             value = null;
 
             if (token.Error != null ||
-                token.Binding == null ||
-                token.Binding.Source == null ||
+                IsNull(token.Root) ||
                 token.Members == null)
             {
                 return false;
             }
 
-            object current = token.Binding.Source;
+            object current =
+                token.Root;
 
             try
             {

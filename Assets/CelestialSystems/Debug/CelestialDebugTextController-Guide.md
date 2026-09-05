@@ -4,6 +4,36 @@
 
 The controller is intended for runtime diagnostics while developing Celestial Systems. It does not execute code or call methods.
 
+## Built-in runtime stats
+
+The reserved `stats` namespace works without adding anything to **Sources**. Built-ins use the same formatting, fallback, and conditional-color syntax as assigned sources:
+
+```text
+FPS: {stats.Fps:N0}
+Frame time: {stats.FrameTimeMilliseconds:N2} ms
+```
+
+| Token | Value |
+| --- | --- |
+| `stats.Fps` | Smoothed frames per second |
+| `stats.FrameTimeMilliseconds` | Smoothed unscaled frame time |
+| `stats.FrameCount` | Frames rendered since startup |
+| `stats.UptimeSeconds` | Unscaled runtime since startup |
+| `stats.TimeScale` | Current Unity time scale |
+| `stats.AllocatedMemoryMegabytes` | Total Unity-allocated memory |
+| `stats.SceneName` | Active scene name |
+| `stats.ScreenWidth` / `stats.ScreenHeight` | Current output dimensions |
+| `stats.Platform` | Current runtime platform |
+| `stats.ApplicationVersion` | Application version |
+
+`stats` is reserved and cannot also be used as an Inspector source alias. FPS and frame time are sampled every frame, smoothed using **FPS Smoothing Seconds**, and displayed at the normal recipe refresh interval.
+
+Conditional colors work with built-ins:
+
+```text
+{color:stats.Fps < 30|#FF6060|#60E880|#AAAAAA}FPS: {stats.Fps:N0}</color>
+```
+
 ## Setup
 
 1. Add `CelestialDebugTextController` to the GameObject used as the Debug Controller.
@@ -418,7 +448,7 @@ debugTextController.SetDisplayCode(
 - Recipes do not currently contain conditional text sections or custom true/false labels.
 - Collection indexing and method calls are intentionally unsupported.
 - Values are refreshed by polling rather than events.
-- A source must be assigned explicitly before its data is available.
+- External object data must be assigned explicitly before it is available; only the documented `stats` values are built in.
 - Reflection is used to read public members. Paths are cached, but very large displays or a zero-second refresh interval should still be avoided.
 
 These constraints keep the tool predictable and prevent pasted recipes from modifying game state.
