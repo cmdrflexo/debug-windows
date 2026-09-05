@@ -366,6 +366,17 @@ Cache error: {factory.SurfaceCacheManager.LastError|None}
 
 One factory body normally reports **2 clients / 1 surface**: rendering and collision share cached data but own their requests independently. Collision readiness requires a nonempty, fully enabled required footprint and stays false in orbit. Query values are meaningful when `Query available` is true; a zero error without `Collider probe: True` is not a successful comparison. Use **Drop Test Sphere** from the generated collision component's context menu after coverage is ready. See `Documentation/CelestialSurfaceCollisionMilestone5.md` for the consolidated test.
 
+### Free universe anchor movement
+
+Assign the `FreeUniverseAnchorController` component with the alias `anchor`:
+
+```text
+Altitude: {anchor.NearestPlanetAltitudeMeters:N1|--} m
+Move speed: {anchor.CurrentMoveSpeedMetersPerSecond:N1|--} m/s ({anchor.MoveSpeedMultiplier:N3|--}×)
+```
+
+`CurrentMoveSpeedMetersPerSecond` includes both the automatic altitude-based speed and the manual multiplier. `AutomaticMoveSpeedMetersPerSecond` is also available when the two factors need to be shown separately. Check `HasNearestPlanet` before treating the altitude as valid.
+
 ### Universe frame origin
 
 ```text
