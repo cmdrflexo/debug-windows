@@ -23,6 +23,15 @@ namespace jcan.CelestialSystems
         public int SampleCount =>
             elevationsMeters.Length;
 
+        public long EstimatedMemoryBytes =>
+            256L +
+            elevationsMeters.LongLength *
+                sizeof(float) +
+            (surfaceControlWeights != null
+                ? surfaceControlWeights.LongLength *
+                    sizeof(float)
+                : 0L);
+
         public int SurfaceLayerCount { get; }
 
         public bool HasSurfaceControlData =>
