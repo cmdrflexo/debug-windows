@@ -24,6 +24,8 @@ namespace jcan.CelestialSystems
             public MeshCollider Collider;
             public Rigidbody Rigidbody;
             public float LastRequiredTime;
+            public float MinimumElevationMeters;
+            public float MaximumElevationMeters;
         }
 
         private struct Interest
@@ -354,14 +356,18 @@ namespace jcan.CelestialSystems
                 patch.Collider.sharedMesh = null;
                 patch.Mesh.Clear();
                 patch.Mesh.indexFormat = data.SampleCount > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16;
-                patch.Mesh.vertices = CelestialSurfaceGeometry.BuildVertices(data, Radius);
-                patch.Mesh.triangles = CelestialSurfaceGeometry.BuildTriangles(data.Resolution);
+                var vertices = CelestialSurfaceGeometry.BuildVertices(data, Radius);
+                patch.Mesh.vertices = vertices;
+                patch.Mesh.triangles = CelestialSurfaceGeometry.BuildOutwardTriangles(
+                    data.Resolution, vertices, patch.Reference);
                 patch.Mesh.RecalculateBounds();
                 // Cooking is limited by maximumMeshBuildsPerFrame; meshes are never cooked during a morph.
                 Physics.BakeMesh(patch.Mesh.GetInstanceID(), false, patch.Collider.cookingOptions);
                 patch.Collider.sharedMesh = patch.Mesh;
                 patch.Object.name = $"Collision {data.Address}";
                 patch.Object.layer = collisionLayer;
+                patch.MinimumElevationMeters = data.MinimumElevationMeters;
+                patch.MaximumElevationMeters = data.MaximumElevationMeters;
                 patches.Add(data.Address, patch);
                 builtPatchCount++;
             }
@@ -415,6 +421,9 @@ namespace jcan.CelestialSystems
                 SetReadiness(false);
                 return;
             }
+            // Probe the settled physics pose before scheduling this tick's kinematic movement.
+            // A MovePosition target is not necessarily the pose currently used by PhysX queries.
+            UpdateProbe();
             removals.Clear();
             activePatchCount = 0;
             foreach (var pair in patches)
@@ -447,7 +456,6 @@ namespace jcan.CelestialSystems
                 patches.Remove(address);
             }
             SetReadiness(!budgetExceeded && required.Count > 0 && IsFootprintReady(required));
-            UpdateProbe();
         }
 
         [ContextMenu("Drop Test Sphere")]
@@ -520,8 +528,19 @@ namespace jcan.CelestialSystems
                 lastSample.BodyPositionMeters / lastSample.BodyPositionMeters.Magnitude);
             var expected = patch.Rigidbody.position + patch.Rigidbody.rotation *
                 CelestialSurfaceGeometry.ToVector3(lastSample.BodyPositionMeters - patch.Reference);
-            var ray = new Ray(expected + direction * 100.0f, -direction);
-            if (!patch.Collider.Raycast(ray, out var hit, 200.0f)) return;
+            var relief = Math.Max(0.0,
+                patch.MaximumElevationMeters - patch.MinimumElevationMeters);
+            var clearance = (float)Math.Max(100.0, relief + 100.0);
+            var ray = new Ray(expected + direction * clearance, -direction);
+            var previousBackfaceSetting = Physics.queriesHitBackfaces;
+            RaycastHit hit;
+            try
+            {
+                // Diagnostic queries should not depend on triangle facing under unusually steep relief.
+                Physics.queriesHitBackfaces = true;
+                if (!patch.Collider.Raycast(ray, out hit, clearance * 2.0f)) return;
+            }
+            finally { Physics.queriesHitBackfaces = previousBackfaceSetting; }
             colliderProbeHit = true;
             colliderQueryErrorMeters = Vector3.Distance(hit.point, expected);
         }

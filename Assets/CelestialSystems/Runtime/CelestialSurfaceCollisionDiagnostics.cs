@@ -35,6 +35,7 @@ namespace jcan.CelestialSystems
                                 elevations[y * resolution + x] = (float)(Math.Sin(x * 1.7 + y * 0.9) *
                                     Math.Min(120.0, radius * 0.001));
                         var data = new CelestialSurfacePatchData(runtime.CacheKey, address, resolution, elevations);
+                        CheckOutwardTriangles(data, radius);
                         for (var y = 0; y < resolution - 1; y += 5)
                             for (var x = 0; x < resolution - 1; x += 5)
                             {
@@ -97,6 +98,23 @@ namespace jcan.CelestialSystems
                 CelestialSurfaceGeometry.Dot(normal, result) <= 0.0)
                 throw new Exception("A radial query returned the wrong triangle position or normal.");
             TestedSamples++;
+        }
+
+        private void CheckOutwardTriangles(CelestialSurfacePatchData data, double radius)
+        {
+            var origin = CelestialSurfaceGeometry.ReferencePosition(data.Address, radius);
+            var vertices = CelestialSurfaceGeometry.BuildVertices(data, radius);
+            var triangles = CelestialSurfaceGeometry.BuildOutwardTriangles(data.Resolution, vertices, origin);
+            for (var i = 0; i < triangles.Length; i += 3)
+            {
+                var a = origin + CelestialSurfaceGeometry.ToDouble(vertices[triangles[i]]);
+                var b = origin + CelestialSurfaceGeometry.ToDouble(vertices[triangles[i + 1]]);
+                var c = origin + CelestialSurfaceGeometry.ToDouble(vertices[triangles[i + 2]]);
+                if (CelestialSurfaceGeometry.Dot(CelestialSurfaceGeometry.Cross(b - a, c - a),
+                        a + b + c) < 0.0)
+                    throw new Exception("A collision triangle faces into the body.");
+                TestedSamples++;
+            }
         }
     }
 }
