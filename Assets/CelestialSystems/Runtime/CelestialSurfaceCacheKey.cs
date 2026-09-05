@@ -12,7 +12,7 @@ namespace jcan.CelestialSystems
     public struct CelestialSurfaceCacheKey :
         IEquatable<CelestialSurfaceCacheKey>
     {
-        public const int CurrentFormatVersion = 1;
+        public const int CurrentFormatVersion = 2;
 
         [SerializeField]
         private int formatVersion;

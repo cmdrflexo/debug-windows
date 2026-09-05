@@ -50,9 +50,13 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Transform spawnedBodyParent;
 
+        [SerializeField]
+        [Tooltip("Optional world-level shared surface cache. One is created automatically when this is empty.")]
+        private CelestialSurfaceCacheManager surfaceCacheManager;
+
         [Header("Adaptive Surface Transition")]
         [SerializeField]
-        [Tooltip("Hidden leaves the working Far/Mid/Local renderer untouched. Select Surface or LOD Debug to compare the Milestone 3 renderer.")]
+        [Tooltip("Hidden leaves the working Far/Mid/Local renderer untouched. Select Surface or LOD Debug to inspect the adaptive renderer.")]
         private CelestialAdaptiveSurfaceRenderMode adaptiveSurfaceRenderMode;
 
         [SerializeField]
@@ -119,6 +123,9 @@ namespace jcan.CelestialSystems
 
         public Transform SpawnedBodyParent =>
             spawnedBodyParent;
+
+        public CelestialSurfaceCacheManager SurfaceCacheManager =>
+            surfaceCacheManager;
 
         public CelestialAdaptiveSurfaceRenderMode AdaptiveSurfaceRenderMode =>
             adaptiveSurfaceRenderMode;
@@ -431,10 +438,20 @@ namespace jcan.CelestialSystems
                     ? surfaceRuntime.QualityProfile
                         .AdaptiveGenerationMargins
                     : 2;
+            var prewarmCoarseSurface =
+                surfaceRuntime.QualityProfile == null ||
+                surfaceRuntime.QualityProfile
+                    .AdaptivePrewarmCoarseSurface;
+            surfaceCacheManager =
+                CelestialSurfaceCacheManager
+                    .ResolveOrCreate(
+                        surfaceCacheManager);
             var generatorReady =
                 patchGenerator.Initialize(
                     surfaceRuntime,
-                    generationMargins);
+                    surfaceCacheManager,
+                    generationMargins,
+                    prewarmCoarseSurface);
             var adaptiveRenderer =
                 hierarchy.SurfaceRoot.GetComponent<
                     CelestialSurfaceQuadtreeRenderer>();

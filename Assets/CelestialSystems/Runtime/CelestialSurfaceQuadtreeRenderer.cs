@@ -34,6 +34,7 @@ namespace jcan.CelestialSystems
         private sealed class PatchNode
         {
             public CubeSpherePatchAddress Address;
+            public PatchNode Parent;
             public PatchNode[] Children;
             public PatchVisual Visual;
             public CelestialSurfacePatchData Data;
@@ -45,6 +46,12 @@ namespace jcan.CelestialSystems
             public double ProjectedErrorPixels;
             public bool PotentiallyVisible;
             public bool DesiredSplit;
+            public bool ChildrenDisplayed;
+            public float ChildMorphWeight;
+            public float TransitionStartWeight;
+            public float TransitionTargetWeight;
+            public float TransitionStartTime;
+            public bool TransitionActive;
         }
 
         private sealed class PatchVisual
@@ -56,6 +63,10 @@ namespace jcan.CelestialSystems
             public MaterialPropertyBlock PropertyBlock;
             public Texture2D ControlTexture;
             public PatchNode Owner;
+            public Vector3[] ParentVertices;
+            public Vector3[] DetailVertices;
+            public Vector3[] WorkingVertices;
+            public float AppliedMorphWeight;
         }
 
         [Header("Runtime Ownership")]
@@ -83,6 +94,11 @@ namespace jcan.CelestialSystems
         [Range(1, 32)]
         private int maximumMeshBuildsPerFrame =
             4;
+
+        [SerializeField]
+        [Range(0.0f, 5.0f)]
+        private float lodMorphDurationSeconds =
+            0.35f;
 
         [SerializeField]
         [Range(0.001f, 0.25f)]
@@ -134,6 +150,9 @@ namespace jcan.CelestialSystems
         private int heldParentCount;
 
         [SerializeField]
+        private int transitioningBranchCount;
+
+        [SerializeField]
         private int maximumActiveLevel;
 
         [SerializeField]
@@ -165,6 +184,7 @@ namespace jcan.CelestialSystems
         private DoubleVector3 observerLocalPosition;
         private int remainingMeshBuilds;
         private bool coverageInvariantValid;
+        private int observedCacheVersion;
 
         public CelestialSurfaceRuntime SurfaceRuntime =>
             surfaceRuntime;
@@ -207,6 +227,12 @@ namespace jcan.CelestialSystems
 
         public int HeldParentCount =>
             heldParentCount;
+
+        public int TransitioningBranchCount =>
+            transitioningBranchCount;
+
+        public float LodMorphDurationSeconds =>
+            lodMorphDurationSeconds;
 
         public int MaximumActiveLevel =>
             maximumActiveLevel;
@@ -257,6 +283,8 @@ namespace jcan.CelestialSystems
 
             ApplyQualityProfile();
             BuildRoots();
+            observedCacheVersion =
+                patchGenerator.CacheVersion;
             lastError = string.Empty;
             return true;
         }
@@ -313,14 +341,49 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (observedCacheVersion !=
+                patchGenerator.CacheVersion)
+            {
+                ReleaseAllNodes();
+                BuildRoots();
+                observedCacheVersion =
+                    patchGenerator.CacheVersion;
+            }
+
+            if (!patchGenerator.BeginRequestFrame())
+            {
+                lastError =
+                    "The adaptive renderer could not begin a shared surface-cache request frame.";
+                SetAllNodesActive(
+                    false);
+                ReportReadiness(
+                    patchGenerator.AreRootsReady(),
+                    false);
+                return;
+            }
+
+            try
+            {
+                UpdateAdaptiveSurface();
+            }
+            finally
+            {
+                patchGenerator.EndRequestFrame();
+            }
+        }
+
+        private void UpdateAdaptiveSurface()
+        {
+
             if (renderMode ==
                 CelestialAdaptiveSurfaceRenderMode.Hidden)
             {
                 SetAllNodesActive(
                     false);
+                ReleaseRootDescendants();
                 ClearFrameStatistics();
                 ReportReadiness(
-                    false,
+                    patchGenerator.AreRootsReady(),
                     false);
                 return;
             }
@@ -335,8 +398,10 @@ namespace jcan.CelestialSystems
                     "Waiting for an enabled adaptive-surface observer camera.";
                 SetAllNodesActive(
                     false);
+                ReleaseRootDescendants();
+                ClearFrameStatistics();
                 ReportReadiness(
-                    false,
+                    patchGenerator.AreRootsReady(),
                     false);
                 return;
             }
@@ -348,8 +413,10 @@ namespace jcan.CelestialSystems
                     "The adaptive-surface observer state is invalid.";
                 SetAllNodesActive(
                     false);
+                ReleaseRootDescendants();
+                ClearFrameStatistics();
                 ReportReadiness(
-                    false,
+                    patchGenerator.AreRootsReady(),
                     false);
                 return;
             }
@@ -404,6 +471,7 @@ namespace jcan.CelestialSystems
                     roots[index]);
             }
 
+            RefreshActiveStatistics();
             pooledVisualCount =
                 visualPool.Count;
             coarseSurfaceReady =
@@ -433,6 +501,11 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     1,
                     quality.AdaptiveMaximumMeshBuildsPerFrame);
+            lodMorphDurationSeconds =
+                Mathf.Clamp(
+                    quality.AdaptiveLodMorphDurationSeconds,
+                    0.0f,
+                    5.0f);
             skirtDepthCellFraction =
                 Mathf.Clamp(
                     quality.AdaptiveSkirtDepthCellFraction,
@@ -459,12 +532,14 @@ namespace jcan.CelestialSystems
 
                 roots[index] =
                     CreateNode(
-                        address);
+                        address,
+                        null);
             }
         }
 
         private PatchNode CreateNode(
-            CubeSpherePatchAddress address)
+            CubeSpherePatchAddress address,
+            PatchNode parent)
         {
             var centerAddress =
                 new CubeSphereAddress(
@@ -488,10 +563,16 @@ namespace jcan.CelestialSystems
             {
                 Address =
                     address,
+                Parent =
+                    parent,
                 CenterDirection =
                     centerDirection,
                 AngularRadiusRadians =
-                    angularRadius
+                    angularRadius,
+                ChildMorphWeight =
+                    0.0f,
+                TransitionTargetWeight =
+                    0.0f
             };
         }
 
@@ -511,6 +592,8 @@ namespace jcan.CelestialSystems
             patchGenerator.RequestPatch(
                 node.Address,
                 ResolveGenerationPriority(
+                    node),
+                ResolveRequestClass(
                     node));
 
             var wasSplit =
@@ -715,7 +798,8 @@ namespace jcan.CelestialSystems
 
                 node.Children[index] =
                     CreateNode(
-                        childAddress);
+                        childAddress,
+                        node);
             }
         }
 
@@ -804,8 +888,28 @@ namespace jcan.CelestialSystems
                 patchGenerator.RequestPatch(
                     child.Address,
                     ResolveGenerationPriority(
-                        child));
+                        child),
+                    CelestialSurfacePatchRequestClass
+                        .Coverage);
             }
+        }
+
+        private static CelestialSurfacePatchRequestClass ResolveRequestClass(
+            PatchNode node)
+        {
+            if (!node.PotentiallyVisible)
+            {
+                return
+                    CelestialSurfacePatchRequestClass
+                        .Prefetch;
+            }
+
+            return
+                node.Address.IsRoot
+                    ? CelestialSurfacePatchRequestClass
+                        .Coverage
+                    : CelestialSurfacePatchRequestClass
+                        .Visible;
         }
 
         private double ResolveGenerationPriority(
@@ -840,7 +944,7 @@ namespace jcan.CelestialSystems
                     10000000.0 +
                 projectedError *
                     10.0 +
-                node.DistanceMeters /
+                -node.DistanceMeters /
                     Math.Max(
                         1.0,
                         radius);
@@ -980,6 +1084,10 @@ namespace jcan.CelestialSystems
                 SetSubtreeActive(
                     node,
                     false);
+                ResetChildTransition(
+                    node);
+                ReleaseChildren(
+                    node);
                 return;
             }
 
@@ -989,33 +1097,38 @@ namespace jcan.CelestialSystems
             if (node.DesiredSplit &&
                 node.Children != null)
             {
-                var childrenReady = true;
-
-                for (var index = 0;
-                    index < node.Children.Length;
-                    index++)
-                {
-                    var child =
-                        node.Children[index];
-                    RefreshPatchData(
-                        child);
-                    EnsureVisual(
-                        child);
-                    childrenReady &=
-                        child != null &&
-                        child.Visual != null;
-                }
+                var childrenReady =
+                    EnsureDirectChildrenReady(
+                        node);
 
                 if (childrenReady)
                 {
+                    node.ChildrenDisplayed =
+                        true;
+                    SetTransitionTarget(
+                        node,
+                        1.0f);
+                    UpdateChildTransition(
+                        node);
                     SetVisualActive(
                         node,
                         false);
+
+                    if (node.TransitionActive)
+                    {
+                        transitioningBranchCount++;
+                        ShowDirectChildren(
+                            node);
+                        return;
+                    }
 
                     for (var index = 0;
                         index < node.Children.Length;
                         index++)
                     {
+                        ApplyVisualMorph(
+                            node.Children[index],
+                            1.0f);
                         ApplyDesiredTree(
                             node.Children[index]);
                     }
@@ -1042,6 +1155,44 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (node.ChildrenDisplayed &&
+                node.Children != null &&
+                EnsureDirectChildrenReady(
+                    node))
+            {
+                if (HasDisplayedDescendants(
+                        node) &&
+                    !CollapseDisplayedDescendants(
+                        node))
+                {
+                    SetVisualActive(
+                        node,
+                        false);
+                    return;
+                }
+
+                SetTransitionTarget(
+                    node,
+                    0.0f);
+                UpdateChildTransition(
+                    node);
+
+                if (node.TransitionActive ||
+                    node.ChildMorphWeight > 0.0f)
+                {
+                    transitioningBranchCount++;
+                    SetVisualActive(
+                        node,
+                        false);
+                    ShowDirectChildren(
+                        node);
+                    return;
+                }
+
+                node.ChildrenDisplayed =
+                    false;
+            }
+
             coverageInvariantValid &=
                 node.Visual != null;
             SetVisualActive(
@@ -1049,6 +1200,437 @@ namespace jcan.CelestialSystems
                 true);
             ReleaseChildren(
                 node);
+        }
+
+        private static bool HasDisplayedDescendants(
+            PatchNode node)
+        {
+            if (node == null ||
+                node.Children == null)
+            {
+                return false;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                if (node.Children[index] != null &&
+                    node.Children[index]
+                        .ChildrenDisplayed)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool CollapseDisplayedDescendants(
+            PatchNode node)
+        {
+            var descendantsCollapsed = true;
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                var child =
+                    node.Children[index];
+
+                if (child == null ||
+                    child.Visual == null)
+                {
+                    coverageInvariantValid = false;
+                    descendantsCollapsed = false;
+                    continue;
+                }
+
+                if (child.ChildrenDisplayed &&
+                    child.Children != null)
+                {
+                    descendantsCollapsed &=
+                        CollapseDisplayedBranch(
+                            child);
+                    continue;
+                }
+
+                ApplyVisualMorph(
+                    child,
+                    1.0f);
+                SetSubtreeActive(
+                    child,
+                    false);
+                coverageInvariantValid &=
+                    child.Visual != null;
+                SetVisualActive(
+                    child,
+                    true);
+            }
+
+            return descendantsCollapsed;
+        }
+
+        private bool CollapseDisplayedBranch(
+            PatchNode node)
+        {
+            if (node.Children == null ||
+                !node.ChildrenDisplayed)
+            {
+                ApplyVisualMorph(
+                    node,
+                    1.0f);
+                SetVisualActive(
+                    node,
+                    true);
+                return true;
+            }
+
+            if (HasDisplayedDescendants(
+                    node) &&
+                !CollapseDisplayedDescendants(
+                    node))
+            {
+                SetVisualActive(
+                    node,
+                    false);
+                return false;
+            }
+
+            SetTransitionTarget(
+                node,
+                0.0f);
+            UpdateChildTransition(
+                node);
+
+            if (node.TransitionActive ||
+                node.ChildMorphWeight > 0.0f)
+            {
+                transitioningBranchCount++;
+                SetVisualActive(
+                    node,
+                    false);
+                ShowDirectChildren(
+                    node);
+                return false;
+            }
+
+            node.ChildrenDisplayed = false;
+            ApplyVisualMorph(
+                node,
+                1.0f);
+            SetVisualActive(
+                node,
+                true);
+            ReleaseChildren(
+                node);
+            return true;
+        }
+
+        private bool EnsureDirectChildrenReady(
+            PatchNode node)
+        {
+            if (node.Children == null)
+            {
+                return false;
+            }
+
+            var childrenReady = true;
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                var child =
+                    node.Children[index];
+                RefreshPatchData(
+                    child);
+                EnsureVisual(
+                    child);
+                childrenReady &=
+                    child != null &&
+                    child.Visual != null;
+            }
+
+            return childrenReady;
+        }
+
+        private void ShowDirectChildren(
+            PatchNode node)
+        {
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                var child =
+                    node.Children[index];
+                ApplyVisualMorph(
+                    child,
+                    node.ChildMorphWeight);
+                SetSubtreeActive(
+                    child,
+                    false);
+                coverageInvariantValid &=
+                    child != null &&
+                    child.Visual != null;
+                SetVisualActive(
+                    child,
+                    true);
+            }
+        }
+
+        private void SetTransitionTarget(
+            PatchNode node,
+            float targetWeight)
+        {
+            targetWeight =
+                Mathf.Clamp01(
+                    targetWeight);
+
+            if (Mathf.Approximately(
+                    node.TransitionTargetWeight,
+                    targetWeight) &&
+                (node.TransitionActive ||
+                Mathf.Approximately(
+                    node.ChildMorphWeight,
+                    targetWeight)))
+            {
+                return;
+            }
+
+            node.TransitionStartWeight =
+                node.ChildMorphWeight;
+            node.TransitionTargetWeight =
+                targetWeight;
+            node.TransitionStartTime =
+                Time.unscaledTime;
+            node.TransitionActive =
+                lodMorphDurationSeconds > 0.0f &&
+                !Mathf.Approximately(
+                    node.TransitionStartWeight,
+                    node.TransitionTargetWeight);
+
+            if (!node.TransitionActive)
+            {
+                node.ChildMorphWeight =
+                    targetWeight;
+            }
+        }
+
+        private void UpdateChildTransition(
+            PatchNode node)
+        {
+            if (!node.TransitionActive)
+            {
+                node.ChildMorphWeight =
+                    node.TransitionTargetWeight;
+                return;
+            }
+
+            var elapsed =
+                Time.unscaledTime -
+                node.TransitionStartTime;
+            var linearWeight =
+                lodMorphDurationSeconds > 0.0f
+                    ? Mathf.Clamp01(
+                        elapsed /
+                        lodMorphDurationSeconds)
+                    : 1.0f;
+            var smoothWeight =
+                linearWeight *
+                linearWeight *
+                (3.0f -
+                    2.0f * linearWeight);
+            node.ChildMorphWeight =
+                Mathf.Lerp(
+                    node.TransitionStartWeight,
+                    node.TransitionTargetWeight,
+                    smoothWeight);
+
+            if (linearWeight >= 1.0f)
+            {
+                node.ChildMorphWeight =
+                    node.TransitionTargetWeight;
+                node.TransitionActive =
+                    false;
+            }
+        }
+
+        private static void ResetChildTransition(
+            PatchNode node)
+        {
+            node.ChildrenDisplayed = false;
+            node.ChildMorphWeight = 0.0f;
+            node.TransitionStartWeight = 0.0f;
+            node.TransitionTargetWeight = 0.0f;
+            node.TransitionActive = false;
+        }
+
+        private static void ApplyVisualMorph(
+            PatchNode node,
+            float morphWeight)
+        {
+            if (node == null ||
+                node.Visual == null)
+            {
+                return;
+            }
+
+            var visual =
+                node.Visual;
+            morphWeight =
+                Mathf.Clamp01(
+                    morphWeight);
+
+            if (visual.ParentVertices == null ||
+                visual.DetailVertices == null ||
+                visual.WorkingVertices == null ||
+                visual.ParentVertices.Length !=
+                    visual.DetailVertices.Length ||
+                visual.WorkingVertices.Length !=
+                    visual.DetailVertices.Length ||
+                Mathf.Approximately(
+                    visual.AppliedMorphWeight,
+                    morphWeight))
+            {
+                return;
+            }
+
+            for (var index = 0;
+                index < visual.WorkingVertices.Length;
+                index++)
+            {
+                visual.WorkingVertices[index] =
+                    Vector3.LerpUnclamped(
+                        visual.ParentVertices[index],
+                        visual.DetailVertices[index],
+                        morphWeight);
+            }
+
+            visual.Mesh.vertices =
+                visual.WorkingVertices;
+            visual.Mesh.RecalculateBounds();
+            visual.AppliedMorphWeight =
+                morphWeight;
+        }
+
+        private static DoubleVector3 ResolveParentPosition(
+            PatchNode node,
+            int sampleX,
+            int sampleY,
+            DoubleVector3 detailPosition,
+            double radiusMeters)
+        {
+            if (node == null ||
+                node.Parent == null ||
+                node.Parent.Data == null ||
+                node.Parent.Visual == null ||
+                node.Parent.Visual.DetailVertices == null ||
+                node.Data == null ||
+                node.Data.Resolution < 2 ||
+                node.Parent.Data.Resolution < 2)
+            {
+                return detailPosition;
+            }
+
+            var normalizedX =
+                sampleX /
+                (double)(node.Data.Resolution - 1);
+            var normalizedY =
+                sampleY /
+                (double)(node.Data.Resolution - 1);
+            var parentX =
+                ((node.Address.X & 1) == 0
+                    ? 0.0
+                    : 0.5) +
+                normalizedX * 0.5;
+            var parentY =
+                ((node.Address.Y & 1) == 0
+                    ? 0.0
+                    : 0.5) +
+                normalizedY * 0.5;
+            var parentResolution =
+                node.Parent.Data.Resolution;
+            var parentSampleX =
+                parentX *
+                (parentResolution - 1);
+            var parentSampleY =
+                parentY *
+                (parentResolution - 1);
+            var lowerX =
+                Math.Min(
+                    (int)Math.Floor(
+                        parentSampleX),
+                    parentResolution - 2);
+            var lowerY =
+                Math.Min(
+                    (int)Math.Floor(
+                        parentSampleY),
+                    parentResolution - 2);
+            var blendX =
+                parentSampleX -
+                    lowerX;
+            var blendY =
+                parentSampleY -
+                    lowerY;
+            var parentVertices =
+                node.Parent.Visual.DetailVertices;
+            var expectedCoreVertexCount =
+                parentResolution *
+                    parentResolution;
+
+            if (parentVertices.Length <
+                expectedCoreVertexCount)
+            {
+                return detailPosition;
+            }
+
+            var lowerLeft =
+                ToDoubleVector3(
+                    parentVertices[
+                        lowerY * parentResolution +
+                        lowerX]);
+            var lowerRight =
+                ToDoubleVector3(
+                    parentVertices[
+                        lowerY * parentResolution +
+                        lowerX + 1]);
+            var upperLeft =
+                ToDoubleVector3(
+                    parentVertices[
+                        (lowerY + 1) *
+                            parentResolution +
+                        lowerX]);
+            DoubleVector3 interpolated;
+
+            if (blendX + blendY <= 1.0)
+            {
+                interpolated =
+                    lowerLeft +
+                    (lowerRight - lowerLeft) *
+                        blendX +
+                    (upperLeft - lowerLeft) *
+                        blendY;
+            }
+            else
+            {
+                var upperRight =
+                    ToDoubleVector3(
+                        parentVertices[
+                            (lowerY + 1) *
+                                parentResolution +
+                            lowerX + 1]);
+                interpolated =
+                    upperRight +
+                    (upperLeft - upperRight) *
+                        (1.0 - blendX) +
+                    (lowerRight - upperRight) *
+                        (1.0 - blendY);
+            }
+
+            return interpolated +
+                node.Parent.CenterDirection *
+                    radiusMeters;
         }
 
         private void EnsureVisual(
@@ -1110,6 +1692,7 @@ namespace jcan.CelestialSystems
                     hideFlags =
                         HideFlags.HideAndDontSave
                 };
+            mesh.MarkDynamic();
 
             meshFilter.sharedMesh =
                 mesh;
@@ -1150,6 +1733,12 @@ namespace jcan.CelestialSystems
                 new Vector3[
                     coreVertexCount +
                     ringCount];
+            var parentVertices =
+                new Vector3[
+                    vertices.Length];
+            var detailVertices =
+                new Vector3[
+                    vertices.Length];
             var normals =
                 new Vector3[vertices.Length];
             var uv =
@@ -1202,15 +1791,31 @@ namespace jcan.CelestialSystems
                         sampleY *
                             resolution +
                         sampleX;
-                    var delta =
+                    var detailPosition =
                         direction *
-                            (radius +
-                                elevation) -
-                        referencePosition;
+                            (radius + elevation);
+                    var parentPosition =
+                        ResolveParentPosition(
+                            node,
+                            sampleX,
+                            sampleY,
+                            detailPosition,
+                            radius);
+                    var detailDelta =
+                        detailPosition -
+                            referencePosition;
+                    var parentDelta =
+                        parentPosition -
+                            referencePosition;
 
-                    vertices[vertexIndex] =
+                    detailVertices[vertexIndex] =
                         ToVector3(
-                            delta);
+                            detailDelta);
+                    parentVertices[vertexIndex] =
+                        ToVector3(
+                            parentDelta);
+                    vertices[vertexIndex] =
+                        detailVertices[vertexIndex];
                     normals[vertexIndex] =
                         ToVector3(
                             direction).normalized;
@@ -1275,22 +1880,36 @@ namespace jcan.CelestialSystems
                 var skirtIndex =
                     coreVertexCount +
                     ringIndex;
-                var corePosition =
+                var detailCorePosition =
                     ToDoubleVector3(
-                        vertices[coreIndex]) +
+                        detailVertices[coreIndex]) +
                     referencePosition;
                 var direction =
                     Normalize(
-                        corePosition);
-                var skirtPosition =
-                    corePosition -
-                    direction *
-                        skirtDepth -
+                        detailCorePosition);
+                var detailSkirtPosition =
+                    detailCorePosition -
+                        direction *
+                            skirtDepth -
+                    referencePosition;
+                var parentCorePosition =
+                    ToDoubleVector3(
+                        parentVertices[coreIndex]) +
+                    referencePosition;
+                var parentSkirtPosition =
+                    parentCorePosition -
+                        direction *
+                            skirtDepth -
                     referencePosition;
 
-                vertices[skirtIndex] =
+                detailVertices[skirtIndex] =
                     ToVector3(
-                        skirtPosition);
+                        detailSkirtPosition);
+                parentVertices[skirtIndex] =
+                    ToVector3(
+                        parentSkirtPosition);
+                vertices[skirtIndex] =
+                    detailVertices[skirtIndex];
                 normals[skirtIndex] =
                     normals[coreIndex];
                 uv[skirtIndex] =
@@ -1347,6 +1966,14 @@ namespace jcan.CelestialSystems
                 triangles;
             visual.Mesh.RecalculateBounds();
             visual.Mesh.RecalculateTangents();
+            visual.ParentVertices =
+                parentVertices;
+            visual.DetailVertices =
+                detailVertices;
+            visual.WorkingVertices =
+                vertices;
+            visual.AppliedMorphWeight =
+                1.0f;
 
             visual.GameObject.name =
                 $"Adaptive {node.Address}";
@@ -1933,17 +2560,52 @@ namespace jcan.CelestialSystems
 
             node.Visual.GameObject.SetActive(
                 active);
+        }
 
-            if (!active)
+        private void RefreshActiveStatistics()
+        {
+            activePatchCount = 0;
+            maximumActiveLevel = 0;
+
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                RefreshActiveStatistics(
+                    roots[index]);
+            }
+        }
+
+        private void RefreshActiveStatistics(
+            PatchNode node)
+        {
+            if (node == null)
             {
                 return;
             }
 
-            activePatchCount++;
-            maximumActiveLevel =
-                Math.Max(
-                    maximumActiveLevel,
-                    node.Address.Level);
+            if (node.Visual != null &&
+                node.Visual.GameObject.activeSelf)
+            {
+                activePatchCount++;
+                maximumActiveLevel =
+                    Math.Max(
+                        maximumActiveLevel,
+                        node.Address.Level);
+            }
+
+            if (node.Children == null)
+            {
+                return;
+            }
+
+            for (var index = 0;
+                index < node.Children.Length;
+                index++)
+            {
+                RefreshActiveStatistics(
+                    node.Children[index]);
+            }
         }
 
         private void SetSubtreeActive(
@@ -1990,6 +2652,9 @@ namespace jcan.CelestialSystems
         private void ReleaseChildren(
             PatchNode node)
         {
+            ResetChildTransition(
+                node);
+
             if (node.Children == null)
             {
                 return;
@@ -2004,6 +2669,22 @@ namespace jcan.CelestialSystems
             }
 
             node.Children = null;
+        }
+
+        private void ReleaseRootDescendants()
+        {
+            for (var index = 0;
+                index < roots.Length;
+                index++)
+            {
+                if (roots[index] != null)
+                {
+                    ReleaseChildren(
+                        roots[index]);
+                    roots[index].DesiredSplit =
+                        false;
+                }
+            }
         }
 
         private void ReleaseNode(
@@ -2023,6 +2704,10 @@ namespace jcan.CelestialSystems
                     node.Visual);
                 node.Visual = null;
             }
+
+            node.Data = null;
+            node.Parent = null;
+            node.DesiredSplit = false;
         }
 
         private void ReleaseVisual(
@@ -2043,6 +2728,11 @@ namespace jcan.CelestialSystems
                 visual);
             visual.Mesh.Clear();
             visual.Owner = null;
+            visual.ParentVertices = null;
+            visual.DetailVertices = null;
+            visual.WorkingVertices = null;
+            visual.AppliedMorphWeight =
+                float.NaN;
             visualPool.Push(
                 visual);
         }
@@ -2211,6 +2901,7 @@ namespace jcan.CelestialSystems
             activePatchCount = 0;
             culledPatchCount = 0;
             heldParentCount = 0;
+            transitioningBranchCount = 0;
             maximumActiveLevel = 0;
             maximumNeighborLevelDifference = 0;
             neighborBalanceValid = true;

@@ -50,6 +50,16 @@ namespace jcan.CelestialSystems
         private int adaptiveGenerationMargins = 2;
 
         [SerializeField]
+        [Tooltip("Requests all six root patches at background priority as soon as a body registers with the shared cache.")]
+        private bool adaptivePrewarmCoarseSurface = true;
+
+        [SerializeField]
+        [Range(0.0f, 5.0f)]
+        [Tooltip("Seconds used to morph child geometry between parent and child elevations during adaptive LOD changes.")]
+        private float adaptiveLodMorphDurationSeconds =
+            0.35f;
+
+        [SerializeField]
         [Range(0.001f, 0.25f)]
         private float adaptiveSkirtDepthCellFraction = 0.02f;
 
@@ -152,6 +162,12 @@ namespace jcan.CelestialSystems
         public int AdaptiveGenerationMargins =>
             adaptiveGenerationMargins;
 
+        public bool AdaptivePrewarmCoarseSurface =>
+            adaptivePrewarmCoarseSurface;
+
+        public float AdaptiveLodMorphDurationSeconds =>
+            adaptiveLodMorphDurationSeconds;
+
         public float AdaptiveSkirtDepthCellFraction =>
             adaptiveSkirtDepthCellFraction;
 
@@ -215,6 +231,10 @@ namespace jcan.CelestialSystems
             adaptiveMaximumMeshBuildsPerFrame >= 1 &&
             adaptiveGenerationMargins >= 0 &&
             adaptiveGenerationMargins <= 16 &&
+            IsFinite(
+                adaptiveLodMorphDurationSeconds) &&
+            adaptiveLodMorphDurationSeconds >= 0.0f &&
+            adaptiveLodMorphDurationSeconds <= 5.0f &&
             IsFinite(
                 adaptiveSkirtDepthCellFraction) &&
             adaptiveSkirtDepthCellFraction >= 0.001f &&

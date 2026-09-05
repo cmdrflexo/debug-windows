@@ -281,24 +281,36 @@ MapMagic coordinates: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.MapM
 Max seam gap: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.LargestDirectionGapMeters:E3|--} m
 Foundation error: {factory.LastSpawnedBody.SurfaceFoundationDiagnostics.LastError|None}
 
+<b>GLOBAL SURFACE CACHE</b>
+Manager: {factory.SurfaceCacheManager.name|None}
+Clients / surfaces: {factory.SurfaceCacheManager.RegisteredClientCount|--} / {factory.SurfaceCacheManager.RegisteredSurfaceCount|--}
+Queued / active / cached / failed: {factory.SurfaceCacheManager.QueuedPatchCount|--} / {factory.SurfaceCacheManager.ActiveGenerationCount|--} / {factory.SurfaceCacheManager.CachedPatchCount|--} / {factory.SurfaceCacheManager.FailedPatchCount|--}
+Cache memory: {factory.SurfaceCacheManager.EstimatedCacheMegabytes:N1|--} / {factory.SurfaceCacheManager.MemoryBudgetMegabytes|--} MB
+Completed / cancelled / evicted: {factory.SurfaceCacheManager.CompletedGenerationCount|--} / {factory.SurfaceCacheManager.CancelledGenerationCount|--} / {factory.SurfaceCacheManager.EvictedPatchCount|--}
+Generation budget: {factory.SurfaceCacheManager.MaximumConcurrentGenerations|--} async, {factory.SurfaceCacheManager.MaximumMainThreadPreparationsPerFrame|--} preparations/frame
+Background roots: {factory.SurfaceCacheManager.PrepareCoarseRoots|--}
+Cache error: {factory.SurfaceCacheManager.LastError|None}
+
 <b>ADAPTIVE SURFACE</b>
 Mode: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.RenderMode|--}
 Observer: {color:factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.HasObserver|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.HasObserver|--}</color>
 Observer altitude: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.ObserverAltitudeMeters:N1|--} m
+Shared cache: {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.CacheManagerName|None} v{factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.CacheVersion|--}
 MapMagic source: {color:factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.SourceReady|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.SourceReady|--}</color> — {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.GenerationSourceName|None}
 Generating: {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.IsGenerating|--} — {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.ActiveRequest|None}
 Queued / cached / failed: {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.QueuedPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.CachedPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.FailedPatchCount|--}
 Last patch time: {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.LastGenerationMilliseconds:N1|--} ms
 Desired / visible / pooled: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.DesiredLeafCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.ActivePatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.PooledVisualCount|--}
 Active LOD: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.MaximumActiveLevel|--}
-Culled / held parents: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.CulledPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.HeldParentCount|--}
+Culled / held / morphing: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.CulledPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.HeldParentCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.TransitioningBranchCount|--}
+LOD morph duration: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.LodMorphDurationSeconds:N2|--} s
 Neighbor balance: {color:factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.NeighborBalanceValid|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.NeighborBalanceValid|--}</color> (max Δ {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.MaximumNeighborLevelDifference|--})
 Coverage invariant: {color:factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.CoverageInvariantValid|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.CoverageInvariantValid|--}</color>
 Generator error: {factory.LastSpawnedBody.SurfaceRuntime.PatchGenerator.LastError|None}
 Renderer error: {factory.LastSpawnedBody.SurfaceRuntime.AdaptiveRenderer.LastError|None}
 ```
 
-From Milestone 3 onward, `Surface foundation` and `Foundation test` should be true. `Coarse surface` becomes true after all six adaptive roots are cached, and `Visible surface` becomes true after at least one adaptive patch is visible. Collision and ocean readiness remain independent.
+From Milestone 4 onward, `Surface foundation` and `Foundation test` should be true. `Coarse surface` becomes true after all six adaptive roots are cached, including while the adaptive renderer is hidden when background preparation is enabled. `Visible surface` becomes true after at least one adaptive patch is visible. Collision and ocean readiness remain independent.
 
 ### Body definition
 
