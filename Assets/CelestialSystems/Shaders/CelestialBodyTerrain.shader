@@ -40,6 +40,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         [HideInInspector] _NormalScale1 ("Layer 1 Normal Scale", Float) = 1
         [HideInInspector] _NormalScale2 ("Layer 2 Normal Scale", Float) = 1
         [HideInInspector] _NormalScale3 ("Layer 3 Normal Scale", Float) = 1
+        [HideInInspector] _Tint0 ("Layer 0 Tint", Color) = (1, 1, 1, 1)
+        [HideInInspector] _Tint1 ("Layer 1 Tint", Color) = (1, 1, 1, 1)
+        [HideInInspector] _Tint2 ("Layer 2 Tint", Color) = (1, 1, 1, 1)
+        [HideInInspector] _Tint3 ("Layer 3 Tint", Color) = (1, 1, 1, 1)
         [HideInInspector] _Metallic0 ("Layer 0 Metallic", Float) = 0
         [HideInInspector] _Metallic1 ("Layer 1 Metallic", Float) = 0
         [HideInInspector] _Metallic2 ("Layer 2 Metallic", Float) = 0
@@ -48,6 +52,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         [HideInInspector] _Smoothness1 ("Layer 1 Smoothness", Float) = 0
         [HideInInspector] _Smoothness2 ("Layer 2 Smoothness", Float) = 0
         [HideInInspector] _Smoothness3 ("Layer 3 Smoothness", Float) = 0
+        [HideInInspector] _OcclusionStrength0 ("Layer 0 Occlusion Strength", Range(0, 1)) = 1
+        [HideInInspector] _OcclusionStrength1 ("Layer 1 Occlusion Strength", Range(0, 1)) = 1
+        [HideInInspector] _OcclusionStrength2 ("Layer 2 Occlusion Strength", Range(0, 1)) = 1
+        [HideInInspector] _OcclusionStrength3 ("Layer 3 Occlusion Strength", Range(0, 1)) = 1
 
         [HideInInspector] _TileFade ("Tile Fade", Range(0, 1)) = 1
         [HideInInspector] _LodMaskMode ("LOD Mask Mode", Float) = 0
@@ -125,6 +133,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         half _NormalScale1;
         half _NormalScale2;
         half _NormalScale3;
+        half4 _Tint0;
+        half4 _Tint1;
+        half4 _Tint2;
+        half4 _Tint3;
         half _Metallic0;
         half _Metallic1;
         half _Metallic2;
@@ -133,6 +145,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         half _Smoothness1;
         half _Smoothness2;
         half _Smoothness3;
+        half _OcclusionStrength0;
+        half _OcclusionStrength1;
+        half _OcclusionStrength2;
+        half _OcclusionStrength3;
         half _TileFade;
         half _LodMaskMode;
         float _LodFadeStartMeters;
@@ -334,10 +350,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
             half4 diffuse2 = UNITY_SAMPLE_TEX2D_SAMPLER(_Splat2, _BaseMap, uv2);
             half4 diffuse3 = UNITY_SAMPLE_TEX2D_SAMPLER(_Splat3, _BaseMap, uv3);
             output.Albedo =
-                diffuse0.rgb * weights.r +
-                diffuse1.rgb * weights.g +
-                diffuse2.rgb * weights.b +
-                diffuse3.rgb * weights.a;
+                diffuse0.rgb * _Tint0.rgb * weights.r +
+                diffuse1.rgb * _Tint1.rgb * weights.g +
+                diffuse2.rgb * _Tint2.rgb * weights.b +
+                diffuse3.rgb * _Tint3.rgb * weights.a;
 
             half3 normal0 = lerp(half3(0.0h, 0.0h, 1.0h), UnpackScaleNormal(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal0, _BaseMap, uv0), _NormalScale0), _HasNormal0);
             half3 normal1 = lerp(half3(0.0h, 0.0h, 1.0h), UnpackScaleNormal(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal1, _BaseMap, uv1), _NormalScale1), _HasNormal1);
@@ -365,10 +381,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                 lerp(_Smoothness2, mask2.a, _HasMask2) * weights.b +
                 lerp(_Smoothness3, mask3.a, _HasMask3) * weights.a;
             output.Occlusion =
-                lerp(1.0h, mask0.g, _HasMask0) * weights.r +
-                lerp(1.0h, mask1.g, _HasMask1) * weights.g +
-                lerp(1.0h, mask2.g, _HasMask2) * weights.b +
-                lerp(1.0h, mask3.g, _HasMask3) * weights.a;
+                lerp(1.0h, mask0.g, _HasMask0 * _OcclusionStrength0) * weights.r +
+                lerp(1.0h, mask1.g, _HasMask1 * _OcclusionStrength1) * weights.g +
+                lerp(1.0h, mask2.g, _HasMask2 * _OcclusionStrength2) * weights.b +
+                lerp(1.0h, mask3.g, _HasMask3 * _OcclusionStrength3) * weights.a;
             output.Alpha = 1.0h;
         }
         ENDCG

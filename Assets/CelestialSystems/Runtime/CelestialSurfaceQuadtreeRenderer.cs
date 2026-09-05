@@ -176,7 +176,14 @@ namespace jcan.CelestialSystems
         private readonly Dictionary<int, Material> debugMaterials =
             new Dictionary<int, Material>();
 
+        private readonly CelestialSurfaceLayerDefinition[]
+            configuredSurfaceLayers =
+                new CelestialSurfaceLayerDefinition[
+                    MaximumAdaptedLayerCount];
+
         private Material surfaceMaterial;
+        private CelestialSurfaceDefinition
+            configuredSurfaceAppearance;
         private int configuredTerrainLayerCount =
             -1;
         private Plane[] frustumPlanes;
@@ -2265,12 +2272,21 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
+                var surfaceLayer =
+                    configuredSurfaceLayers[
+                        layerIndex];
                 var tileSizeX =
-                    SafeTileSize(
-                        layer.tileSize.x);
+                    surfaceLayer != null
+                        ? SafeTileSize(
+                            surfaceLayer
+                                .TextureScaleMeters)
+                        : SafeTileSize(
+                            layer.tileSize.x);
                 var tileSizeZ =
-                    SafeTileSize(
-                        layer.tileSize.y);
+                    surfaceLayer != null
+                        ? tileSizeX
+                        : SafeTileSize(
+                            layer.tileSize.y);
                 var scaleX =
                     request.MapWorldSizeXMeters /
                     tileSizeX;
@@ -2311,21 +2327,31 @@ namespace jcan.CelestialSystems
 
             var layerCount =
                 patchGenerator.TerrainLayerCount;
+            var surfaceAppearance =
+                surfaceRuntime.SurfaceDefinition
+                    .SurfaceAppearance;
 
             if (surfaceMaterial != null &&
                 configuredTerrainLayerCount ==
-                    layerCount)
+                    layerCount &&
+                configuredSurfaceAppearance ==
+                    surfaceAppearance)
             {
                 return;
             }
 
             DestroyRuntimeMaterial(
                 ref surfaceMaterial);
+            ResolveConfiguredSurfaceLayers(
+                surfaceAppearance,
+                layerCount);
             surfaceMaterial =
                 CreateSurfaceMaterial(
                     layerCount);
             configuredTerrainLayerCount =
                 layerCount;
+            configuredSurfaceAppearance =
+                surfaceAppearance;
             RefreshVisualMaterials();
         }
 
@@ -2409,83 +2435,185 @@ namespace jcan.CelestialSystems
                         ? patchGenerator.GetTerrainLayer(
                             index)
                         : null,
+                    configuredSurfaceLayers[
+                        index],
                     index);
             }
 
             return material;
         }
 
+        private void ResolveConfiguredSurfaceLayers(
+            CelestialSurfaceDefinition surfaceAppearance,
+            int terrainLayerCount)
+        {
+            Array.Clear(
+                configuredSurfaceLayers,
+                0,
+                configuredSurfaceLayers.Length);
+
+            if (surfaceAppearance == null ||
+                !surfaceAppearance.HasValidSettings)
+            {
+                return;
+            }
+
+            var resolvedCount =
+                Math.Min(
+                    terrainLayerCount,
+                    MaximumAdaptedLayerCount);
+
+            for (var terrainIndex = 0;
+                terrainIndex < resolvedCount;
+                terrainIndex++)
+            {
+                var terrainLayer =
+                    patchGenerator.GetTerrainLayer(
+                        terrainIndex);
+
+                for (var appearanceIndex = 0;
+                    appearanceIndex <
+                        surfaceAppearance.LayerCount;
+                    appearanceIndex++)
+                {
+                    var candidate =
+                        surfaceAppearance.GetLayer(
+                            appearanceIndex);
+
+                    if (candidate != null &&
+                        candidate.MapMagicTerrainLayer != null &&
+                        candidate.MapMagicTerrainLayer ==
+                            terrainLayer)
+                    {
+                        configuredSurfaceLayers[
+                            terrainIndex] =
+                                candidate;
+                        break;
+                    }
+                }
+
+                if (configuredSurfaceLayers[
+                        terrainIndex] != null)
+                {
+                    continue;
+                }
+
+                var orderedCandidate =
+                    surfaceAppearance.GetLayer(
+                        terrainIndex);
+
+                if (orderedCandidate != null &&
+                    orderedCandidate.MapMagicTerrainLayer ==
+                        null)
+                {
+                    configuredSurfaceLayers[
+                        terrainIndex] =
+                            orderedCandidate;
+                }
+            }
+        }
+
         private static void ConfigureTerrainLayer(
             Material material,
-            TerrainLayer layer,
+            TerrainLayer terrainLayer,
+            CelestialSurfaceLayerDefinition surfaceLayer,
             int index)
         {
             var suffix =
                 index.ToString();
-
-            if (layer == null)
-            {
-                SetTextureIfPresent(
-                    material,
-                    "_Splat" + suffix,
-                    Texture2D.whiteTexture);
-                SetTextureIfPresent(
-                    material,
-                    "_Normal" + suffix,
-                    null);
-                SetTextureIfPresent(
-                    material,
-                    "_Mask" + suffix,
-                    null);
-                SetFloatIfPresent(
-                    material,
-                    "_HasNormal" + suffix,
-                    0.0f);
-                SetFloatIfPresent(
-                    material,
-                    "_HasMask" + suffix,
-                    0.0f);
-                return;
-            }
+            var albedoTexture =
+                surfaceLayer != null &&
+                surfaceLayer.AlbedoTexture != null
+                    ? surfaceLayer.AlbedoTexture
+                    : terrainLayer != null &&
+                        terrainLayer.diffuseTexture != null
+                        ? terrainLayer.diffuseTexture
+                        : Texture2D.whiteTexture;
+            var normalTexture =
+                surfaceLayer != null &&
+                surfaceLayer.NormalTexture != null
+                    ? surfaceLayer.NormalTexture
+                    : terrainLayer != null
+                        ? terrainLayer.normalMapTexture
+                        : null;
+            var maskTexture =
+                surfaceLayer != null &&
+                surfaceLayer.MaskTexture != null
+                    ? surfaceLayer.MaskTexture
+                    : terrainLayer != null
+                        ? terrainLayer.maskMapTexture
+                        : null;
+            var normalStrength =
+                surfaceLayer != null
+                    ? surfaceLayer.NormalStrength
+                    : terrainLayer != null
+                        ? terrainLayer.normalScale
+                        : 1.0f;
+            var metallic =
+                surfaceLayer != null
+                    ? surfaceLayer.Metallic
+                    : terrainLayer != null
+                        ? terrainLayer.metallic
+                        : 0.0f;
+            var smoothness =
+                surfaceLayer != null
+                    ? surfaceLayer.Smoothness
+                    : terrainLayer != null
+                        ? terrainLayer.smoothness
+                        : 0.0f;
+            var tint =
+                surfaceLayer != null
+                    ? surfaceLayer.Tint
+                    : Color.white;
+            var occlusionStrength =
+                surfaceLayer != null
+                    ? surfaceLayer.OcclusionStrength
+                    : 1.0f;
 
             SetTextureIfPresent(
                 material,
                 "_Splat" + suffix,
-                layer.diffuseTexture != null
-                    ? layer.diffuseTexture
-                    : Texture2D.whiteTexture);
+                albedoTexture);
             SetTextureIfPresent(
                 material,
                 "_Normal" + suffix,
-                layer.normalMapTexture);
+                normalTexture);
             SetTextureIfPresent(
                 material,
                 "_Mask" + suffix,
-                layer.maskMapTexture);
+                maskTexture);
             SetFloatIfPresent(
                 material,
                 "_HasNormal" + suffix,
-                layer.normalMapTexture != null
+                normalTexture != null
                     ? 1.0f
                     : 0.0f);
             SetFloatIfPresent(
                 material,
                 "_HasMask" + suffix,
-                layer.maskMapTexture != null
+                maskTexture != null
                     ? 1.0f
                     : 0.0f);
             SetFloatIfPresent(
                 material,
                 "_NormalScale" + suffix,
-                layer.normalScale);
+                normalStrength);
             SetFloatIfPresent(
                 material,
                 "_Metallic" + suffix,
-                layer.metallic);
+                metallic);
             SetFloatIfPresent(
                 material,
                 "_Smoothness" + suffix,
-                layer.smoothness);
+                smoothness);
+            SetColorIfPresent(
+                material,
+                "_Tint" + suffix,
+                tint);
+            SetFloatIfPresent(
+                material,
+                "_OcclusionStrength" + suffix,
+                occlusionStrength);
         }
 
         private Material GetDebugMaterial(
@@ -3171,6 +3299,20 @@ namespace jcan.CelestialSystems
                     propertyName))
             {
                 material.SetFloat(
+                    propertyName,
+                    value);
+            }
+        }
+
+        private static void SetColorIfPresent(
+            Material material,
+            string propertyName,
+            Color value)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetColor(
                     propertyName,
                     value);
             }
