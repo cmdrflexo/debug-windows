@@ -5,6 +5,7 @@
 using System;
 using CW.Common;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace jcan.CelestialSystems
 {
@@ -55,7 +56,55 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private LayerMask collisionLayers = ~0;
 
-        [Header("Controls")]
+        [Header("Input Actions")]
+        [SerializeField]
+        [Tooltip("Vector2 action where X is horizontal movement and Y is forward/back movement.")]
+        private InputActionReference moveAction;
+
+        [SerializeField]
+        [Tooltip("Axis action for vertical movement.")]
+        private InputActionReference verticalAction;
+
+        [SerializeField]
+        [Tooltip("Axis action whose positive/negative performed values increase/decrease the manual speed multiplier.")]
+        private InputActionReference speedMultiplierAction;
+
+        [SerializeField]
+        [Tooltip("Button action that temporarily ramps the boost multiplier while held.")]
+        private InputActionReference boostAction;
+
+        [Header("Manual Speed Multiplier")]
+        [SerializeField]
+        [Min(1.0001f)]
+        private float speedMultiplierStep = 2.0f;
+
+        [SerializeField]
+        [Min(0.0001f)]
+        private float minimumSpeedMultiplier = 0.0625f;
+
+        [SerializeField]
+        [Min(0.0001f)]
+        private float maximumSpeedMultiplier = 64.0f;
+
+        [SerializeField]
+        [Min(0.0001f)]
+        private float moveSpeedMultiplier = 1.0f;
+
+        [Header("Boost")]
+        [SerializeField]
+        [Min(1.0f)]
+        private float maximumBoostMultiplier = 8.0f;
+
+        [SerializeField]
+        [Tooltip("Seconds of continuous boost input required to reach the maximum multiplier.")]
+        [Min(0.01f)]
+        private float boostRampSeconds = 3.0f;
+
+        [SerializeField]
+        [Min(1.0f)]
+        private float currentBoostMultiplier = 1.0f;
+
+        [Header("Fallback Controls")]
         [SerializeField]
         private CwInputManager.Axis horizontalControls =
             new CwInputManager.Axis(
@@ -130,6 +179,35 @@ namespace jcan.CelestialSystems
 
         private GravityEngine gravityEngine;
         private Vector3 remainingDelta;
+        private bool enabledMoveAction;
+        private bool enabledVerticalAction;
+        private bool enabledSpeedMultiplierAction;
+        private bool enabledBoostAction;
+
+        public bool HasNearestPlanet =>
+            hasNearestPlanet;
+
+        public double NearestPlanetAltitudeMeters =>
+            nearestPlanetAltitudeMeters;
+
+        public float MoveSpeedMultiplier =>
+            moveSpeedMultiplier;
+
+        public float AutomaticMoveSpeedMetersPerSecond =>
+            resolvedSpeed;
+
+        public bool IsBoosting =>
+            boostAction != null &&
+            boostAction.action != null &&
+            boostAction.action.IsPressed();
+
+        public float CurrentBoostMultiplier =>
+            currentBoostMultiplier;
+
+        public float CurrentMoveSpeedMetersPerSecond =>
+            resolvedSpeed *
+            moveSpeedMultiplier *
+            currentBoostMultiplier;
 
         private void Awake()
         {
@@ -139,10 +217,95 @@ namespace jcan.CelestialSystems
         private void OnEnable()
         {
             CwInputManager.EnsureThisComponentExists();
+
+            enabledMoveAction =
+                EnableAction(
+                    moveAction);
+            enabledVerticalAction =
+                EnableAction(
+                    verticalAction);
+            enabledSpeedMultiplierAction =
+                EnableAction(
+                    speedMultiplierAction);
+            enabledBoostAction =
+                EnableAction(
+                    boostAction);
+
+            if (speedMultiplierAction != null &&
+                speedMultiplierAction.action != null)
+            {
+                speedMultiplierAction.action.performed +=
+                    OnSpeedMultiplierPerformed;
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (speedMultiplierAction != null &&
+                speedMultiplierAction.action != null)
+            {
+                speedMultiplierAction.action.performed -=
+                    OnSpeedMultiplierPerformed;
+            }
+
+            DisableAction(
+                moveAction,
+                enabledMoveAction);
+            DisableAction(
+                verticalAction,
+                enabledVerticalAction);
+            DisableAction(
+                speedMultiplierAction,
+                enabledSpeedMultiplierAction);
+            DisableAction(
+                boostAction,
+                enabledBoostAction);
+
+            enabledMoveAction = false;
+            enabledVerticalAction = false;
+            enabledSpeedMultiplierAction = false;
+            enabledBoostAction = false;
+            currentBoostMultiplier = 1.0f;
+        }
+
+        private void OnValidate()
+        {
+            speedMultiplierStep =
+                Mathf.Max(
+                    1.0001f,
+                    speedMultiplierStep);
+            minimumSpeedMultiplier =
+                Mathf.Max(
+                    0.0001f,
+                    minimumSpeedMultiplier);
+            maximumSpeedMultiplier =
+                Mathf.Max(
+                    minimumSpeedMultiplier,
+                    maximumSpeedMultiplier);
+            moveSpeedMultiplier =
+                Mathf.Clamp(
+                    moveSpeedMultiplier,
+                    minimumSpeedMultiplier,
+                    maximumSpeedMultiplier);
+            maximumBoostMultiplier =
+                Mathf.Max(
+                    1.0f,
+                    maximumBoostMultiplier);
+            boostRampSeconds =
+                Mathf.Max(
+                    0.01f,
+                    boostRampSeconds);
+            currentBoostMultiplier =
+                Mathf.Clamp(
+                    currentBoostMultiplier,
+                    1.0f,
+                    maximumBoostMultiplier);
         }
 
         private void Update()
         {
+            UpdateBoostMultiplier(
+                Time.deltaTime);
             UpdateSpeedState();
 
             if (listen)
@@ -163,13 +326,123 @@ namespace jcan.CelestialSystems
 
         private Vector3 GetDelta(float deltaTime)
         {
+            var planarInput =
+                moveAction != null &&
+                moveAction.action != null
+                    ? moveAction.action.ReadValue<
+                        Vector2>()
+                    : new Vector2(
+                        horizontalControls.GetValue(
+                            deltaTime),
+                        depthControls.GetValue(
+                            deltaTime));
+            var verticalInput =
+                verticalAction != null &&
+                verticalAction.action != null
+                    ? verticalAction.action.ReadValue<
+                        float>()
+                    : verticalControls.GetValue(
+                        deltaTime);
+
             return new Vector3(
-                horizontalControls.GetValue(
-                    deltaTime),
-                verticalControls.GetValue(
-                    deltaTime),
-                depthControls.GetValue(
-                    deltaTime));
+                planarInput.x,
+                verticalInput,
+                planarInput.y);
+        }
+
+        private void UpdateBoostMultiplier(
+            float deltaTime)
+        {
+            if (!IsBoosting)
+            {
+                currentBoostMultiplier = 1.0f;
+                return;
+            }
+
+            var rampRate =
+                (maximumBoostMultiplier -
+                    1.0f) /
+                Mathf.Max(
+                    0.01f,
+                    boostRampSeconds);
+
+            currentBoostMultiplier =
+                Mathf.MoveTowards(
+                    currentBoostMultiplier,
+                    maximumBoostMultiplier,
+                    rampRate *
+                        deltaTime);
+        }
+
+        private void OnSpeedMultiplierPerformed(
+            InputAction.CallbackContext context)
+        {
+            var input =
+                context.ReadValue<float>();
+
+            if (Mathf.Approximately(
+                    input,
+                    0.0f))
+            {
+                return;
+            }
+
+            var stepCount =
+                Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        Mathf.Abs(
+                            input)));
+            var multiplierChange =
+                Mathf.Pow(
+                    speedMultiplierStep,
+                    stepCount);
+
+            if (input < 0.0f)
+            {
+                multiplierChange =
+                    1.0f /
+                    multiplierChange;
+            }
+
+            moveSpeedMultiplier =
+                Mathf.Clamp(
+                    moveSpeedMultiplier *
+                        multiplierChange,
+                    minimumSpeedMultiplier,
+                    maximumSpeedMultiplier);
+        }
+
+        private static bool EnableAction(
+            InputActionReference actionReference)
+        {
+            var action =
+                actionReference != null
+                    ? actionReference.action
+                    : null;
+
+            if (action == null ||
+                action.enabled)
+            {
+                return false;
+            }
+
+            action.Enable();
+            return true;
+        }
+
+        private static void DisableAction(
+            InputActionReference actionReference,
+            bool enabledByThisComponent)
+        {
+            if (!enabledByThisComponent ||
+                actionReference == null ||
+                actionReference.action == null)
+            {
+                return;
+            }
+
+            actionReference.action.Disable();
         }
 
         private void AddToDelta(Vector3 localDelta)
@@ -585,7 +858,7 @@ namespace jcan.CelestialSystems
         private float GetSpeedMultiplier()
         {
             return
-                resolvedSpeed;
+                CurrentMoveSpeedMetersPerSecond;
         }
 
         private static bool IsFinite(
