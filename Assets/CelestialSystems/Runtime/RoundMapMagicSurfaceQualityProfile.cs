@@ -67,6 +67,39 @@ namespace jcan.CelestialSystems
         [Min(0.01f)]
         private float adaptiveMinimumSkirtDepthMeters = 1.0f;
 
+        [Header("Unified Collision")]
+        [SerializeField] private bool adaptiveCollisionEnabled = true;
+        [SerializeField] private bool adaptiveCollisionFollowsCamera = true;
+        [SerializeField, Min(1.0f)] private float adaptiveCollisionCoverageRadiusMeters = 256.0f;
+        [SerializeField, Min(0.0f)] private float adaptiveCollisionPrefetchMarginMeters = 128.0f;
+        [SerializeField, Min(0.1f)] private float adaptiveCollisionSampleSpacingMeters = 8.0f;
+        [SerializeField, Min(0.0f)] private float adaptiveCollisionActivationAltitudeMeters = 2500.0f;
+        [SerializeField, Range(4, 512)] private int adaptiveCollisionMaximumPatchCount = 128;
+        [SerializeField, Range(1, 8)] private int adaptiveCollisionMeshBuildsPerFrame = 2;
+        [SerializeField, Min(0.0f)] private float adaptiveCollisionRetirementDelaySeconds = 1.0f;
+        [SerializeField, Range(0, 31)] private int adaptiveCollisionLayer;
+
+        public bool AdaptiveCollisionEnabled => adaptiveCollisionEnabled;
+        public bool AdaptiveCollisionFollowsCamera => adaptiveCollisionFollowsCamera;
+        public float AdaptiveCollisionCoverageRadiusMeters => adaptiveCollisionCoverageRadiusMeters;
+        public float AdaptiveCollisionPrefetchMarginMeters => adaptiveCollisionPrefetchMarginMeters;
+        public float AdaptiveCollisionSampleSpacingMeters => adaptiveCollisionSampleSpacingMeters;
+        public float AdaptiveCollisionActivationAltitudeMeters => adaptiveCollisionActivationAltitudeMeters;
+        public int AdaptiveCollisionMaximumPatchCount => adaptiveCollisionMaximumPatchCount;
+        public int AdaptiveCollisionMeshBuildsPerFrame => adaptiveCollisionMeshBuildsPerFrame;
+        public float AdaptiveCollisionRetirementDelaySeconds => adaptiveCollisionRetirementDelaySeconds;
+        public int AdaptiveCollisionLayer => adaptiveCollisionLayer;
+
+        public bool HasValidAdaptiveCollisionSettings =>
+            IsFinite(adaptiveCollisionCoverageRadiusMeters) && adaptiveCollisionCoverageRadiusMeters >= 1.0f &&
+            IsFinite(adaptiveCollisionPrefetchMarginMeters) && adaptiveCollisionPrefetchMarginMeters >= 0.0f &&
+            IsFinite(adaptiveCollisionSampleSpacingMeters) && adaptiveCollisionSampleSpacingMeters >= 0.1f &&
+            IsFinite(adaptiveCollisionActivationAltitudeMeters) && adaptiveCollisionActivationAltitudeMeters >= 0.0f &&
+            adaptiveCollisionMaximumPatchCount >= 4 && adaptiveCollisionMaximumPatchCount <= 512 &&
+            adaptiveCollisionMeshBuildsPerFrame >= 1 && adaptiveCollisionMeshBuildsPerFrame <= 8 &&
+            IsFinite(adaptiveCollisionRetirementDelaySeconds) && adaptiveCollisionRetirementDelaySeconds >= 0.0f &&
+            adaptiveCollisionLayer >= 0 && adaptiveCollisionLayer <= 31;
+
         [Header("Local Detail")]
         [SerializeField]
         [Range(3, 257)]
@@ -227,6 +260,7 @@ namespace jcan.CelestialSystems
 
         public bool HasValidSettings =>
             AdaptiveLodPolicy.IsValid &&
+            HasValidAdaptiveCollisionSettings &&
             adaptiveMaximumPatchCount >= 16 &&
             adaptiveMaximumMeshBuildsPerFrame >= 1 &&
             adaptiveGenerationMargins >= 0 &&

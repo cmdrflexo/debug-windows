@@ -605,11 +605,14 @@ namespace jcan.CelestialSystems
 
             var wasSplit =
                 node.DesiredSplit;
+            var collisionRequiresSplit =
+                surfaceRuntime.CollisionRuntime != null &&
+                surfaceRuntime.CollisionRuntime.RequiresVisualRefinement(node.Address);
             var shouldSplit =
                 node.PotentiallyVisible &&
-                ShouldSubdivide(
+                (collisionRequiresSplit || ShouldSubdivide(
                     node,
-                    wasSplit) &&
+                    wasSplit)) &&
                 desiredLeafCount + 3 <=
                     Mathf.Max(
                         16,
@@ -2941,12 +2944,8 @@ namespace jcan.CelestialSystems
 
         private bool TryBuildObserverState()
         {
-            var localPosition =
-                transform.InverseTransformPoint(
-                    observerCamera.transform.position);
-            observerLocalPosition =
-                ToDoubleVector3(
-                    localPosition);
+            if (!surfaceRuntime.TrySceneToBodyLocal(observerCamera.transform.position, out observerLocalPosition))
+                return false;
             var distanceFromCenter =
                 Magnitude(
                     observerLocalPosition);
@@ -3071,7 +3070,8 @@ namespace jcan.CelestialSystems
                 surfaceRuntime.Body.ReportSurfaceReadiness(
                     coarseReady,
                     visibleReady,
-                    false);
+                    surfaceRuntime.CollisionRuntime != null &&
+                    surfaceRuntime.CollisionRuntime.CoverageReady);
             }
         }
 

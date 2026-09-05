@@ -327,6 +327,45 @@ Valid surface: {definition.HasValidResolvedSurfaceSettings}
 
 `name` is inherited from `UnityEngine.Object` and is therefore available as a public property.
 
+### Milestone 5 collision display
+
+Use the existing `factory` source alias. This block can replace the longer surface recipe while testing local collision. It reads the generated component through `LastSpawnedBody`, so there is no runtime object to assign manually.
+
+```text
+<b>LOCAL COLLISION</b>
+Initialized: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.Initialized|--}
+Enabled: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.CollisionEnabled|--}
+Collision ready: {color:factory.LastSpawnedBody.HasCollisionSurface|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.HasCollisionSurface|--}</color>
+Observers / LOD: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.ObserverCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.CollisionLevel|--}
+Required / active / pending: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.RequiredPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.ActivePatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.PendingPatchCount|--}
+Pooled / built: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.PooledPatchCount|--} / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.BuiltPatchCount|--}
+Budget exceeded: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.BudgetExceeded|--}
+Origin shifts: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.OriginShiftCount|--}
+
+<b>SURFACE QUERY</b>
+Query available: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.QueryAvailable|--}
+Query exact: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.IsRequestedDetail|--}
+Query LOD: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.ResolvedLevel|--}
+Terrain altitude: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.AltitudeMeters:N2|--} m
+Elevation / slope: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.ElevationMeters:N2|--} m / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.SlopeDegrees:N1|--}°
+Collider probe: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.ColliderProbeHit|--}
+Query / collider error: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.ColliderQueryErrorMeters:N4|--} m
+Drop active: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.DropTestActive|--}
+Drop touching terrain: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.DropTestTouchingTerrain|--}
+
+<b>GEOMETRY / CACHE</b>
+Geometry test: {color:factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.GeometryDiagnostics.Passed|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.GeometryDiagnostics.Passed|--}</color>
+Samples tested: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.GeometryDiagnostics.TestedSamples:N0|--}
+Max query error: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.GeometryDiagnostics.MaximumQueryErrorMeters:E3|--} m
+Geometry error: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.GeometryDiagnostics.LastError|None}
+Clients / surfaces: {factory.SurfaceCacheManager.RegisteredClientCount|--} / {factory.SurfaceCacheManager.RegisteredSurfaceCount|--}
+Queued / active / failed: {factory.SurfaceCacheManager.QueuedPatchCount|--} / {factory.SurfaceCacheManager.ActiveGenerationCount|--} / {factory.SurfaceCacheManager.FailedPatchCount|--}
+Collision error: {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastError|None}
+Cache error: {factory.SurfaceCacheManager.LastError|None}
+```
+
+One factory body normally reports **2 clients / 1 surface**: rendering and collision share cached data but own their requests independently. Collision readiness requires a nonempty, fully enabled required footprint and stays false in orbit. Query values are meaningful when `Query available` is true; a zero error without `Collider probe: True` is not a successful comparison. Use **Drop Test Sphere** from the generated collision component's context menu after coverage is ready. See `Documentation/CelestialSurfaceCollisionMilestone5.md` for the consolidated test.
+
 ### Universe frame origin
 
 ```text

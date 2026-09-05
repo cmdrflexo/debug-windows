@@ -476,6 +476,12 @@ namespace jcan.CelestialSystems
                 patchGenerator,
                 adaptiveRenderer);
 
+            var collisionRuntime = hierarchy.SurfaceRoot.GetComponent<CelestialSurfaceCollisionRuntime>();
+            if (collisionRuntime == null)
+                collisionRuntime = hierarchy.SurfaceRoot.gameObject.AddComponent<CelestialSurfaceCollisionRuntime>();
+            if (generatorReady)
+                collisionRuntime.Initialize(surfaceRuntime);
+
             spawnedBodies.Add(
                 request.InstanceId,
                 instance);
