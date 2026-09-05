@@ -241,6 +241,12 @@ namespace jcan.CelestialSystems
         public float LodMorphDurationSeconds =>
             lodMorphDurationSeconds;
 
+        public bool CastShadows =>
+            castShadows;
+
+        public bool ReceiveShadows =>
+            receiveShadows;
+
         public int MaximumActiveLevel =>
             maximumActiveLevel;
 
@@ -522,6 +528,10 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.01f,
                     quality.AdaptiveMinimumSkirtDepthMeters);
+            castShadows =
+                quality.AdaptiveCastShadows;
+            receiveShadows =
+                quality.AdaptiveReceiveShadows;
         }
 
         private void BuildRoots()
