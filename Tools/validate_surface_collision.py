@@ -111,6 +111,36 @@ def collect(center, radius, coverage, level, limit):
 
 
 class CollisionMathTests(unittest.TestCase):
+    def test_extreme_relief_triangles_are_oriented_outward(self):
+        radius = 6371000.0
+        corrected = 0
+        for face in range(6):
+            patch = (face, 20, 2**19, 2**19)
+            for y in range(32):
+                for x in range(32):
+                    a, b, c, d = [vertex(patch, xx, yy, radius) for xx, yy in
+                                   ((x, y), (x+1, y), (x, y+1), (x+1, y+1))]
+                    for triangle in ((a, b, c), (b, d, c)):
+                        pa, pb, pc = triangle
+                        if dot(cross(sub(pb, pa), sub(pc, pa)), add(add(pa, pb), pc)) < 0:
+                            pb, pc = pc, pb
+                            corrected += 1
+                        self.assertGreaterEqual(
+                            dot(cross(sub(pb, pa), sub(pc, pa)), add(add(pa, pb), pc)), 0)
+        print(f"12,288 extreme-relief winding checks; {corrected} required correction")
+
+    def test_carrier_velocity_update_preserves_relative_velocity(self):
+        previous_carrier = (1200.0, -300.0, 40.0)
+        current_carrier = (1200.5, -299.0, 39.75)
+        relative = (4.0, -2.0, 1.0)
+        angle = .01
+        rotated_relative = (relative[0]*math.cos(angle)-relative[1]*math.sin(angle),
+                            relative[0]*math.sin(angle)+relative[1]*math.cos(angle), relative[2])
+        rigidbody_velocity = add(previous_carrier, relative)
+        transported = add(current_carrier, rotated_relative)
+        self.assertLess(length(sub(sub(transported, current_carrier), rotated_relative)), 1e-12)
+        self.assertEqual(sub(rigidbody_velocity, previous_carrier), relative)
+
     def test_nearby_positions_across_large_cell_boundary(self):
         cell = 9007199254741000
         size = 1e9

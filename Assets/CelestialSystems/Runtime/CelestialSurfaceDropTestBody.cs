@@ -14,6 +14,10 @@ namespace jcan.CelestialSystems
         private CelestialSurfaceRuntime surface;
         private Rigidbody physicsBody;
         private UniverseFrameController frame;
+        private CelestialBodyMotionState previousMotion;
+        private Vector3 previousCarrierVelocity;
+        private bool hasPreviousMotion;
+        private bool hasPreviousCarrierVelocity;
         private readonly HashSet<Collider> contacts = new HashSet<Collider>();
         public bool TouchingTerrain
         {
@@ -28,6 +32,9 @@ namespace jcan.CelestialSystems
         {
             surface = value;
             physicsBody = GetComponent<Rigidbody>();
+            hasPreviousMotion = surface.Body.TryGetMotionState(out previousMotion);
+            previousCarrierVelocity = physicsBody.linearVelocity;
+            hasPreviousCarrierVelocity = hasPreviousMotion;
             frame = surface.Body.UniverseFrame;
             if (frame != null) frame.OriginShifted += ShiftOrigin;
             surface.Body.Destroying += BodyDestroying;
@@ -41,6 +48,7 @@ namespace jcan.CelestialSystems
                 Destroy(gameObject);
                 return;
             }
+            CompensateForBodyFrameMotion();
             if (surface.TryGetScenePose(out var center, out _))
             {
                 var towardsCenter = center - CelestialSurfaceGeometry.ToDouble(physicsBody.position);
@@ -48,6 +56,31 @@ namespace jcan.CelestialSystems
                     physicsBody.AddForce(CelestialSurfaceGeometry.ToVector3(towardsCenter / towardsCenter.Magnitude) * 9.81f,
                         ForceMode.Acceleration);
             }
+        }
+
+        private void CompensateForBodyFrameMotion()
+        {
+            if (!surface.Body.TryGetMotionState(out var currentMotion)) return;
+            if (hasPreviousMotion && Time.fixedDeltaTime > 0.0f &&
+                surface.TrySceneToBodyLocal(physicsBody.position, out var local))
+            {
+                var previousPoint = CelestialSurfaceGeometry.Add(previousMotion.Position,
+                    CelestialSurfaceGeometry.Rotate(local, previousMotion.Rotation));
+                var currentPoint = CelestialSurfaceGeometry.Add(currentMotion.Position,
+                    CelestialSurfaceGeometry.Rotate(local, currentMotion.Rotation));
+                var carrierVelocity = CelestialSurfaceGeometry.ToVector3(
+                    CelestialSurfaceGeometry.Difference(currentPoint, previousPoint) / Time.fixedDeltaTime);
+                if (hasPreviousCarrierVelocity)
+                {
+                    var frameRotation = currentMotion.Rotation * Quaternion.Inverse(previousMotion.Rotation);
+                    var relativeVelocity = physicsBody.linearVelocity - previousCarrierVelocity;
+                    physicsBody.linearVelocity = carrierVelocity + frameRotation * relativeVelocity;
+                }
+                previousCarrierVelocity = carrierVelocity;
+                hasPreviousCarrierVelocity = true;
+            }
+            previousMotion = currentMotion;
+            hasPreviousMotion = true;
         }
 
         private void ShiftOrigin(UniversePosition origin, Vector3 delta) { physicsBody.position += delta; }

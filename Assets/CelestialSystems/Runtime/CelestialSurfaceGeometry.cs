@@ -35,7 +35,7 @@ namespace jcan.CelestialSystems
             return vertices;
         }
 
-        // Same diagonal and winding as the adaptive renderer. No skirts in physics.
+        // Same diagonal as the adaptive renderer. No skirts in physics.
         public static int[] BuildTriangles(int resolution)
         {
             var indices = new int[(resolution - 1) * (resolution - 1) * 6];
@@ -48,6 +48,37 @@ namespace jcan.CelestialSystems
                     indices[i++] = a + 1; indices[i++] = a + resolution + 1; indices[i++] = a + resolution;
                 }
             return indices;
+        }
+
+        public static int[] BuildOutwardTriangles(int resolution, Vector3[] localVertices, DoubleVector3 origin)
+        {
+            if (localVertices == null || localVertices.Length != resolution * resolution)
+                throw new ArgumentException("Collision vertices do not match the patch resolution.", nameof(localVertices));
+            var indices = new int[(resolution - 1) * (resolution - 1) * 6];
+            var i = 0;
+            for (var y = 0; y < resolution - 1; y++)
+                for (var x = 0; x < resolution - 1; x++)
+                {
+                    var a = y * resolution + x;
+                    var b = a + 1;
+                    var c = a + resolution;
+                    var d = c + 1;
+                    WriteOutwardTriangle(indices, ref i, a, b, c, localVertices, origin);
+                    WriteOutwardTriangle(indices, ref i, b, d, c, localVertices, origin);
+                }
+            return indices;
+        }
+
+        private static void WriteOutwardTriangle(int[] indices, ref int target, int a, int b, int c,
+            Vector3[] localVertices, DoubleVector3 origin)
+        {
+            var pa = origin + ToDouble(localVertices[a]);
+            var pb = origin + ToDouble(localVertices[b]);
+            var pc = origin + ToDouble(localVertices[c]);
+            var outward = Dot(Cross(pb - pa, pc - pa), pa + pb + pc) >= 0.0;
+            indices[target++] = a;
+            indices[target++] = outward ? b : c;
+            indices[target++] = outward ? c : b;
         }
 
         public static bool TrySample(CelestialSurfacePatchData data, double radius,
