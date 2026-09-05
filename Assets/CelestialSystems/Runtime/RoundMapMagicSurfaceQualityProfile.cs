@@ -67,6 +67,15 @@ namespace jcan.CelestialSystems
         [Min(0.01f)]
         private float adaptiveMinimumSkirtDepthMeters = 1.0f;
 
+        [Header("Unified Rendering")]
+        [SerializeField]
+        [Tooltip("Allows adaptive surface patches to cast real-time shadows.")]
+        private bool adaptiveCastShadows;
+
+        [SerializeField]
+        [Tooltip("Allows adaptive surface patches to receive real-time shadows.")]
+        private bool adaptiveReceiveShadows = true;
+
         [Header("Unified Collision")]
         [SerializeField] private bool adaptiveCollisionEnabled = true;
         [SerializeField] private bool adaptiveCollisionFollowsCamera = true;
@@ -206,6 +215,12 @@ namespace jcan.CelestialSystems
 
         public float AdaptiveMinimumSkirtDepthMeters =>
             adaptiveMinimumSkirtDepthMeters;
+
+        public bool AdaptiveCastShadows =>
+            adaptiveCastShadows;
+
+        public bool AdaptiveReceiveShadows =>
+            adaptiveReceiveShadows;
 
         public int LocalMeshResolution =>
             localMeshResolution;
