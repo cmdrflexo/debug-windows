@@ -41,6 +41,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Background",
+                    "type": "Button",
+                    "id": "7d565fee-bed2-4282-9d6b-4e89f8273c3d",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Debug",
+                    "type": "Button",
+                    "id": "29368057-623d-4797-9dbc-e198f7c4480e",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -85,6 +103,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "Toggle Atmosphere",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "536e225b-5e48-4dd2-9514-6b81bdb0fb93",
+                    "path": "<Keyboard>/b",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Background",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0f02f028-6021-47ef-b1f5-0b7c812f9666",
+                    "path": "<Keyboard>/backquote",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Debug",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

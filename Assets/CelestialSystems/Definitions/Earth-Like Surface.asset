@@ -18,4 +18,5 @@ MonoBehaviour:
   tileSizeMeters: 1000
   adjacentPreloadDistanceMeters: 3000
   meshResolution: 65
-  material: {fileID: 0}
+  material: {fileID: 2100000, guid: 24d4a3f8350ce854995980551426eb93, type: 2}
+  surfaceAppearance: {fileID: 11400000, guid: 8c3c603ae7b75ee408f3fda097751163, type: 2}
