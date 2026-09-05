@@ -1747,9 +1747,13 @@ namespace jcan.CelestialSystems
                 (resolution - 1) *
                 (resolution - 1) *
                 6;
+            // Skirt quads are intentionally double-sided. Very sharp relief can
+            // twist an edge quad far enough for one half to reverse its facing;
+            // rendering the reverse winding keeps the seam covered without
+            // disabling back-face culling on the terrain surface itself.
             var skirtTriangleIndexCount =
                 ringCount *
-                6;
+                12;
             var triangles =
                 new int[
                     coreTriangleIndexCount +
@@ -1760,10 +1764,6 @@ namespace jcan.CelestialSystems
             var referencePosition =
                 node.CenterDirection *
                 radius;
-            var skirtDepth =
-                ResolveSkirtDepthMeters(
-                    node.Address);
-
             for (var sampleY = 0;
                 sampleY < resolution;
                 sampleY++)
@@ -1870,6 +1870,42 @@ namespace jcan.CelestialSystems
             var boundary =
                 BuildBoundaryRing(
                     resolution);
+            var skirtDepth =
+                ResolveSkirtDepthMeters(
+                    node.Address);
+            var maximumParentDisplacement =
+                0.0;
+
+            for (var ringIndex = 0;
+                ringIndex < boundary.Length;
+                ringIndex++)
+            {
+                var coreIndex =
+                    boundary[ringIndex];
+                var displacement =
+                    Magnitude(
+                        ToDoubleVector3(
+                            detailVertices[coreIndex]) -
+                        ToDoubleVector3(
+                            parentVertices[coreIndex]));
+
+                maximumParentDisplacement =
+                    Math.Max(
+                        maximumParentDisplacement,
+                        displacement);
+            }
+
+            // A fixed fraction of cell size is enough for smooth terrain, but
+            // not for deliberately aggressive high-frequency relief. Extend
+            // the skirt beyond the exact detail-to-parent edge displacement so
+            // it continues to overlap the neighboring coarse patch throughout
+            // the entire morph.
+            skirtDepth =
+                Math.Max(
+                    skirtDepth,
+                    maximumParentDisplacement *
+                        1.25 +
+                    minimumSkirtDepthMeters);
 
             for (var ringIndex = 0;
                 ringIndex < boundary.Length;
@@ -1896,9 +1932,12 @@ namespace jcan.CelestialSystems
                     ToDoubleVector3(
                         parentVertices[coreIndex]) +
                     referencePosition;
+                var parentDirection =
+                    Normalize(
+                        parentCorePosition);
                 var parentSkirtPosition =
                     parentCorePosition -
-                        direction *
+                        parentDirection *
                             skirtDepth -
                     referencePosition;
 
@@ -1946,6 +1985,19 @@ namespace jcan.CelestialSystems
                     skirtFirst;
                 triangles[triangleIndex++] =
                     skirtSecond;
+
+                triangles[triangleIndex++] =
+                    coreSecond;
+                triangles[triangleIndex++] =
+                    skirtFirst;
+                triangles[triangleIndex++] =
+                    coreFirst;
+                triangles[triangleIndex++] =
+                    skirtSecond;
+                triangles[triangleIndex++] =
+                    skirtFirst;
+                triangles[triangleIndex++] =
+                    coreSecond;
             }
 
             visual.Mesh.Clear();
