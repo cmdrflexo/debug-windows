@@ -38,6 +38,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Material material;
 
+        [SerializeField]
+        [Tooltip("Optional reusable appearance definition. Its ordered layers correspond to MapMagic surface-control outputs.")]
+        private CelestialSurfaceDefinition surfaceAppearance;
+
         public Graph Graph =>
             graph;
 
@@ -59,6 +63,9 @@ namespace jcan.CelestialSystems
         public Material Material =>
             material;
 
+        public CelestialSurfaceDefinition SurfaceAppearance =>
+            surfaceAppearance;
+
         public bool HasValidSettings =>
             graph != null &&
             IsFinite(elevationOffsetMeters) &&
@@ -67,7 +74,9 @@ namespace jcan.CelestialSystems
             IsFinite(
                 adjacentPreloadDistanceMeters) &&
             adjacentPreloadDistanceMeters >= 0.0 &&
-            meshResolution >= 3;
+            meshResolution >= 3 &&
+            (surfaceAppearance == null ||
+                surfaceAppearance.HasValidSettings);
 
         private static bool IsFinite(
             double value)
