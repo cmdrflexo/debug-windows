@@ -372,10 +372,11 @@ Assign the `FreeUniverseAnchorController` component with the alias `anchor`:
 
 ```text
 Altitude: {anchor.NearestPlanetAltitudeMeters:N1|--} m
-Move speed: {anchor.CurrentMoveSpeedMetersPerSecond:N1|--} m/s ({anchor.MoveSpeedMultiplier:N3|--}×)
+Move speed: {anchor.CurrentMoveSpeedMetersPerSecond:N1|--} m/s
+Manual / boost: {anchor.MoveSpeedMultiplier:N3|--}× / {anchor.CurrentBoostMultiplier:N2|--}×
 ```
 
-`CurrentMoveSpeedMetersPerSecond` includes both the automatic altitude-based speed and the manual multiplier. `AutomaticMoveSpeedMetersPerSecond` is also available when the two factors need to be shown separately. Check `HasNearestPlanet` before treating the altitude as valid.
+`CurrentMoveSpeedMetersPerSecond` includes the automatic altitude-based speed, persistent manual multiplier, and temporary hold boost. `AutomaticMoveSpeedMetersPerSecond`, `IsBoosting`, and each multiplier are also available separately. Check `HasNearestPlanet` before treating the altitude as valid.
 
 ### Universe frame origin
 
