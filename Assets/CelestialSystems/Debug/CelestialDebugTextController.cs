@@ -187,10 +187,15 @@ namespace jcan.CelestialSystems
         private string compiledTemplate;
         private int compiledSourceSignature;
         private double nextRefreshTime;
+        private string renderedText = string.Empty;
 
         public string HeaderCode => headerCode;
 
         public string DisplayCode => displayCode;
+
+        public string RenderedText => renderedText;
+
+        public string LastConfigurationError => lastConfigurationError;
 
         private void Reset()
         {
@@ -237,11 +242,6 @@ namespace jcan.CelestialSystems
 
         private void RefreshText()
         {
-            if (targetText == null)
-            {
-                return;
-            }
-
             EnsureTemplateCompiled();
             outputBuilder.Clear();
 
@@ -279,7 +279,12 @@ namespace jcan.CelestialSystems
                 }
             }
 
-            targetText.text = outputBuilder.ToString();
+            renderedText = outputBuilder.ToString();
+
+            if (targetText != null)
+            {
+                targetText.text = renderedText;
+            }
         }
 
         private void EnsureTemplateCompiled()

@@ -20,6 +20,7 @@ namespace jcan.DebugWindows
 
         public RectTransform Root { get; }
         public float TextSize => manager.TextSize;
+        internal DebugWindowManager Manager => manager;
 
         public TMP_Text AddText(string text)
         {

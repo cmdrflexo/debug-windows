@@ -9,6 +9,7 @@ using System.IO;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 
 namespace jcan.DebugWindows
 {
@@ -33,6 +34,7 @@ namespace jcan.DebugWindows
             public DebugWindowDisplayState state;
             public float positionX;
             public float positionY;
+            public bool pinned;
         }
 
         [Header("Scene")]
@@ -61,6 +63,15 @@ namespace jcan.DebugWindows
         [Min(0.0f)]
         private float spacing = 4.0f;
 
+        [Header("Visuals")]
+        [SerializeField]
+        [Tooltip("Optional 9-sliced sprite used by every generated window background.")]
+        private Sprite windowBackgroundSprite;
+
+        [SerializeField]
+        [Tooltip("Optional 9-sliced outline sprite used by list and text-input frames.")]
+        private Sprite listFrameSprite;
+
         [Header("Colors")]
         [SerializeField]
         private Color windowColor = new Color(0.06f, 0.07f, 0.09f, 0.94f);
@@ -75,7 +86,11 @@ namespace jcan.DebugWindows
         private Color textColor = Color.white;
 
         [SerializeField]
-        private Color checkColor = new Color(0.30f, 0.85f, 0.50f, 1.0f);
+        [FormerlySerializedAs("checkColor")]
+        private Color accentColor = new Color(0.30f, 0.85f, 0.50f, 1.0f);
+
+        [SerializeField]
+        private Color selectionColor = new Color(0.20f, 0.45f, 0.70f, 0.65f);
 
         [Header("Persistence")]
         [SerializeField]
@@ -108,6 +123,7 @@ namespace jcan.DebugWindows
         private float smoothedUnscaledDeltaTime;
         private bool initialized;
         private bool applicationIsQuitting;
+        private bool menuVisible = true;
 
         public static DebugWindowManager Instance { get; private set; }
 
@@ -117,13 +133,19 @@ namespace jcan.DebugWindows
         public float MinimumWindowWidth => minimumWindowWidth;
         public int Padding => padding;
         public float Spacing => spacing;
+        public Sprite WindowBackgroundSprite => windowBackgroundSprite;
+        public Sprite ListFrameSprite => listFrameSprite;
         public Color WindowColor => windowColor;
         public Color TitleColor => titleColor;
         public Color ButtonColor => buttonColor;
         public Color TextColor => textColor;
-        public Color CheckColor => checkColor;
+        public Color AccentColor => accentColor;
+        public Color SelectionColor => selectionColor;
         public string LayoutFilePath => layoutFilePath;
         public string LastPersistenceError => lastPersistenceError;
+        public bool MenuVisible => menuVisible;
+
+        public event Action<bool> MenuVisibilityChanged;
 
         private void Awake()
         {
@@ -234,11 +256,13 @@ namespace jcan.DebugWindows
             {
                 view.SetPosition(new Vector2(saved.positionX, saved.positionY), false);
                 view.SetState(saved.state, false);
+                view.SetPinned(saved.pinned, false);
             }
             else
             {
                 view.SetPosition(registration.DefaultPosition, false);
                 view.SetState(registration.DefaultState, false);
+                view.SetPinned(false, false);
             }
 
             if (registration.UniqueId != CoreWindowId)
@@ -296,6 +320,29 @@ namespace jcan.DebugWindows
                 true);
         }
 
+        public void TogglePinned(string uniqueId)
+        {
+            if (views.TryGetValue(uniqueId, out var view))
+                view.SetPinned(!view.Pinned, true);
+        }
+
+        public void ToggleMenuVisibility()
+        {
+            SetMenuVisible(!menuVisible);
+        }
+
+        public void SetMenuVisible(bool visible)
+        {
+            if (menuVisible == visible)
+                return;
+
+            menuVisible = visible;
+            foreach (var view in views.Values)
+                view.RefreshPresentation();
+
+            MenuVisibilityChanged?.Invoke(menuVisible);
+        }
+
         public void SaveLayout()
         {
             if (!initialized || string.IsNullOrWhiteSpace(layoutFilePath))
@@ -313,7 +360,8 @@ namespace jcan.DebugWindows
                     uniqueId = pair.Key,
                     state = view.State,
                     positionX = view.Position.x,
-                    positionY = view.Position.y
+                    positionY = view.Position.y,
+                    pinned = view.Pinned
                 });
             }
 
@@ -337,6 +385,44 @@ namespace jcan.DebugWindows
             {
                 lastPersistenceError = exception.Message;
                 Debug.LogWarning($"Could not save debug window layout: {exception.Message}", this);
+            }
+        }
+
+        private void LoadLayout()
+        {
+            loadedStates.Clear();
+            lastPersistenceError = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(layoutFilePath) ||
+                !File.Exists(layoutFilePath))
+                return;
+
+            try
+            {
+                var layout = JsonUtility.FromJson<SavedLayout>(
+                    File.ReadAllText(layoutFilePath));
+
+                if (layout?.windows == null)
+                    return;
+
+                for (var i = 0; i < layout.windows.Count; i++)
+                {
+                    var saved = layout.windows[i];
+                    if (saved == null ||
+                        string.IsNullOrWhiteSpace(saved.uniqueId) ||
+                        !Enum.IsDefined(typeof(DebugWindowDisplayState), saved.state) ||
+                        !IsFinite(saved.positionX) ||
+                        !IsFinite(saved.positionY))
+                        continue;
+
+                    // The last valid duplicate wins. The next save writes one current entry.
+                    loadedStates[saved.uniqueId] = saved;
+                }
+            }
+            catch (Exception exception)
+            {
+                lastPersistenceError = exception.Message;
+                Debug.LogWarning($"Could not load debug window layout: {exception.Message}", this);
             }
         }
 
@@ -478,11 +564,16 @@ namespace jcan.DebugWindows
                     textSize,
                     textColor,
                     buttonColor,
-                    checkColor,
+                    accentColor,
                     value => SetWindowState(
                         uniqueId,
                         value ? DebugWindowDisplayState.Open : DebugWindowDisplayState.Closed));
             }
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }
