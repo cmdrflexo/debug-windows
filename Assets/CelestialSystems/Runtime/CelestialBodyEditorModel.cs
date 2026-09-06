@@ -152,6 +152,7 @@ namespace jcan.CelestialSystems
             position = default;
             velocity = default;
             if (universeFrame == null || orbitParent == null ||
+                orbitParent.Definition == null ||
                 !orbitParent.TryGetMotionState(out var parentState))
             {
                 error = "On-rails spawning requires an active parent body and universe frame.";
