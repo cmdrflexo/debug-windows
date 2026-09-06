@@ -253,7 +253,7 @@ namespace jcan.CelestialSystems
             {
                 var value = catalog.BodyDefinitions[i];
                 if (value != null)
-                    result.Add(new DebugChoiceOption(value.DefinitionId, value.DefinitionId, value));
+                    result.Add(new DebugChoiceOption(value.DefinitionId, value.name, value));
             }
             return result;
         }
