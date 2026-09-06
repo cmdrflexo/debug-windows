@@ -336,13 +336,37 @@ namespace jcan.CelestialSystems
             instance.name =
                 $"{request.Definition.DefinitionId} ({request.InstanceId})";
 
+            var gravityBodyAdded = false;
             try
             {
                 gravityEngine.AddBody(
                     instance.gameObject);
+                gravityBodyAdded = true;
+
+                if (request.MotionMode ==
+                    CelestialBodySpawnMode.OnRails)
+                {
+                    var orbit =
+                        instance.GetComponent<OrbitUniversal>();
+                    if (orbit == null)
+                    {
+                        orbit =
+                            instance.gameObject.AddComponent<OrbitUniversal>();
+                    }
+
+                    orbit.InitFromActiveNBody(
+                        gravityBody,
+                        request.OrbitCenter.GravityBody,
+                        OrbitUniversal.EvolveMode.KEPLERS_EQN);
+                }
             }
             catch (Exception exception)
             {
+                if (gravityBodyAdded)
+                {
+                    gravityEngine.RemoveBody(
+                        instance.gameObject);
+                }
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
@@ -644,10 +668,22 @@ namespace jcan.CelestialSystems
                 !IsFinite(
                     request.InitialVelocityMetersPerSecond) ||
                 !IsFinite(
+                    request.InitialAngularVelocityRadiansPerSecond) ||
+                !IsFinite(
                     request.InitialRotation))
             {
                 return RecordSpawnFailure(
                     "The spawned body's starting position, velocity, and rotation must contain finite values.");
+            }
+
+            if (request.MotionMode ==
+                CelestialBodySpawnMode.OnRails &&
+                (request.OrbitCenter == null ||
+                    request.OrbitCenter.GravityBody == null ||
+                    request.OrbitCenter.Definition == null))
+            {
+                return RecordSpawnFailure(
+                    "An on-rails celestial body requires an active orbit-center body.");
             }
 
             RefreshMotionBackendState();

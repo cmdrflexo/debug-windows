@@ -22,6 +22,12 @@ namespace jcan.CelestialSystems
 
         public Transform ParentOverride { get; }
 
+        public CelestialBodySpawnMode MotionMode { get; }
+
+        public CelestialBodyRuntimeContext OrbitCenter { get; }
+
+        public DoubleVector3 InitialAngularVelocityRadiansPerSecond { get; }
+
         public CelestialBodySpawnRequest(
             string instanceId,
             CelestialBodyDefinition definition,
@@ -29,7 +35,10 @@ namespace jcan.CelestialSystems
             DoubleVector3 initialVelocityMetersPerSecond,
             Quaternion initialRotation,
             RoundMapMagicSurfaceQualityProfile qualityProfile = null,
-            Transform parentOverride = null)
+            Transform parentOverride = null,
+            CelestialBodySpawnMode motionMode = CelestialBodySpawnMode.FreeSimulation,
+            CelestialBodyRuntimeContext orbitCenter = null,
+            DoubleVector3 initialAngularVelocityRadiansPerSecond = default)
         {
             InstanceId = instanceId;
             Definition = definition;
@@ -40,6 +49,10 @@ namespace jcan.CelestialSystems
             InitialRotation = initialRotation;
             QualityProfile = qualityProfile;
             ParentOverride = parentOverride;
+            MotionMode = motionMode;
+            OrbitCenter = orbitCenter;
+            InitialAngularVelocityRadiansPerSecond =
+                initialAngularVelocityRadiansPerSecond;
         }
     }
 }
