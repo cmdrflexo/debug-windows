@@ -169,7 +169,7 @@ namespace jcan.DebugWindows
             var row = CreateRow(label);
             var input = CreateInput(
                 row,
-                value.ToString("G17", CultureInfo.InvariantCulture),
+                FormatNumber(value),
                 text =>
                 {
                     if (double.TryParse(
@@ -242,6 +242,17 @@ namespace jcan.DebugWindows
                 manager.TextColor,
                 clicked,
                 Mathf.Max(72.0f, manager.MinimumWindowWidth * 0.45f));
+        }
+
+        private static string FormatNumber(double value)
+        {
+            if (value == 0.0)
+                return "0";
+
+            var magnitude = Math.Abs(value);
+            return magnitude >= 1.0e15 || magnitude < 1.0e-6
+                ? value.ToString("0.###############E+0", CultureInfo.InvariantCulture)
+                : value.ToString("0.###############", CultureInfo.InvariantCulture);
         }
 
         private RectTransform CreateRow(string label)
