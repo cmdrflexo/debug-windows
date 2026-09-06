@@ -226,12 +226,12 @@ namespace jcan.DebugWindows
             frameSize.flexibleWidth = 1.0f;
             frameSize.flexibleHeight = 1.0f;
 
-            var frameImage = DebugWindowUi.AddImage(frame.gameObject, Color.clear);
+            var frameImage = DebugWindowUi.AddImage(frame.gameObject, windowContent.Manager.ElementColor);
             if (windowContent.Manager.ListFrameSprite != null)
             {
                 frameImage.sprite = windowContent.Manager.ListFrameSprite;
                 frameImage.type = Image.Type.Sliced;
-                frameImage.color = Color.white;
+                frameImage.color = windowContent.Manager.ElementColor;
             }
 
             var viewport = DebugWindowUi.CreateRect("Viewport", frame);
@@ -333,12 +333,12 @@ namespace jcan.DebugWindows
             var inputSize = inputFrame.gameObject.AddComponent<LayoutElement>();
             inputSize.flexibleWidth = 1.0f;
             inputSize.preferredHeight = windowContent.Manager.TextSize + 8.0f;
-            var inputImage = DebugWindowUi.AddImage(inputFrame.gameObject, Color.clear);
+            var inputImage = DebugWindowUi.AddImage(inputFrame.gameObject, windowContent.Manager.ElementColor);
             if (windowContent.Manager.ListFrameSprite != null)
             {
                 inputImage.sprite = windowContent.Manager.ListFrameSprite;
                 inputImage.type = Image.Type.Sliced;
-                inputImage.color = Color.white;
+                inputImage.color = windowContent.Manager.ElementColor;
             }
 
             var textArea = DebugWindowUi.CreateRect("Text Area", inputFrame);

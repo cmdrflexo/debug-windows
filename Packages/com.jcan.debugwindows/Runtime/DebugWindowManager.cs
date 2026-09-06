@@ -88,6 +88,10 @@ namespace jcan.DebugWindows
         private Color buttonColor = new Color(0.22f, 0.27f, 0.34f, 1.0f);
 
         [SerializeField]
+        [Tooltip("Tint used by framed controls such as tabs, lists, and text fields.")]
+        private Color elementColor = new Color(0.06f, 0.07f, 0.09f, 0.94f);
+
+        [SerializeField]
         private Color textColor = Color.white;
 
         [SerializeField]
@@ -144,6 +148,7 @@ namespace jcan.DebugWindows
         public Color WindowColor => windowColor;
         public Color TitleColor => titleColor;
         public Color ButtonColor => buttonColor;
+        public Color ElementColor => elementColor;
         public Color TextColor => textColor;
         public Color AccentColor => accentColor;
         public Color SelectionColor => selectionColor;
