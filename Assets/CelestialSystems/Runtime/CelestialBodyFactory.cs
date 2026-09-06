@@ -336,10 +336,12 @@ namespace jcan.CelestialSystems
             instance.name =
                 $"{request.Definition.DefinitionId} ({request.InstanceId})";
 
+            var gravityBodyAdded = false;
             try
             {
                 gravityEngine.AddBody(
                     instance.gameObject);
+                gravityBodyAdded = true;
 
                 if (request.MotionMode ==
                     CelestialBodySpawnMode.OnRails)
@@ -360,8 +362,11 @@ namespace jcan.CelestialSystems
             }
             catch (Exception exception)
             {
-                gravityEngine.RemoveBody(
-                    instance.gameObject);
+                if (gravityBodyAdded)
+                {
+                    gravityEngine.RemoveBody(
+                        instance.gameObject);
+                }
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
