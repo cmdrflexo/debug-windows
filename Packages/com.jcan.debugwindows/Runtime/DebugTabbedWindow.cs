@@ -105,6 +105,11 @@ namespace jcan.DebugWindows
             return true;
         }
 
+        public void RefreshActivePage()
+        {
+            ActivePageChanged?.Invoke();
+        }
+
         internal DebugTabbedPage GetActivePage()
         {
             return pages.Find(page => page.UniqueId == activePageId) ?? pages[0];
@@ -189,6 +194,21 @@ namespace jcan.DebugWindows
             }
 
             return input;
+        }
+
+        public DebugChoiceField AddChoice(
+            string label,
+            IReadOnlyList<DebugChoiceOption> options,
+            string selectedId,
+            Action<DebugChoiceOption> changed)
+        {
+            var row = CreateRow(label);
+            return DebugChoiceField.Create(
+                manager,
+                row,
+                options,
+                selectedId,
+                changed);
         }
 
         public Toggle AddToggle(
