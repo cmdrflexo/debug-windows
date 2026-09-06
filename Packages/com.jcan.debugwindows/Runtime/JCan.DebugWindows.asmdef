@@ -1,0 +1,9 @@
+{
+  "name": "JCan.DebugWindows",
+  "rootNamespace": "jcan.DebugWindows",
+  "references": [
+    "Unity.TextMeshPro",
+    "Unity.ugui"
+  ],
+  "autoReferenced": true
+}
