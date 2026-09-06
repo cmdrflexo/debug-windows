@@ -12,6 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43b7d6eb33dd4c38b8898ea64d89f51e, type: 3}
   m_Name: Default Surface Quality
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.RoundMapMagicSurfaceQualityProfile
+  adaptivePatchResolution: 33
+  adaptiveMinimumLevel: 0
+  adaptiveMaximumLevel: 20
+  adaptiveCollisionMaximumLevel: 20
+  adaptiveMaximumScreenErrorPixels: 2
+  adaptiveLodHysteresisFraction: 0.15
+  adaptiveMaximumPatchCount: 768
+  adaptiveMaximumMeshBuildsPerFrame: 4
+  adaptiveGenerationMargins: 2
+  adaptivePrewarmCoarseSurface: 1
+  adaptiveLodMorphDurationSeconds: 0.35
+  adaptiveSkirtDepthCellFraction: 0.02
+  adaptiveMinimumSkirtDepthMeters: 1
+  adaptiveCastShadows: 1
+  adaptiveReceiveShadows: 1
+  adaptiveCollisionEnabled: 1
+  adaptiveCollisionFollowsCamera: 1
+  adaptiveCollisionCoverageRadiusMeters: 256
+  adaptiveCollisionPrefetchMarginMeters: 128
+  adaptiveCollisionSampleSpacingMeters: 8
+  adaptiveCollisionActivationAltitudeMeters: 2500
+  adaptiveCollisionMaximumPatchCount: 128
+  adaptiveCollisionMeshBuildsPerFrame: 2
+  adaptiveCollisionRetirementDelaySeconds: 1
+  adaptiveCollisionLayer: 0
   localMeshResolution: 65
   localCoverageRadiusMeters: 5000
   localPrefetchMarginMeters: 1000
