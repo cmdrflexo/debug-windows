@@ -34,6 +34,7 @@ namespace jcan.DebugWindows
         private Action<DebugChoiceOption> changed;
         private TMP_Text caption;
         private RectTransform popup;
+        private RectTransform dismissLayer;
         private string selectedId;
 
         internal static DebugChoiceField Create(
@@ -122,6 +123,15 @@ namespace jcan.DebugWindows
             if (manager == null || manager.WindowsRoot == null || options.Count == 0)
                 return;
 
+            dismissLayer = DebugWindowUi.CreateRect("Choice Dismiss Layer", manager.WindowsRoot);
+            DebugWindowUi.Stretch(dismissLayer);
+            dismissLayer.SetAsLastSibling();
+            var dismissImage = DebugWindowUi.AddImage(dismissLayer.gameObject, Color.clear);
+            dismissImage.raycastTarget = true;
+            var dismissButton = dismissLayer.gameObject.AddComponent<Button>();
+            dismissButton.targetGraphic = dismissImage;
+            dismissButton.onClick.AddListener(ClosePopup);
+
             popup = DebugWindowUi.CreateRect("Choice Popup", manager.WindowsRoot);
             popup.anchorMin = new Vector2(0.0f, 1.0f);
             popup.anchorMax = new Vector2(0.0f, 1.0f);
@@ -184,7 +194,7 @@ namespace jcan.DebugWindows
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = manager.TextSize + 4.0f;
             var image = DebugWindowUi.AddImage(
                 row.gameObject,
-                option.UniqueId == selectedId ? manager.SelectionColor : Color.clear);
+                option.UniqueId == selectedId ? manager.SelectionColor : manager.ElementColor);
             var button = row.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             var label = DebugWindowUi.CreateText(
@@ -243,10 +253,17 @@ namespace jcan.DebugWindows
 
         private void ClosePopup()
         {
-            if (popup == null)
-                return;
-            Destroy(popup.gameObject);
-            popup = null;
+            if (popup != null)
+            {
+                Destroy(popup.gameObject);
+                popup = null;
+            }
+
+            if (dismissLayer != null)
+            {
+                Destroy(dismissLayer.gameObject);
+                dismissLayer = null;
+            }
         }
     }
 }
