@@ -73,6 +73,10 @@ namespace jcan.DebugWindows
         private float controlVerticalPadding = 6.0f;
 
         [SerializeField]
+        [Min(40.0f)]
+        private float fieldLabelWidth = 120.0f;
+
+        [SerializeField]
         [Min(60.0f)]
         private float preferredFieldWidth = 180.0f;
 
@@ -156,6 +160,7 @@ namespace jcan.DebugWindows
         public float Spacing => spacing;
         public float ControlHorizontalPadding => controlHorizontalPadding;
         public float ControlVerticalPadding => controlVerticalPadding;
+        public float FieldLabelWidth => fieldLabelWidth;
         public float PreferredFieldWidth => preferredFieldWidth;
         public Sprite WindowBackgroundSprite => windowBackgroundSprite;
         public Sprite ListFrameSprite => listFrameSprite;
