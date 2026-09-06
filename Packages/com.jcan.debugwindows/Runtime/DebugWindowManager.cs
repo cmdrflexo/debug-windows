@@ -362,6 +362,7 @@ namespace jcan.DebugWindows
                 if (view == null)
                     continue;
 
+                registrations.TryGetValue(pair.Key, out var registration);
                 layout.windows.Add(new SavedWindow
                 {
                     uniqueId = pair.Key,
@@ -369,7 +370,7 @@ namespace jcan.DebugWindows
                     positionX = view.Position.x,
                     positionY = view.Position.y,
                     pinned = view.Pinned,
-                    customState = pair.Value.Registration.CaptureCustomState?.Invoke()
+                    customState = registration?.CaptureCustomState?.Invoke()
                 });
             }
 
