@@ -1,0 +1,13 @@
+{
+  "name": "com.jcan.debugwindows",
+  "version": "0.1.0",
+  "displayName": "JCan Debug Windows",
+  "description": "Portable runtime debug windows with dragging, collapsing, registration, and persistent layouts.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  },
+  "author": {
+    "name": "JCan"
+  }
+}

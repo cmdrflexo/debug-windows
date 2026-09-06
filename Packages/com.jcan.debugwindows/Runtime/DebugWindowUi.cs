@@ -1,0 +1,139 @@
+/*
+ * Creates the minimal uGUI and TextMeshPro controls used by runtime debug windows.
+ */
+
+using System;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace jcan.DebugWindows
+{
+    internal static class DebugWindowUi
+    {
+        public static RectTransform CreateRect(string name, Transform parent)
+        {
+            var gameObject = new GameObject(name, typeof(RectTransform));
+            gameObject.layer = parent.gameObject.layer;
+            var rect = (RectTransform)gameObject.transform;
+            rect.SetParent(parent, false);
+            return rect;
+        }
+
+        public static Image AddImage(GameObject target, Color color)
+        {
+            var image = target.AddComponent<Image>();
+            image.color = color;
+            return image;
+        }
+
+        public static TextMeshProUGUI CreateText(
+            string name,
+            Transform parent,
+            string text,
+            float size,
+            Color color,
+            TextAlignmentOptions alignment)
+        {
+            var rect = CreateRect(name, parent);
+            var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            label.text = text;
+            label.fontSize = size;
+            label.color = color;
+            label.alignment = alignment;
+            label.raycastTarget = false;
+            label.enableWordWrapping = false;
+            return label;
+        }
+
+        public static Button CreateButton(
+            string name,
+            Transform parent,
+            string text,
+            float textSize,
+            Color background,
+            Color foreground,
+            Action clicked,
+            float width)
+        {
+            var rect = CreateRect(name, parent);
+            var image = AddImage(rect.gameObject, background);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            rect.gameObject.AddComponent<LayoutElement>().preferredWidth = width;
+
+            var label = CreateText(
+                "Label",
+                rect,
+                text,
+                textSize,
+                foreground,
+                TextAlignmentOptions.Center);
+            Stretch(label.rectTransform);
+
+            if (clicked != null)
+                button.onClick.AddListener(() => clicked());
+
+            return button;
+        }
+
+        public static Toggle CreateToggle(
+            string name,
+            Transform parent,
+            string text,
+            bool isOn,
+            float textSize,
+            Color foreground,
+            Color controlBackground,
+            Color checkColor,
+            Action<bool> changed)
+        {
+            var row = CreateRect(name, parent);
+            var rowLayout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.spacing = 6.0f;
+            rowLayout.childAlignment = TextAnchor.MiddleLeft;
+            rowLayout.childControlWidth = true;
+            rowLayout.childControlHeight = true;
+            rowLayout.childForceExpandWidth = false;
+            rowLayout.childForceExpandHeight = false;
+
+            var box = CreateRect("Box", row);
+            var boxImage = AddImage(box.gameObject, controlBackground);
+            var boxLayout = box.gameObject.AddComponent<LayoutElement>();
+            boxLayout.preferredWidth = textSize;
+            boxLayout.preferredHeight = textSize;
+
+            var check = CreateRect("Checkmark", box);
+            var checkImage = AddImage(check.gameObject, checkColor);
+            check.anchorMin = new Vector2(0.2f, 0.2f);
+            check.anchorMax = new Vector2(0.8f, 0.8f);
+            check.offsetMin = Vector2.zero;
+            check.offsetMax = Vector2.zero;
+
+            var label = CreateText(
+                "Label",
+                row,
+                text,
+                textSize,
+                foreground,
+                TextAlignmentOptions.MidlineLeft);
+            label.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1.0f;
+
+            var toggle = row.gameObject.AddComponent<Toggle>();
+            toggle.targetGraphic = boxImage;
+            toggle.graphic = checkImage;
+            toggle.isOn = isOn;
+            if (changed != null)
+                toggle.onValueChanged.AddListener(value => changed(value));
+            return toggle;
+        }
+
+        public static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+    }
+}

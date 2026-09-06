@@ -2586,6 +2586,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1757395888}
+  - component: {fileID: 1757395889}
   m_Layer: 5
   m_Name: Debug Window Manager
   m_TagString: Untagged
@@ -2612,6 +2613,34 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1757395889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757395887}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74f727fe0e5e4ed08f6f93d0202462b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: JCan.DebugWindows::jcan.DebugWindows.DebugWindowManager
+  windowsRoot: {fileID: 1894990529}
+  textSize: 18
+  titleTextSize: 18
+  minimumWindowWidth: 180
+  padding: 6
+  spacing: 4
+  windowColor: {r: 0.06, g: 0.07, b: 0.09, a: 0.94}
+  titleColor: {r: 0.12, g: 0.16, b: 0.22, a: 1}
+  buttonColor: {r: 0.22, g: 0.27, b: 0.34, a: 1}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  checkColor: {r: 0.3, g: 0.85, b: 0.5, a: 1}
+  layoutFileName: jcan-debug-windows.json
+  fpsSmoothingSeconds: 0.5
+  fpsRefreshIntervalSeconds: 0.1
+  layoutFilePath: 
+  lastPersistenceError: 
 --- !u!1 &1798278914
 GameObject:
   m_ObjectHideFlags: 0
