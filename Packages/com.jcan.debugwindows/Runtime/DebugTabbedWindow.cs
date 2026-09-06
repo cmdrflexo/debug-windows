@@ -276,7 +276,9 @@ namespace jcan.DebugWindows
                 manager.TextSize,
                 manager.TextColor,
                 TextAlignmentOptions.MidlineLeft);
-            name.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1.0f;
+            var labelSize = name.gameObject.AddComponent<LayoutElement>();
+            labelSize.preferredWidth = manager.FieldLabelWidth;
+            labelSize.flexibleWidth = 0.0f;
             return row;
         }
 
@@ -292,7 +294,7 @@ namespace jcan.DebugWindows
                 manager.TextColor,
                 TextAlignmentOptions.MidlineRight);
             value.gameObject.AddComponent<LayoutElement>().preferredWidth =
-                manager.MinimumWindowWidth * 0.55f;
+                manager.PreferredFieldWidth;
 
             if (provider != null)
             {
