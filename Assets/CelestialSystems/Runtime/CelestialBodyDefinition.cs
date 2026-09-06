@@ -128,6 +128,28 @@ namespace jcan.CelestialSystems
             }
         }
 
+        internal void ConfigureRuntime(
+            string newDefinitionId,
+            double newMassKilograms,
+            double newReferenceRadiusMeters,
+            int newGenerationSeed,
+            Vector3 newNorthAxis,
+            Vector3 newPoleReferenceAxis,
+            CelestialSurfaceSystem newSurfaceSystem,
+            RoundMapMagicSurfaceDefinition newRoundMapMagicSurface,
+            OceanDefinition newOceanDefinition)
+        {
+            definitionId = newDefinitionId?.Trim();
+            massKilograms = newMassKilograms;
+            referenceRadiusMeters = newReferenceRadiusMeters;
+            generationSeed = newGenerationSeed;
+            northAxis = newNorthAxis;
+            poleReferenceAxis = newPoleReferenceAxis;
+            surfaceSystem = newSurfaceSystem;
+            roundMapMagicSurface = newRoundMapMagicSurface;
+            oceanDefinition = newOceanDefinition;
+        }
+
         private static bool IsFinite(
             double value)
         {
