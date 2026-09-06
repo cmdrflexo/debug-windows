@@ -33,7 +33,12 @@ namespace jcan.CelestialSystems
                     new DebugTabbedPage("surface", "Surface", BuildPlaceholder),
                     new DebugTabbedPage("ocean", "Ocean", BuildOcean),
                     new DebugTabbedPage("motion", "Motion / Orbit", BuildPlaceholder),
-                    new DebugTabbedPage("spawn", "Spawn", BuildPlaceholder)
+                    new DebugTabbedPage("spawn", "Spawn", BuildPlaceholder),
+                    new DebugTabbedPage("atmosphere", "Atmosphere", BuildPlaceholder),
+                    new DebugTabbedPage("rendering", "Rendering", BuildPlaceholder),
+                    new DebugTabbedPage("satellites", "Satellites", BuildPlaceholder),
+                    new DebugTabbedPage("metadata", "Metadata", BuildPlaceholder),
+                    new DebugTabbedPage("diagnostics", "Diagnostics", BuildPlaceholder)
                 },
                 BuildFooter,
                 new Vector2(440.0f, 320.0f),
