@@ -15,6 +15,8 @@ namespace jcan.DebugWindows
         public Vector2 DefaultPosition { get; }
         public bool CanClose { get; }
         public Action<DebugWindowContent> BuildContent { get; }
+        public Func<string> CaptureCustomState { get; }
+        public Action<string> RestoreCustomState { get; }
 
         public DebugWindowRegistration(
             string uniqueId,
@@ -22,7 +24,9 @@ namespace jcan.DebugWindows
             Action<DebugWindowContent> buildContent,
             DebugWindowDisplayState defaultState = DebugWindowDisplayState.Closed,
             Vector2? defaultPosition = null,
-            bool canClose = true)
+            bool canClose = true,
+            Func<string> captureCustomState = null,
+            Action<string> restoreCustomState = null)
         {
             if (string.IsNullOrWhiteSpace(uniqueId))
                 throw new ArgumentException("A debug window requires a stable unique ID.", nameof(uniqueId));
@@ -37,6 +41,8 @@ namespace jcan.DebugWindows
                 : DebugWindowDisplayState.Collapsed;
             DefaultPosition = defaultPosition ?? Vector2.zero;
             CanClose = canClose;
+            CaptureCustomState = captureCustomState;
+            RestoreCustomState = restoreCustomState;
         }
     }
 }
