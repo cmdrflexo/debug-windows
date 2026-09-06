@@ -225,7 +225,8 @@ namespace jcan.DebugWindows
                 manager.TextColor,
                 manager.ButtonColor,
                 manager.AccentColor,
-                changed);
+                changed,
+                manager.ControlVerticalPadding);
         }
 
         public Button AddButton(
@@ -241,7 +242,9 @@ namespace jcan.DebugWindows
                 manager.ButtonColor,
                 manager.TextColor,
                 clicked,
-                Mathf.Max(72.0f, manager.MinimumWindowWidth * 0.45f));
+                Mathf.Max(72.0f, manager.MinimumWindowWidth * 0.45f),
+                manager.ControlHorizontalPadding,
+                manager.ControlVerticalPadding);
         }
 
         private static string FormatNumber(double value)
@@ -307,8 +310,8 @@ namespace jcan.DebugWindows
         {
             var frame = DebugWindowUi.CreateRect("Input", row);
             var frameSize = frame.gameObject.AddComponent<LayoutElement>();
-            frameSize.preferredWidth = manager.MinimumWindowWidth * 0.65f;
-            frameSize.preferredHeight = manager.TextSize + 8.0f;
+            frameSize.preferredWidth = manager.PreferredFieldWidth;
+            frameSize.preferredHeight = manager.TextSize + manager.ControlVerticalPadding * 2.0f;
 
             var image = DebugWindowUi.AddImage(frame.gameObject, manager.ElementColor);
             if (manager.ListFrameSprite != null)
@@ -319,8 +322,12 @@ namespace jcan.DebugWindows
 
             var viewport = DebugWindowUi.CreateRect("Text Area", frame);
             DebugWindowUi.Stretch(viewport);
-            viewport.offsetMin = new Vector2(6.0f, 2.0f);
-            viewport.offsetMax = new Vector2(-6.0f, -2.0f);
+            viewport.offsetMin = new Vector2(
+                manager.ControlHorizontalPadding,
+                manager.ControlVerticalPadding * 0.5f);
+            viewport.offsetMax = new Vector2(
+                -manager.ControlHorizontalPadding,
+                -manager.ControlVerticalPadding * 0.5f);
             viewport.gameObject.AddComponent<RectMask2D>();
 
             var text = DebugWindowUi.CreateText(
@@ -405,7 +412,9 @@ namespace jcan.DebugWindows
         {
             var viewport = DebugWindowUi.CreateRect("Tabs", parent);
             var viewportSize = viewport.gameObject.AddComponent<LayoutElement>();
-            viewportSize.preferredHeight = content.Manager.TextSize + 12.0f;
+            viewportSize.preferredHeight =
+                content.Manager.TextSize +
+                content.Manager.ControlVerticalPadding * 2.0f + 4.0f;
             viewport.gameObject.AddComponent<RectMask2D>();
 
             var tabContent = DebugWindowUi.CreateRect("Content", viewport);
@@ -436,7 +445,8 @@ namespace jcan.DebugWindows
                 var page = definition.Pages[i];
                 var width = Mathf.Max(
                     48.0f,
-                    page.TabText.Length * content.Manager.TextSize * 0.62f + 16.0f);
+                    page.TabText.Length * content.Manager.TextSize * 0.62f +
+                        content.Manager.ControlHorizontalPadding * 2.0f);
                 var capturedId = page.UniqueId;
                 var button = DebugWindowUi.CreateButton(
                     page.UniqueId,
@@ -446,7 +456,9 @@ namespace jcan.DebugWindows
                     content.Manager.ElementColor,
                     content.Manager.TextColor,
                     () => definition.SetActivePage(capturedId),
-                    width);
+                    width,
+                    content.Manager.ControlHorizontalPadding,
+                    content.Manager.ControlVerticalPadding);
                 var image = button.GetComponent<Image>();
                 if (content.Manager.TabBackgroundSprite != null)
                 {
@@ -495,7 +507,9 @@ namespace jcan.DebugWindows
 
             var footer = DebugWindowUi.CreateRect("Footer", parent);
             var footerSize = footer.gameObject.AddComponent<LayoutElement>();
-            footerSize.preferredHeight = content.Manager.TextSize + 8.0f;
+            footerSize.preferredHeight =
+                content.Manager.TextSize +
+                content.Manager.ControlVerticalPadding * 2.0f;
             footerSize.flexibleHeight = 0.0f;
 
             var layout = footer.gameObject.AddComponent<HorizontalLayoutGroup>();
