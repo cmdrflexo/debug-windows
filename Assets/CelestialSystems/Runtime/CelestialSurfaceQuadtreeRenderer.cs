@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -22,6 +23,35 @@ namespace jcan.CelestialSystems
             0.25;
         private const int MaximumAdaptedLayerCount =
             4;
+
+        private static readonly ProfilerMarker RequestFrameMarker =
+            new ProfilerMarker("Celestial Surface.Request Frame");
+        private static readonly ProfilerMarker CacheResetMarker =
+            new ProfilerMarker("Celestial Surface.Cache Reset");
+        private static readonly ProfilerMarker ObserverMarker =
+            new ProfilerMarker("Celestial Surface.Observer");
+        private static readonly ProfilerMarker PrepareTreeMarker =
+            new ProfilerMarker("Celestial Surface.Prepare Tree");
+        private static readonly ProfilerMarker BalanceTreeMarker =
+            new ProfilerMarker("Celestial Surface.Balance Tree");
+        private static readonly ProfilerMarker EvaluateBalanceMarker =
+            new ProfilerMarker("Celestial Surface.Evaluate Balance");
+        private static readonly ProfilerMarker MaterialsMarker =
+            new ProfilerMarker("Celestial Surface.Materials");
+        private static readonly ProfilerMarker ApplyTreeMarker =
+            new ProfilerMarker("Celestial Surface.Apply Tree");
+        private static readonly ProfilerMarker StatisticsMarker =
+            new ProfilerMarker("Celestial Surface.Statistics");
+        private static readonly ProfilerMarker BuildVisualMarker =
+            new ProfilerMarker("Celestial Surface.Build Visual");
+        private static readonly ProfilerMarker BuildGeometryMarker =
+            new ProfilerMarker("Celestial Surface.Build Geometry");
+        private static readonly ProfilerMarker UploadMeshMarker =
+            new ProfilerMarker("Celestial Surface.Upload Mesh");
+        private static readonly ProfilerMarker RecalculateTangentsMarker =
+            new ProfilerMarker("Celestial Surface.Recalculate Tangents");
+        private static readonly ProfilerMarker ConfigureMaterialMarker =
+            new ProfilerMarker("Celestial Surface.Configure Material");
 
         private static readonly CubeSphereEdge[] Edges =
         {
@@ -357,11 +387,17 @@ namespace jcan.CelestialSystems
             if (observedCacheVersion !=
                 patchGenerator.CacheVersion)
             {
-                ReleaseAllNodes();
-                BuildRoots();
-                observedCacheVersion =
-                    patchGenerator.CacheVersion;
+                using (CacheResetMarker.Auto())
+                {
+                    ReleaseAllNodes();
+                    BuildRoots();
+                    observedCacheVersion =
+                        patchGenerator.CacheVersion;
+                }
             }
+
+            using var requestFrameScope =
+                RequestFrameMarker.Auto();
 
             if (!patchGenerator.BeginRequestFrame())
             {
@@ -401,44 +437,47 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            ResolveObserverCamera();
-
-            if (observerCamera == null ||
-                !observerCamera.isActiveAndEnabled)
+            using (ObserverMarker.Auto())
             {
-                hasObserver = false;
-                lastError =
-                    "Waiting for an enabled adaptive-surface observer camera.";
-                SetAllNodesActive(
-                    false);
-                ReleaseRootDescendants();
-                ClearFrameStatistics();
-                ReportReadiness(
-                    patchGenerator.AreRootsReady(),
-                    false);
-                return;
-            }
+                ResolveObserverCamera();
 
-            if (!TryBuildObserverState())
-            {
-                hasObserver = false;
-                lastError =
-                    "The adaptive-surface observer state is invalid.";
-                SetAllNodesActive(
-                    false);
-                ReleaseRootDescendants();
-                ClearFrameStatistics();
-                ReportReadiness(
-                    patchGenerator.AreRootsReady(),
-                    false);
-                return;
-            }
+                if (observerCamera == null ||
+                    !observerCamera.isActiveAndEnabled)
+                {
+                    hasObserver = false;
+                    lastError =
+                        "Waiting for an enabled adaptive-surface observer camera.";
+                    SetAllNodesActive(
+                        false);
+                    ReleaseRootDescendants();
+                    ClearFrameStatistics();
+                    ReportReadiness(
+                        patchGenerator.AreRootsReady(),
+                        false);
+                    return;
+                }
 
-            hasObserver = true;
-            lastError = string.Empty;
-            frustumPlanes =
-                GeometryUtility.CalculateFrustumPlanes(
-                    observerCamera);
+                if (!TryBuildObserverState())
+                {
+                    hasObserver = false;
+                    lastError =
+                        "The adaptive-surface observer state is invalid.";
+                    SetAllNodesActive(
+                        false);
+                    ReleaseRootDescendants();
+                    ClearFrameStatistics();
+                    ReportReadiness(
+                        patchGenerator.AreRootsReady(),
+                        false);
+                    return;
+                }
+
+                hasObserver = true;
+                lastError = string.Empty;
+                frustumPlanes =
+                    GeometryUtility.CalculateFrustumPlanes(
+                        observerCamera);
+            }
             remainingMeshBuilds =
                 Mathf.Max(
                     1,
@@ -447,20 +486,33 @@ namespace jcan.CelestialSystems
             desiredLeafCount =
                 roots.Length;
 
-            for (var index = 0;
-                index < roots.Length;
-                index++)
+            using (PrepareTreeMarker.Auto())
             {
-                PrepareDesiredTree(
-                    roots[index]);
+                for (var index = 0;
+                    index < roots.Length;
+                    index++)
+                {
+                    PrepareDesiredTree(
+                        roots[index]);
+                }
             }
 
-            BalanceDesiredTree();
-            EvaluateNeighborBalance();
+            using (BalanceTreeMarker.Auto())
+            {
+                BalanceDesiredTree();
+            }
+
+            using (EvaluateBalanceMarker.Auto())
+            {
+                EvaluateNeighborBalance();
+            }
 
             try
             {
-                EnsureRenderMaterials();
+                using (MaterialsMarker.Auto())
+                {
+                    EnsureRenderMaterials();
+                }
             }
             catch (Exception exception)
             {
@@ -476,24 +528,30 @@ namespace jcan.CelestialSystems
 
             coverageInvariantValid = true;
 
-            for (var index = 0;
-                index < roots.Length;
-                index++)
+            using (ApplyTreeMarker.Auto())
             {
-                ApplyDesiredTree(
-                    roots[index]);
+                for (var index = 0;
+                    index < roots.Length;
+                    index++)
+                {
+                    ApplyDesiredTree(
+                        roots[index]);
+                }
             }
 
-            RefreshActiveStatistics();
-            pooledVisualCount =
-                visualPool.Count;
-            coarseSurfaceReady =
-                AreAllRootsReady();
-            visibleSurfaceReady =
-                activePatchCount > 0;
-            ReportReadiness(
-                coarseSurfaceReady,
-                visibleSurfaceReady);
+            using (StatisticsMarker.Auto())
+            {
+                RefreshActiveStatistics();
+                pooledVisualCount =
+                    visualPool.Count;
+                coarseSurfaceReady =
+                    AreAllRootsReady();
+                visibleSurfaceReady =
+                    activePatchCount > 0;
+                ReportReadiness(
+                    coarseSurfaceReady,
+                    visibleSurfaceReady);
+            }
         }
 
         private void ApplyQualityProfile()
@@ -1669,9 +1727,12 @@ namespace jcan.CelestialSystems
 
             try
             {
-                BuildPatchVisual(
-                    visual,
-                    node);
+                using (BuildVisualMarker.Auto())
+                {
+                    BuildPatchVisual(
+                        visual,
+                        node);
+                }
                 node.Visual =
                     visual;
                 visual.Owner =
@@ -1739,6 +1800,13 @@ namespace jcan.CelestialSystems
             PatchVisual visual,
             PatchNode node)
         {
+            var geometryScope =
+                BuildGeometryMarker.Auto();
+            var geometryScopeActive =
+                true;
+
+            try
+            {
             var data =
                 node.Data;
             var resolution =
@@ -2020,24 +2088,35 @@ namespace jcan.CelestialSystems
                     coreSecond;
             }
 
-            visual.Mesh.Clear();
-            visual.Mesh.name =
-                $"Adaptive {node.Address}";
-            visual.Mesh.indexFormat =
-                vertices.Length >
-                    65535
-                    ? IndexFormat.UInt32
-                    : IndexFormat.UInt16;
-            visual.Mesh.vertices =
-                vertices;
-            visual.Mesh.normals =
-                normals;
-            visual.Mesh.uv =
-                uv;
-            visual.Mesh.triangles =
-                triangles;
-            visual.Mesh.RecalculateBounds();
-            visual.Mesh.RecalculateTangents();
+            geometryScope.Dispose();
+            geometryScopeActive =
+                false;
+
+            using (UploadMeshMarker.Auto())
+            {
+                visual.Mesh.Clear();
+                visual.Mesh.name =
+                    $"Adaptive {node.Address}";
+                visual.Mesh.indexFormat =
+                    vertices.Length >
+                        65535
+                        ? IndexFormat.UInt32
+                        : IndexFormat.UInt16;
+                visual.Mesh.vertices =
+                    vertices;
+                visual.Mesh.normals =
+                    normals;
+                visual.Mesh.uv =
+                    uv;
+                visual.Mesh.triangles =
+                    triangles;
+                visual.Mesh.RecalculateBounds();
+            }
+
+            using (RecalculateTangentsMarker.Auto())
+            {
+                visual.Mesh.RecalculateTangents();
+            }
             visual.ParentVertices =
                 parentVertices;
             visual.DetailVertices =
@@ -2063,9 +2142,20 @@ namespace jcan.CelestialSystems
             visual.MeshRenderer.receiveShadows =
                 receiveShadows;
 
-            ConfigureVisualMaterial(
-                visual,
-                node);
+            using (ConfigureMaterialMarker.Auto())
+            {
+                ConfigureVisualMaterial(
+                    visual,
+                    node);
+            }
+            }
+            finally
+            {
+                if (geometryScopeActive)
+                {
+                    geometryScope.Dispose();
+                }
+            }
         }
 
         private static int[] BuildBoundaryRing(
