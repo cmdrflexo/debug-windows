@@ -46,8 +46,8 @@ namespace jcan.DebugWindows
         {
             var frame = DebugWindowUi.CreateRect("Choice", parent);
             var size = frame.gameObject.AddComponent<LayoutElement>();
-            size.preferredWidth = manager.MinimumWindowWidth * 0.65f;
-            size.preferredHeight = manager.TextSize + 8.0f;
+            size.preferredWidth = manager.PreferredFieldWidth;
+            size.preferredHeight = manager.TextSize + manager.ControlVerticalPadding * 2.0f;
 
             var image = DebugWindowUi.AddImage(frame.gameObject, manager.ElementColor);
             if (manager.ListFrameSprite != null)
@@ -68,8 +68,12 @@ namespace jcan.DebugWindows
                 "Value", frame, string.Empty, manager.TextSize,
                 manager.TextColor, TextAlignmentOptions.MidlineLeft);
             DebugWindowUi.Stretch(field.caption.rectTransform);
-            field.caption.rectTransform.offsetMin = new Vector2(6.0f, 1.0f);
-            field.caption.rectTransform.offsetMax = new Vector2(-20.0f, -1.0f);
+            field.caption.rectTransform.offsetMin = new Vector2(
+                manager.ControlHorizontalPadding,
+                manager.ControlVerticalPadding * 0.5f);
+            field.caption.rectTransform.offsetMax = new Vector2(
+                -(manager.ControlHorizontalPadding + 14.0f),
+                -manager.ControlVerticalPadding * 0.5f);
             field.caption.raycastTarget = false;
 
             var arrow = DebugWindowUi.CreateText(
@@ -142,9 +146,11 @@ namespace jcan.DebugWindows
             ((RectTransform)transform).GetWorldCorners(corners);
             popup.position = corners[0];
             var visibleRows = Mathf.Min(6, options.Count);
+            var rowHeight =
+                manager.TextSize + manager.ControlVerticalPadding * 2.0f;
             popup.sizeDelta = new Vector2(
                 ((RectTransform)transform).rect.width,
-                visibleRows * (manager.TextSize + 4.0f) + 4.0f);
+                visibleRows * rowHeight + manager.ControlVerticalPadding);
 
             var popupImage = DebugWindowUi.AddImage(popup.gameObject, manager.ElementColor);
             if (manager.ListFrameSprite != null)
@@ -155,8 +161,14 @@ namespace jcan.DebugWindows
 
             var viewport = DebugWindowUi.CreateRect("Viewport", popup);
             DebugWindowUi.Stretch(viewport);
-            viewport.offsetMin = new Vector2(4.0f, 2.0f);
-            viewport.offsetMax = new Vector2(options.Count > visibleRows ? -8.0f : -4.0f, -2.0f);
+            viewport.offsetMin = new Vector2(
+                manager.ControlHorizontalPadding * 0.5f,
+                manager.ControlVerticalPadding * 0.5f);
+            viewport.offsetMax = new Vector2(
+                options.Count > visibleRows
+                    ? -(manager.ControlHorizontalPadding * 0.5f + 4.0f)
+                    : -manager.ControlHorizontalPadding * 0.5f,
+                -manager.ControlVerticalPadding * 0.5f);
             viewport.gameObject.AddComponent<RectMask2D>();
 
             var list = DebugWindowUi.CreateRect("Content", viewport);
@@ -191,7 +203,8 @@ namespace jcan.DebugWindows
         private void BuildOption(RectTransform parent, DebugChoiceOption option)
         {
             var row = DebugWindowUi.CreateRect(option.UniqueId, parent);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = manager.TextSize + 4.0f;
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight =
+                manager.TextSize + manager.ControlVerticalPadding * 2.0f;
             var image = DebugWindowUi.AddImage(
                 row.gameObject,
                 option.UniqueId == selectedId ? manager.SelectionColor : manager.ElementColor);
@@ -201,7 +214,12 @@ namespace jcan.DebugWindows
                 "Label", row, option.DisplayText, manager.TextSize,
                 manager.TextColor, TextAlignmentOptions.MidlineLeft);
             DebugWindowUi.Stretch(label.rectTransform);
-            label.rectTransform.offsetMin = new Vector2(3.0f, 0.0f);
+            label.rectTransform.offsetMin = new Vector2(
+                manager.ControlHorizontalPadding,
+                0.0f);
+            label.rectTransform.offsetMax = new Vector2(
+                -manager.ControlHorizontalPadding,
+                0.0f);
             label.raycastTarget = false;
             button.onClick.AddListener(() => Select(option));
         }

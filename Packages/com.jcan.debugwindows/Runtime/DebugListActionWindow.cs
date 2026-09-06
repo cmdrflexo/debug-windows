@@ -311,7 +311,9 @@ namespace jcan.DebugWindows
                     windowContent.Manager.ButtonColor,
                     windowContent.Manager.TextColor,
                     () => Invoke(captured.ActionId),
-                    Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f));
+                    Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f),
+                    windowContent.Manager.ControlHorizontalPadding,
+                    windowContent.Manager.ControlVerticalPadding);
             }
         }
 
@@ -319,7 +321,9 @@ namespace jcan.DebugWindows
         {
             var row = DebugWindowUi.CreateRect("Input Row", parent);
             var rowSize = row.gameObject.AddComponent<LayoutElement>();
-            rowSize.preferredHeight = windowContent.Manager.TextSize + 8.0f;
+            rowSize.preferredHeight =
+                windowContent.Manager.TextSize +
+                windowContent.Manager.ControlVerticalPadding * 2.0f;
             rowSize.flexibleHeight = 0.0f;
 
             var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -332,7 +336,9 @@ namespace jcan.DebugWindows
             var inputFrame = DebugWindowUi.CreateRect("Input", row);
             var inputSize = inputFrame.gameObject.AddComponent<LayoutElement>();
             inputSize.flexibleWidth = 1.0f;
-            inputSize.preferredHeight = windowContent.Manager.TextSize + 8.0f;
+            inputSize.preferredHeight =
+                windowContent.Manager.TextSize +
+                windowContent.Manager.ControlVerticalPadding * 2.0f;
             var inputImage = DebugWindowUi.AddImage(inputFrame.gameObject, windowContent.Manager.ElementColor);
             if (windowContent.Manager.ListFrameSprite != null)
             {
@@ -343,8 +349,12 @@ namespace jcan.DebugWindows
 
             var textArea = DebugWindowUi.CreateRect("Text Area", inputFrame);
             DebugWindowUi.Stretch(textArea);
-            textArea.offsetMin = new Vector2(6.0f, 2.0f);
-            textArea.offsetMax = new Vector2(-6.0f, -2.0f);
+            textArea.offsetMin = new Vector2(
+                windowContent.Manager.ControlHorizontalPadding,
+                windowContent.Manager.ControlVerticalPadding * 0.5f);
+            textArea.offsetMax = new Vector2(
+                -windowContent.Manager.ControlHorizontalPadding,
+                -windowContent.Manager.ControlVerticalPadding * 0.5f);
             textArea.gameObject.AddComponent<RectMask2D>();
 
             var text = DebugWindowUi.CreateText(
@@ -388,7 +398,9 @@ namespace jcan.DebugWindows
                     windowContent.Manager.ButtonColor,
                     windowContent.Manager.TextColor,
                     () => Invoke(action.ActionId),
-                    Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f));
+                    Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f),
+                    windowContent.Manager.ControlHorizontalPadding,
+                    windowContent.Manager.ControlVerticalPadding);
             }
         }
 
@@ -408,7 +420,9 @@ namespace jcan.DebugWindows
                 var button = row.gameObject.AddComponent<Button>();
                 button.targetGraphic = image;
                 var rowSize = row.gameObject.AddComponent<LayoutElement>();
-                rowSize.preferredHeight = windowContent.Manager.TextSize + 4.0f;
+                rowSize.preferredHeight =
+                    windowContent.Manager.TextSize +
+                    windowContent.Manager.ControlVerticalPadding * 2.0f;
 
                 var label = DebugWindowUi.CreateText(
                     "Label",
@@ -418,7 +432,12 @@ namespace jcan.DebugWindows
                     windowContent.Manager.TextColor,
                     TextAlignmentOptions.MidlineLeft);
                 DebugWindowUi.Stretch(label.rectTransform);
-                label.rectTransform.offsetMin = new Vector2(3.0f, 0.0f);
+                label.rectTransform.offsetMin = new Vector2(
+                    windowContent.Manager.ControlHorizontalPadding,
+                    0.0f);
+                label.rectTransform.offsetMax = new Vector2(
+                    -windowContent.Manager.ControlHorizontalPadding,
+                    0.0f);
 
                 var capturedItem = item;
                 button.onClick.AddListener(() => Select(capturedItem));

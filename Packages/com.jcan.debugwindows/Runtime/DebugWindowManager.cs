@@ -64,6 +64,18 @@ namespace jcan.DebugWindows
         [Min(0.0f)]
         private float spacing = 4.0f;
 
+        [SerializeField]
+        [Min(0.0f)]
+        private float controlHorizontalPadding = 8.0f;
+
+        [SerializeField]
+        [Min(0.0f)]
+        private float controlVerticalPadding = 6.0f;
+
+        [SerializeField]
+        [Min(60.0f)]
+        private float preferredFieldWidth = 180.0f;
+
         [Header("Visuals")]
         [SerializeField]
         [Tooltip("Optional 9-sliced sprite used by every generated window background.")]
@@ -142,6 +154,9 @@ namespace jcan.DebugWindows
         public float MinimumWindowWidth => minimumWindowWidth;
         public int Padding => padding;
         public float Spacing => spacing;
+        public float ControlHorizontalPadding => controlHorizontalPadding;
+        public float ControlVerticalPadding => controlVerticalPadding;
+        public float PreferredFieldWidth => preferredFieldWidth;
         public Sprite WindowBackgroundSprite => windowBackgroundSprite;
         public Sprite ListFrameSprite => listFrameSprite;
         public Sprite TabBackgroundSprite => tabBackgroundSprite;
@@ -581,7 +596,8 @@ namespace jcan.DebugWindows
                     accentColor,
                     value => SetWindowState(
                         uniqueId,
-                        value ? DebugWindowDisplayState.Open : DebugWindowDisplayState.Closed));
+                        value ? DebugWindowDisplayState.Open : DebugWindowDisplayState.Closed),
+                    controlVerticalPadding);
             }
         }
 

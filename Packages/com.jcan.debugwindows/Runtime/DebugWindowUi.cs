@@ -54,7 +54,9 @@ namespace jcan.DebugWindows
             Color background,
             Color foreground,
             Action clicked,
-            float width)
+            float width,
+            float horizontalPadding = 0.0f,
+            float verticalPadding = 4.0f)
         {
             var rect = CreateRect(name, parent);
             var image = AddImage(rect.gameObject, background);
@@ -62,7 +64,7 @@ namespace jcan.DebugWindows
             button.targetGraphic = image;
             var buttonSize = rect.gameObject.AddComponent<LayoutElement>();
             buttonSize.preferredWidth = width;
-            buttonSize.preferredHeight = textSize + 8.0f;
+            buttonSize.preferredHeight = textSize + verticalPadding * 2.0f;
 
             var label = CreateText(
                 "Label",
@@ -72,6 +74,8 @@ namespace jcan.DebugWindows
                 foreground,
                 TextAlignmentOptions.Center);
             Stretch(label.rectTransform);
+            label.rectTransform.offsetMin = new Vector2(horizontalPadding, 0.0f);
+            label.rectTransform.offsetMax = new Vector2(-horizontalPadding, 0.0f);
 
             if (clicked != null)
                 button.onClick.AddListener(() => clicked());
@@ -88,9 +92,12 @@ namespace jcan.DebugWindows
             Color foreground,
             Color controlBackground,
             Color checkColor,
-            Action<bool> changed)
+            Action<bool> changed,
+            float verticalPadding = 0.0f)
         {
             var row = CreateRect(name, parent);
+            var rowSize = row.gameObject.AddComponent<LayoutElement>();
+            rowSize.preferredHeight = textSize + verticalPadding * 2.0f;
             var rowLayout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 6.0f;
             rowLayout.childAlignment = TextAnchor.MiddleLeft;
