@@ -198,6 +198,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.FreeUniverseAnchorController
   movementReference: {fileID: 433888932}
   universeFrame: {fileID: 1210988297}
+  debugWindowManager: {fileID: 0}
   listen: 1
   damping: 10
   speedMin: 0.1
@@ -456,6 +457,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 451151457}
+  - component: {fileID: 451151458}
   m_Layer: 0
   m_Name: Anchors
   m_TagString: Untagged
@@ -479,6 +481,22 @@ Transform:
   - {fileID: 288112567}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &451151458
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 451151456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0861b2ab81ef4bf39ee09985fcabf095, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CameraAnchorPoseLibrary
+  anchorSource: {fileID: 1210988295}
+  fileName: camera-anchor-poses.json
+  filePath: 
+  lastPersistenceError: 
 --- !u!21 &491649399
 Material:
   serializedVersion: 8
@@ -592,10 +610,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 554659565}
-  - component: {fileID: 554659570}
   - component: {fileID: 554659569}
   - component: {fileID: 554659571}
-  - component: {fileID: 554659568}
+  - component: {fileID: 554659572}
   m_Layer: 0
   m_Name: Debug
   m_TagString: Untagged
@@ -619,39 +636,6 @@ Transform:
   - {fileID: 740865258}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &554659568
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 554659563}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 65c7e52e2f33ec643ab9b96a151621b5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialDebugTextController
-  targetText: {fileID: 1142339737}
-  refreshIntervalSeconds: 0.1
-  fpsSmoothingSeconds: 0.5
-  sources:
-  - alias: anchor
-    source: {fileID: 288112568}
-  - alias: frame
-    source: {fileID: 1210988297}
-  - alias: surfaceDef
-    source: {fileID: 11400000, guid: b1f16f79fa318094a8a148264b250ccb, type: 2}
-  - alias: factory
-    source: {fileID: 1349232944}
-  - alias: shader
-    source: {fileID: 0}
-  headerCode: "<b>CELESTIAL DEBUG</b>\r\n{color:stats.Fps < 30|#FF6060|#60E880|#AAAAAA}FPS:
-    {stats.Fps:N0}</color>\r\nAltitude / Terrain: {anchor.NearestPlanetAltitudeMeters:N1|--}
-    m / {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.AltitudeMeters:N2|--}
-    m\r\nMove speed: {anchor.CurrentMoveSpeedMetersPerSecond:N1|--} m/s\r\nManual
-    / boost: {anchor.MoveSpeedMultiplier:N3|--}\xD7 / {anchor.CurrentBoostMultiplier:N2|--}\xD7\r\n\\n"
-  displayCode: 
-  lastConfigurationError: 
 --- !u!114 &554659569
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -668,22 +652,6 @@ MonoBehaviour:
   toggleOnStart: 0
   gameObjects:
   - {fileID: 363207314}
---- !u!114 &554659570
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 554659563}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1b1bbeabe88c50046845965d712a3457, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BasicToggleGameObjects
-  toggleAction: {fileID: 8987666144617521417, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
-  toggleOnStart: 0
-  gameObjects:
-  - {fileID: 740865254}
 --- !u!114 &554659571
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -700,6 +668,21 @@ MonoBehaviour:
   toggleOnStart: 0
   gameObjects:
   - {fileID: 1820261096}
+--- !u!114 &554659572
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 554659563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40d33c2a198d4c01a455b935db8f6af8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugWindowToggleInput
+  toggleAction: {fileID: 8987666144617521417, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
+  toggleOnStart: 0
+  windowManager: {fileID: 1757395889}
 --- !u!1 &740865254
 GameObject:
   m_ObjectHideFlags: 0
@@ -795,7 +778,6 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1142339736}
   - {fileID: 926420433}
   - {fileID: 1757395888}
   - {fileID: 1894990529}
@@ -1214,156 +1196,6 @@ Transform:
   - {fileID: 363207315}
   m_Father: {fileID: 1210988294}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1142339735
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1142339736}
-  - component: {fileID: 1142339738}
-  - component: {fileID: 1142339737}
-  - component: {fileID: 1142339739}
-  m_Layer: 5
-  m_Name: old Debug Text
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1142339736
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1142339735}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 740865258}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: -10, y: -10}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1142339737
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1142339735}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_text: <b>CELESTIAL DEBUG</b>
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_fontSharedMaterials: []
-  m_fontMaterial: {fileID: 0}
-  m_fontMaterials: []
-  m_fontColor32:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
-  m_enableVertexGradient: 0
-  m_colorMode: 3
-  m_fontColorGradient:
-    topLeft: {r: 1, g: 1, b: 1, a: 1}
-    topRight: {r: 1, g: 1, b: 1, a: 1}
-    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
-    bottomRight: {r: 1, g: 1, b: 1, a: 1}
-  m_fontColorGradientPreset: {fileID: 0}
-  m_spriteAsset: {fileID: 0}
-  m_tintAllSprites: 0
-  m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: -1183493901
-  m_overrideHtmlColors: 0
-  m_faceColor:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontSize: 12
-  m_fontSizeBase: 12
-  m_fontWeight: 400
-  m_enableAutoSizing: 1
-  m_fontSizeMin: 8
-  m_fontSizeMax: 12
-  m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
-  m_textAlignment: 65535
-  m_characterSpacing: 0
-  m_characterHorizontalScale: 1
-  m_wordSpacing: 0
-  m_lineSpacing: 0
-  m_lineSpacingMax: 0
-  m_paragraphSpacing: 0
-  m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
-  m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
-  m_linkedTextComponent: {fileID: 0}
-  parentLinkedComponent: {fileID: 0}
-  m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
-  m_enableExtraPadding: 0
-  checkPaddingRequired: 0
-  m_isRichText: 1
-  m_EmojiFallbackSupport: 1
-  m_parseCtrlCharacters: 1
-  m_isOrthographic: 1
-  m_isCullingEnabled: 0
-  m_horizontalMapping: 0
-  m_verticalMapping: 0
-  m_uvLineOffset: 0
-  m_geometrySortingOrder: 0
-  m_IsTextObjectScaleStatic: 0
-  m_VertexBufferAutoSizeReduction: 0
-  m_useMaxVisibleDescender: 1
-  m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
-  m_isUsingLegacyAnimationComponent: 0
-  m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
-  m_baseMaterial: {fileID: 0}
-  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!222 &1142339738
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1142339735}
-  m_CullTransparentMesh: 1
---- !u!114 &1142339739
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1142339735}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 91ae261ddf274fda9a3addb068f87140, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.GePlanetSurfaceAltitudeDebugText
 --- !u!1 &1152057539
 GameObject:
   m_ObjectHideFlags: 0
@@ -1961,6 +1793,7 @@ MonoBehaviour:
   activeBehaviours:
   - {fileID: 288112568}
   floatingCamera: {fileID: 288112566}
+  poseRotationSource: {fileID: 433888932}
 --- !u!114 &1210988297
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2587,6 +2420,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1757395888}
   - component: {fileID: 1757395889}
+  - component: {fileID: 1757395891}
+  - component: {fileID: 1757395890}
+  - component: {fileID: 1757395893}
+  - component: {fileID: 1757395892}
   m_Layer: 5
   m_Name: Debug Window Manager
   m_TagString: Untagged
@@ -2626,21 +2463,101 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: JCan.DebugWindows::jcan.DebugWindows.DebugWindowManager
   windowsRoot: {fileID: 1894990529}
-  textSize: 18
-  titleTextSize: 18
+  textSize: 10
+  titleTextSize: 12
   minimumWindowWidth: 180
   padding: 6
   spacing: 4
-  windowColor: {r: 0.06, g: 0.07, b: 0.09, a: 0.94}
-  titleColor: {r: 0.12, g: 0.16, b: 0.22, a: 1}
-  buttonColor: {r: 0.22, g: 0.27, b: 0.34, a: 1}
+  windowBackgroundSprite: {fileID: 21300000, guid: 5b8b0410fdaaff645864fd56773e45aa, type: 3}
+  listFrameSprite: {fileID: 21300000, guid: af854fad21f998f4a82e1e5009b513bb, type: 3}
+  windowColor: {r: 0.5882353, g: 0.5882353, b: 0.5882353, a: 1}
+  titleColor: {r: 0.12, g: 0.16, b: 0.22, a: 0}
+  buttonColor: {r: 0, g: 0, b: 0, a: 0.6509804}
   textColor: {r: 1, g: 1, b: 1, a: 1}
-  checkColor: {r: 0.3, g: 0.85, b: 0.5, a: 1}
+  accentColor: {r: 0.23866853, g: 0.5381741, b: 0.833, a: 1}
+  selectionColor: {r: 0.12156863, g: 0.27450982, b: 0.43137255, a: 0.9019608}
   layoutFileName: jcan-debug-windows.json
   fpsSmoothingSeconds: 0.5
   fpsRefreshIntervalSeconds: 0.1
   layoutFilePath: 
   lastPersistenceError: 
+--- !u!114 &1757395890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757395887}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65c7e52e2f33ec643ab9b96a151621b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialDebugTextController
+  targetText: {fileID: 0}
+  refreshIntervalSeconds: 0.1
+  fpsSmoothingSeconds: 0.5
+  sources:
+  - alias: anchor
+    source: {fileID: 288112568}
+  - alias: frame
+    source: {fileID: 1210988297}
+  - alias: surfaceDef
+    source: {fileID: 11400000, guid: b1f16f79fa318094a8a148264b250ccb, type: 2}
+  - alias: factory
+    source: {fileID: 1349232944}
+  - alias: shader
+    source: {fileID: 0}
+  headerCode: "Altitude / Terrain: {anchor.NearestPlanetAltitudeMeters:N1|--} m /
+    {factory.LastSpawnedBody.SurfaceRuntime.CollisionRuntime.LastSample.AltitudeMeters:N2|--}
+    m\r\nMove speed: {anchor.CurrentMoveSpeedMetersPerSecond:N1|--} m/s\r\nManual
+    / boost: {anchor.MoveSpeedMultiplier:N3|--}\xD7 / {anchor.CurrentBoostMultiplier:N2|--}\xD7\r\n\\n"
+  displayCode: 
+  lastConfigurationError: 
+--- !u!114 &1757395891
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757395887}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84c64a896a9c4bc7ae853708a56acd8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialDebugWindow
+  source: {fileID: 1757395890}
+  uniqueId: jcan.celestialsystems.debug-text
+  windowTitle: Celestial Debug
+  defaultState: 2
+  defaultPosition: {x: 210, y: -12}
+  refreshIntervalSeconds: 0.1
+--- !u!114 &1757395892
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757395887}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c79f1f0cd59f4c71ad3a4476341400c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.DebugListActionWindowTest
+--- !u!114 &1757395893
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757395887}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57dc3317298445ccb062c1dd33720eb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CameraAnchorPoseDebugWindow
+  poseLibrary: {fileID: 451151458}
+  preferredContentSize: {x: 360, y: 260}
+  defaultPosition: {x: 450, y: -12}
 --- !u!1 &1798278914
 GameObject:
   m_ObjectHideFlags: 0
@@ -2786,7 +2703,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1798278914}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.28900585, y: -0.39305267, z: 0.1316374, w: 0.86293507}
+  m_LocalRotation: {x: 0.28900623, y: -0.39305088, z: 0.13163684, w: 0.8629358}
   m_LocalPosition: {x: 100000000, y: 100000000, z: -87000000}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
