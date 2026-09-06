@@ -21,13 +21,21 @@ namespace jcan.DebugWindows
         private DebugWindowRegistration registration;
         private RectTransform rectTransform;
         private RectTransform contentRoot;
+        private Image windowImage;
+        private Image titleImage;
         private TMP_Text collapseLabel;
+        private TMP_Text pinLabel;
+        private GameObject collapseButton;
+        private GameObject pinButton;
+        private GameObject closeButton;
         private Vector2 dragStartPosition;
         private Vector2 pointerStartPosition;
         private DebugWindowDisplayState state;
+        private bool pinned;
 
         public string UniqueId => registration.UniqueId;
         public DebugWindowDisplayState State => state;
+        public bool Pinned => pinned;
         public Vector2 Position => rectTransform.anchoredPosition;
 
         public void Initialize(
@@ -54,9 +62,7 @@ namespace jcan.DebugWindows
                 newState = DebugWindowDisplayState.Collapsed;
 
             state = newState;
-            gameObject.SetActive(state != DebugWindowDisplayState.Closed);
-            contentRoot.gameObject.SetActive(state == DebugWindowDisplayState.Open);
-            collapseLabel.text = state == DebugWindowDisplayState.Open ? "−" : "+";
+            RefreshPresentation();
 
             if (gameObject.activeSelf)
             {
@@ -68,6 +74,39 @@ namespace jcan.DebugWindows
                 manager.NotifyWindowStateChanged(this);
         }
 
+        public void SetPinned(bool value, bool save)
+        {
+            pinned = value;
+            pinLabel.text = pinned ? "●" : "○";
+            RefreshPresentation();
+
+            if (save)
+                manager.SaveLayout();
+        }
+
+        internal void RefreshPresentation()
+        {
+            var pinnedOverlay = !manager.MenuVisible && pinned &&
+                state != DebugWindowDisplayState.Closed;
+            var visible = state != DebugWindowDisplayState.Closed &&
+                (manager.MenuVisible || pinned);
+
+            gameObject.SetActive(visible);
+            if (!visible)
+                return;
+
+            windowImage.enabled = !pinnedOverlay;
+            titleImage.enabled = !pinnedOverlay;
+            collapseButton.SetActive(!pinnedOverlay);
+            pinButton.SetActive(!pinnedOverlay);
+            if (closeButton != null)
+                closeButton.SetActive(!pinnedOverlay);
+
+            contentRoot.gameObject.SetActive(
+                pinnedOverlay || state == DebugWindowDisplayState.Open);
+            collapseLabel.text = state == DebugWindowDisplayState.Open ? "−" : "+";
+        }
+
         public void OnPointerDown(PointerEventData eventData)
         {
             transform.SetAsLastSibling();
@@ -75,6 +114,9 @@ namespace jcan.DebugWindows
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (pinned)
+                return;
+
             transform.SetAsLastSibling();
             dragStartPosition = rectTransform.anchoredPosition;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -86,6 +128,9 @@ namespace jcan.DebugWindows
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (pinned)
+                return;
+
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                     manager.WindowsRoot,
                     eventData.position,
@@ -100,6 +145,9 @@ namespace jcan.DebugWindows
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (pinned)
+                return;
+
             manager.ClampToCanvas(this);
             manager.SaveLayout();
         }
@@ -112,7 +160,13 @@ namespace jcan.DebugWindows
             rectTransform.anchorMax = new Vector2(0.0f, 1.0f);
             rectTransform.pivot = new Vector2(0.0f, 1.0f);
 
-            DebugWindowUi.AddImage(gameObject, manager.WindowColor);
+            windowImage = DebugWindowUi.AddImage(gameObject, manager.WindowColor);
+            if (manager.WindowBackgroundSprite != null)
+            {
+                windowImage.sprite = manager.WindowBackgroundSprite;
+                windowImage.type = Image.Type.Sliced;
+            }
+
             var fitter = gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -126,7 +180,7 @@ namespace jcan.DebugWindows
             layout.childForceExpandHeight = false;
 
             var titleBar = DebugWindowUi.CreateRect("Title Bar", transform);
-            var titleImage = DebugWindowUi.AddImage(titleBar.gameObject, manager.TitleColor);
+            titleImage = DebugWindowUi.AddImage(titleBar.gameObject, manager.TitleColor);
             titleImage.raycastTarget = true;
             var titleLayout = titleBar.gameObject.AddComponent<HorizontalLayoutGroup>();
             titleLayout.padding = new RectOffset(4, 4, 2, 2);
@@ -160,10 +214,23 @@ namespace jcan.DebugWindows
                 () => manager.ToggleCollapsed(UniqueId),
                 manager.TitleTextSize + 8.0f);
             collapseLabel = collapse.GetComponentInChildren<TMP_Text>();
+            collapseButton = collapse.gameObject;
+
+            var pin = DebugWindowUi.CreateButton(
+                "Pin",
+                titleBar,
+                "○",
+                manager.TitleTextSize,
+                manager.ButtonColor,
+                manager.TextColor,
+                () => manager.TogglePinned(UniqueId),
+                manager.TitleTextSize + 8.0f);
+            pinLabel = pin.GetComponentInChildren<TMP_Text>();
+            pinButton = pin.gameObject;
 
             if (registration.CanClose)
             {
-                DebugWindowUi.CreateButton(
+                var close = DebugWindowUi.CreateButton(
                     "Close",
                     titleBar,
                     "×",
@@ -172,6 +239,7 @@ namespace jcan.DebugWindows
                     manager.TextColor,
                     () => manager.SetWindowState(UniqueId, DebugWindowDisplayState.Closed),
                     manager.TitleTextSize + 8.0f);
+                closeButton = close.gameObject;
             }
 
             contentRoot = DebugWindowUi.CreateRect("Content", transform);

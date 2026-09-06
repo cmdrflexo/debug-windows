@@ -4,6 +4,7 @@
 
 using System;
 using CW.Common;
+using jcan.DebugWindows;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -19,6 +20,10 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private UniverseFrameController universeFrame;
+
+        [SerializeField]
+        [Tooltip("Optional debug-window manager whose full menu blocks flight input.")]
+        private DebugWindowManager debugWindowManager;
 
         [Header("Movement")]
         [SerializeField]
@@ -183,6 +188,8 @@ namespace jcan.CelestialSystems
         private bool enabledVerticalAction;
         private bool enabledSpeedMultiplierAction;
         private bool enabledBoostAction;
+        private DebugWindowManager subscribedDebugWindowManager;
+        private bool debugMenuVisible;
 
         public bool HasNearestPlanet =>
             hasNearestPlanet;
@@ -196,7 +203,11 @@ namespace jcan.CelestialSystems
         public float AutomaticMoveSpeedMetersPerSecond =>
             resolvedSpeed;
 
+        public bool InputBlockedByDebugMenu =>
+            debugMenuVisible;
+
         public bool IsBoosting =>
+            !debugMenuVisible &&
             boostAction != null &&
             boostAction.action != null &&
             boostAction.action.IsPressed();
@@ -237,10 +248,19 @@ namespace jcan.CelestialSystems
                 speedMultiplierAction.action.performed +=
                     OnSpeedMultiplierPerformed;
             }
+
+            SubscribeToDebugMenu();
+        }
+
+        private void Start()
+        {
+            SubscribeToDebugMenu();
         }
 
         private void OnDisable()
         {
+            UnsubscribeFromDebugMenu();
+
             if (speedMultiplierAction != null &&
                 speedMultiplierAction.action != null)
             {
@@ -308,7 +328,8 @@ namespace jcan.CelestialSystems
                 Time.deltaTime);
             UpdateSpeedState();
 
-            if (listen)
+            if (listen &&
+                !debugMenuVisible)
             {
                 AddToDelta(
                     GetDelta(
@@ -318,7 +339,8 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
-            if (listen)
+            if (listen &&
+                !debugMenuVisible)
             {
                 DampenDelta();
             }
@@ -377,6 +399,11 @@ namespace jcan.CelestialSystems
         private void OnSpeedMultiplierPerformed(
             InputAction.CallbackContext context)
         {
+            if (debugMenuVisible)
+            {
+                return;
+            }
+
             var input =
                 context.ReadValue<float>();
 
@@ -823,6 +850,64 @@ namespace jcan.CelestialSystems
                 universeFrame == null ||
                 bodyContext.UniverseFrame ==
                     universeFrame;
+        }
+
+        private void SubscribeToDebugMenu()
+        {
+            var manager = debugWindowManager != null
+                ? debugWindowManager
+                : DebugWindowManager.Instance;
+
+            if (manager == subscribedDebugWindowManager)
+            {
+                return;
+            }
+
+            UnsubscribeFromDebugMenu();
+            subscribedDebugWindowManager = manager;
+
+            if (subscribedDebugWindowManager == null)
+            {
+                debugMenuVisible = false;
+                return;
+            }
+
+            debugWindowManager = subscribedDebugWindowManager;
+            debugMenuVisible = subscribedDebugWindowManager.MenuVisible;
+            subscribedDebugWindowManager.MenuVisibilityChanged +=
+                OnDebugMenuVisibilityChanged;
+
+            if (debugMenuVisible)
+            {
+                ClearActiveInput();
+            }
+        }
+
+        private void UnsubscribeFromDebugMenu()
+        {
+            if (subscribedDebugWindowManager != null)
+            {
+                subscribedDebugWindowManager.MenuVisibilityChanged -=
+                    OnDebugMenuVisibilityChanged;
+            }
+
+            subscribedDebugWindowManager = null;
+        }
+
+        private void OnDebugMenuVisibilityChanged(bool visible)
+        {
+            debugMenuVisible = visible;
+
+            if (debugMenuVisible)
+            {
+                ClearActiveInput();
+            }
+        }
+
+        private void ClearActiveInput()
+        {
+            remainingDelta = Vector3.zero;
+            currentBoostMultiplier = 1.0f;
         }
 
         private void ResolveUniverseFrame()

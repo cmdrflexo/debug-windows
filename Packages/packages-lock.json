@@ -1,5 +1,13 @@
 {
   "dependencies": {
+    "com.jcan.debugwindows": {
+      "version": "file:com.jcan.debugwindows",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.13",
       "depth": 0,

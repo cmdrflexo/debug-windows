@@ -14,6 +14,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private SgtFloatingCamera floatingCamera;
 
+        [SerializeField]
+        [Tooltip("Transform whose universe rotation is captured and restored with camera poses.")]
+        private Transform poseRotationSource;
+
         private SgtPosition previousSnappedPoint;
         private bool previousSnappedPointSet;
 
@@ -73,6 +77,44 @@ namespace jcan.CelestialSystems
         private void OnDisable()
         {
             SgtFloatingCamera.OnSnap -= HandleFloatingCameraSnap;
+        }
+
+        public bool TryGetUniversePose(
+            out UniverseMotionState pose)
+        {
+            if (floatingCamera == null)
+            {
+                pose = default;
+                return false;
+            }
+
+            var rotationSource = ResolvePoseRotationSource();
+            pose = new UniverseMotionState(
+                SgtUniversePositionConverter.ToUniversePosition(
+                    floatingCamera.Position),
+                rotationSource.rotation);
+            return true;
+        }
+
+        public bool TrySetUniversePose(
+            UniverseMotionState pose)
+        {
+            if (!IsActiveSource ||
+                floatingCamera == null ||
+                !SgtUniversePositionConverter.TryToSgtPosition(
+                    pose.Position,
+                    0.0,
+                    0.0,
+                    0.0,
+                    out var targetPosition))
+            {
+                return false;
+            }
+
+            floatingCamera.Position = targetPosition;
+            ResolvePoseRotationSource().rotation = pose.Rotation;
+            floatingCamera.Snap();
+            return true;
         }
 
         public override bool TryGetFrameOffsetMeters(
@@ -140,6 +182,25 @@ namespace jcan.CelestialSystems
             {
                 previousSnappedPoint = currentSnappedPoint;
             }
+        }
+
+        private Transform ResolvePoseRotationSource()
+        {
+            if (poseRotationSource != null)
+                return poseRotationSource;
+
+            var mainCamera = Camera.main;
+            if (mainCamera != null &&
+                mainCamera.transform.IsChildOf(floatingCamera.transform))
+            {
+                poseRotationSource = mainCamera.transform;
+            }
+            else
+            {
+                poseRotationSource = floatingCamera.transform;
+            }
+
+            return poseRotationSource;
         }
 
         private static Vector3d CalculateDeltaMeters(

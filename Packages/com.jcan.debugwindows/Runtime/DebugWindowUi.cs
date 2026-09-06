@@ -60,7 +60,9 @@ namespace jcan.DebugWindows
             var image = AddImage(rect.gameObject, background);
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
-            rect.gameObject.AddComponent<LayoutElement>().preferredWidth = width;
+            var buttonSize = rect.gameObject.AddComponent<LayoutElement>();
+            buttonSize.preferredWidth = width;
+            buttonSize.preferredHeight = textSize + 8.0f;
 
             var label = CreateText(
                 "Label",
