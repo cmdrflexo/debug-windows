@@ -35,6 +35,7 @@ namespace jcan.DebugWindows
             public float positionX;
             public float positionY;
             public bool pinned;
+            public string customState;
         }
 
         [Header("Scene")]
@@ -71,6 +72,10 @@ namespace jcan.DebugWindows
         [SerializeField]
         [Tooltip("Optional 9-sliced outline sprite used by list and text-input frames.")]
         private Sprite listFrameSprite;
+
+        [SerializeField]
+        [Tooltip("Optional 9-sliced sprite used by tab buttons.")]
+        private Sprite tabBackgroundSprite;
 
         [Header("Colors")]
         [SerializeField]
@@ -135,6 +140,7 @@ namespace jcan.DebugWindows
         public float Spacing => spacing;
         public Sprite WindowBackgroundSprite => windowBackgroundSprite;
         public Sprite ListFrameSprite => listFrameSprite;
+        public Sprite TabBackgroundSprite => tabBackgroundSprite;
         public Color WindowColor => windowColor;
         public Color TitleColor => titleColor;
         public Color ButtonColor => buttonColor;
@@ -254,6 +260,7 @@ namespace jcan.DebugWindows
 
             if (loadedStates.TryGetValue(registration.UniqueId, out var saved))
             {
+                registration.RestoreCustomState?.Invoke(saved.customState);
                 view.SetPosition(new Vector2(saved.positionX, saved.positionY), false);
                 view.SetState(saved.state, false);
                 view.SetPinned(saved.pinned, false);
@@ -361,7 +368,8 @@ namespace jcan.DebugWindows
                     state = view.State,
                     positionX = view.Position.x,
                     positionY = view.Position.y,
-                    pinned = view.Pinned
+                    pinned = view.Pinned,
+                    customState = pair.Value.Registration.CaptureCustomState?.Invoke()
                 });
             }
 
