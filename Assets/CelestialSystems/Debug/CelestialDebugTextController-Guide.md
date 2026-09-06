@@ -396,6 +396,22 @@ Cache error: {factory.SurfaceCacheManager.LastError|None}
 
 One factory body normally reports **2 clients / 1 surface**: rendering and collision share cached data but own their requests independently. Collision readiness requires a nonempty, fully enabled required footprint and stays false in orbit. Query values are meaningful when `Query available` is true; a zero error without `Collider probe: True` is not a successful comparison. Use **Drop Test Sphere** from the generated collision component's context menu after coverage is ready. See `Documentation/CelestialSurfaceCollisionMilestone5.md` for the consolidated test.
 
+### Universe motion state
+
+Use the existing `factory` source alias and replace temporary **Display Code** with this compact block. Keep the source list and Header Code as they are.
+
+```text
+<b>UNIVERSE MOTION</b>
+Body: {factory.LastSpawnedBody.InstanceId|--}
+Ready: {color:factory.LastSpawnedBody.IsMotionReady|#60E880|#FF6060|#AAAAAA}{factory.LastSpawnedBody.IsMotionReady|--}</color>
+Speed: {factory.LastSpawnedBody.CurrentMotionState.LinearVelocityMetersPerSecond.Magnitude:N3|--} m/s
+V: ({factory.LastSpawnedBody.CurrentMotionState.LinearVelocityMetersPerSecond.x:N3|--}, {factory.LastSpawnedBody.CurrentMotionState.LinearVelocityMetersPerSecond.y:N3|--}, {factory.LastSpawnedBody.CurrentMotionState.LinearVelocityMetersPerSecond.z:N3|--}) m/s
+Omega: ({factory.LastSpawnedBody.CurrentMotionState.AngularVelocityRadiansPerSecond.x:E3|--}, {factory.LastSpawnedBody.CurrentMotionState.AngularVelocityRadiansPerSecond.y:E3|--}, {factory.LastSpawnedBody.CurrentMotionState.AngularVelocityRadiansPerSecond.z:E3|--}) rad/s
+Error: {factory.LastSpawnedBody.LastError|None}
+```
+
+Treat values as current only when **Ready** is true. A stationary body has zero angular velocity; the first sample also reports zero while establishing rotation history. The generated Motion provider exposes **Has Angular Velocity Estimate**, **Simulation Time Seconds**, and its own **Last Error** in the Inspector. Angular velocity uses simulated seconds and universe axes. Origin shifts should not introduce velocity spikes. See `Documentation/UniverseMotionState.md` for the full test and sampling limitations.
+
 ### Free universe anchor movement
 
 Assign the `FreeUniverseAnchorController` component with the alias `anchor`:

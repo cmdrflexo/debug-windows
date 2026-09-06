@@ -79,8 +79,8 @@ namespace jcan.CelestialSystems
         private readonly List<CubeSpherePatchAddress> removals = new List<CubeSpherePatchAddress>();
         private readonly Dictionary<CubeSpherePatchAddress, float> queryRequests = new Dictionary<CubeSpherePatchAddress, float>();
         private CelestialSurfaceSample lastSample;
-        private CelestialBodyMotionState previousMotion;
-        private CelestialBodyMotionState physicsMotion;
+        private UniverseMotionState previousMotion;
+        private UniverseMotionState physicsMotion;
         private bool hasPhysicsMotion;
         private bool hasPreviousMotion;
         private CelestialSurfaceDropTestBody dropTestBody;
