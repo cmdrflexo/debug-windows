@@ -279,7 +279,7 @@ namespace jcan.DebugWindows
             frameSize.preferredWidth = manager.MinimumWindowWidth * 0.65f;
             frameSize.preferredHeight = manager.TextSize + 8.0f;
 
-            var image = DebugWindowUi.AddImage(frame.gameObject, Color.white);
+            var image = DebugWindowUi.AddImage(frame.gameObject, manager.ElementColor);
             if (manager.ListFrameSprite != null)
             {
                 image.sprite = manager.ListFrameSprite;
@@ -374,7 +374,7 @@ namespace jcan.DebugWindows
         {
             var viewport = DebugWindowUi.CreateRect("Tabs", parent);
             var viewportSize = viewport.gameObject.AddComponent<LayoutElement>();
-            viewportSize.preferredHeight = content.Manager.TextSize + 10.0f;
+            viewportSize.preferredHeight = content.Manager.TextSize + 12.0f;
             viewport.gameObject.AddComponent<RectMask2D>();
 
             var tabContent = DebugWindowUi.CreateRect("Content", viewport);
@@ -383,6 +383,7 @@ namespace jcan.DebugWindows
             tabContent.pivot = new Vector2(0.0f, 0.5f);
             tabContent.anchoredPosition = Vector2.zero;
             var tabsLayout = tabContent.gameObject.AddComponent<HorizontalLayoutGroup>();
+            tabsLayout.padding = new RectOffset(0, 0, 2, 2);
             tabsLayout.spacing = content.Manager.Spacing;
             tabsLayout.childControlWidth = true;
             tabsLayout.childControlHeight = true;
@@ -411,7 +412,7 @@ namespace jcan.DebugWindows
                     tabContent,
                     page.TabText,
                     content.Manager.TextSize,
-                    content.Manager.ButtonColor,
+                    content.Manager.ElementColor,
                     content.Manager.TextColor,
                     () => definition.SetActivePage(capturedId),
                     width);
@@ -462,13 +463,17 @@ namespace jcan.DebugWindows
                 return;
 
             var footer = DebugWindowUi.CreateRect("Footer", parent);
+            var footerSize = footer.gameObject.AddComponent<LayoutElement>();
+            footerSize.preferredHeight = content.Manager.TextSize + 8.0f;
+            footerSize.flexibleHeight = 0.0f;
+
             var layout = footer.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = content.Manager.Spacing;
             layout.childAlignment = TextAnchor.MiddleRight;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandHeight = false;
             definition.BuildFooter(new DebugWindowFormContent(
                 content.Manager,
                 footer));
@@ -492,7 +497,7 @@ namespace jcan.DebugWindows
             {
                 pair.Value.color = pair.Key == page.UniqueId
                     ? content.Manager.SelectionColor
-                    : content.Manager.ButtonColor;
+                    : content.Manager.ElementColor;
             }
 
             Canvas.ForceUpdateCanvases();
