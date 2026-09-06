@@ -10,7 +10,8 @@ namespace jcan.CelestialSystems
 
         bool IsReady { get; }
 
+        /// <summary>Returns a global SI motion snapshot; false means the output is unavailable.</summary>
         bool TryGetMotionState(
-            out CelestialBodyMotionState motionState);
+            out UniverseMotionState motionState);
     }
 }

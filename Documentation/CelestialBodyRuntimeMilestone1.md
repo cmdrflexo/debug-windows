@@ -56,6 +56,8 @@ The startup fields already present on `CelestialBodyFactory` remain supported fo
 
 `ICelestialBodyMotionProvider` is the boundary between a body package and its motion authority. Runtime consumers should prefer `CelestialBodyRuntimeContext.TryGetMotionState` rather than reading Gravity Engine directly.
 
+The returned value is now `UniverseMotionState`, containing global position, rotation, linear velocity in meters per simulated second, and angular velocity in radians per simulated second. See [Universe motion state](UniverseMotionState.md) for the coordinate contract, migration, sampling limitations, and test steps.
+
 `GravityEngineCelestialBodyMotionProvider` is the first implementation. The runtime context still exposes `GravityBody` as a compatibility bridge for the current surface system. That direct dependency can be retired only after the legacy Surface Frame no longer needs it.
 
 ## Readiness
@@ -92,4 +94,3 @@ At each later milestone, the new subsystem will be added under the generated pac
 6. Confirm the root context reaches `Lifecycle State: Active` and `Is Ready: true` after the universe frame initializes.
 7. Confirm the existing Surface Frame continues selecting and rendering bodies normally.
 8. Exit Play Mode and confirm there are no errors.
-

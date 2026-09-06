@@ -26,7 +26,7 @@ namespace jcan.CelestialSystems
 
         internal CelestialSurfaceSample(CelestialSurfacePatchData data, int requestedLevel, int version,
             double radius, DoubleVector3 observer, DoubleVector3 point, DoubleVector3 normal,
-            CelestialBodyMotionState motion)
+            UniverseMotionState motion)
         {
             IsValid = true;
             Patch = data.Address;

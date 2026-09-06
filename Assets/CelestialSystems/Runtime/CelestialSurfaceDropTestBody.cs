@@ -14,7 +14,7 @@ namespace jcan.CelestialSystems
         private CelestialSurfaceRuntime surface;
         private Rigidbody physicsBody;
         private UniverseFrameController frame;
-        private CelestialBodyMotionState previousMotion;
+        private UniverseMotionState previousMotion;
         private Vector3 previousCarrierVelocity;
         private bool hasPreviousMotion;
         private bool hasPreviousCarrierVelocity;

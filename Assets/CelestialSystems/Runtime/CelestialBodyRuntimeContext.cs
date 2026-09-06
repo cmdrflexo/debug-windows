@@ -87,7 +87,7 @@ namespace jcan.CelestialSystems
         private double configuredReferenceRadiusMeters;
 
         [SerializeField]
-        private CelestialBodyMotionState currentMotionState;
+        private UniverseMotionState currentMotionState;
 
         [SerializeField]
         private string lastError;
@@ -200,7 +200,7 @@ namespace jcan.CelestialSystems
         public double ConfiguredReferenceRadiusMeters =>
             configuredReferenceRadiusMeters;
 
-        public CelestialBodyMotionState CurrentMotionState =>
+        public UniverseMotionState CurrentMotionState =>
             currentMotionState;
 
         public string LastError =>
@@ -365,7 +365,7 @@ namespace jcan.CelestialSystems
         }
 
         public bool TryGetMotionState(
-            out CelestialBodyMotionState motionState)
+            out UniverseMotionState motionState)
         {
             if (motionProvider == null ||
                 !motionProvider.TryGetMotionState(
