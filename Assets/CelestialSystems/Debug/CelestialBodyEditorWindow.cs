@@ -17,12 +17,15 @@ namespace jcan.CelestialSystems
         [SerializeField] private CelestialDefinitionCatalog catalog;
         [SerializeField] private CelestialBodyFactory factory;
         [SerializeField] private CelestialBodyDefinition defaultDefinition;
+        [SerializeField] private CelestialBodyDefinitionLibrary definitionLibrary;
         [SerializeField] private Vector2 preferredContentSize = new Vector2(500.0f, 380.0f);
         [SerializeField] private Vector2 defaultPosition = new Vector2(12.0f, -220.0f);
 
         private CelestialBodyEditorModel model;
         private DebugTabbedWindow window;
         private string status = "Ready.";
+        private string loadedSavedDefinitionId;
+        private string selectedBodyOptionId;
         private bool applicationIsQuitting;
 
         private void OnEnable()
@@ -30,6 +33,11 @@ namespace jcan.CelestialSystems
             applicationIsQuitting = false;
             if (factory == null)
                 factory = FindFirstObjectByType<CelestialBodyFactory>();
+            if (definitionLibrary == null)
+                definitionLibrary = GetComponent<CelestialBodyDefinitionLibrary>();
+            if (definitionLibrary == null)
+                definitionLibrary = gameObject.AddComponent<CelestialBodyDefinitionLibrary>();
+            definitionLibrary.Initialize(catalog);
 
             ResetModel();
             window = new DebugTabbedWindow(
@@ -70,16 +78,8 @@ namespace jcan.CelestialSystems
             content.AddChoice(
                 "Body Preset",
                 BodyOptions(),
-                model.definitionId,
-                option =>
-                {
-                    if (option?.Value is CelestialBodyDefinition definition)
-                    {
-                        model.Load(definition);
-                        status = $"Loaded '{definition.DefinitionId}'.";
-                        window.RefreshActivePage();
-                    }
-                });
+                selectedBodyOptionId,
+                LoadBodyOption);
             content.AddTextField("Instance ID", model.instanceId, value => model.instanceId = value);
             content.AddTextField("Definition ID", model.definitionId, value => model.definitionId = value);
             content.AddNumberField("Generation Seed", model.generationSeed, value => model.generationSeed = (int)value);
@@ -196,8 +196,46 @@ namespace jcan.CelestialSystems
         private void BuildFooter(DebugWindowFormContent content)
         {
             content.AddButton("new", "New", ResetAndRefresh);
-            content.AddButton("save", "Save", () => status = "Definition saving is the next milestone.");
+            content.AddButton("save", "Save", SaveDefinition);
+            content.AddButton("delete", "Delete", DeleteDefinition);
             content.AddButton("spawn", "Spawn", Spawn);
+        }
+
+        private void SaveDefinition()
+        {
+            if (definitionLibrary == null ||
+                !definitionLibrary.Save(model, loadedSavedDefinitionId, out var error))
+            {
+                status = string.IsNullOrWhiteSpace(error)
+                    ? "The definition library is unavailable."
+                    : error;
+                return;
+            }
+
+            loadedSavedDefinitionId = model.definitionId.Trim();
+            selectedBodyOptionId = "saved:" + loadedSavedDefinitionId;
+            status = $"Saved '{loadedSavedDefinitionId}'.";
+            window.RefreshActivePage();
+        }
+
+        private void DeleteDefinition()
+        {
+            if (definitionLibrary == null ||
+                string.IsNullOrWhiteSpace(loadedSavedDefinitionId))
+            {
+                status = "Select a saved definition before deleting.";
+                return;
+            }
+
+            if (!definitionLibrary.Delete(loadedSavedDefinitionId, out var error))
+            {
+                status = error;
+                return;
+            }
+
+            ResetModel();
+            status = "Deleted saved definition.";
+            window.RefreshActivePage();
         }
 
         private void Spawn()
@@ -234,6 +272,8 @@ namespace jcan.CelestialSystems
         private void ResetModel()
         {
             model = new CelestialBodyEditorModel();
+            loadedSavedDefinitionId = null;
+            selectedBodyOptionId = null;
             var source = defaultDefinition;
             if (source == null && catalog != null && catalog.BodyDefinitions.Count > 0)
                 source = catalog.BodyDefinitions[0];
@@ -241,20 +281,67 @@ namespace jcan.CelestialSystems
             {
                 model.Load(source);
                 model.instanceId = source.DefinitionId + "-01";
+                selectedBodyOptionId = "asset:" + source.DefinitionId;
             }
+        }
+
+        private void LoadBodyOption(DebugChoiceOption option)
+        {
+            if (option?.Value is CelestialBodyDefinition asset)
+            {
+                model.Load(asset);
+                loadedSavedDefinitionId = null;
+                selectedBodyOptionId = option.UniqueId;
+                status = $"Loaded catalog definition '{asset.DefinitionId}'.";
+            }
+            else if (option?.Value is SavedCelestialBodyDefinition saved &&
+                definitionLibrary.LoadInto(saved.DefinitionId, model, out var error))
+            {
+                loadedSavedDefinitionId = saved.DefinitionId;
+                selectedBodyOptionId = option.UniqueId;
+                status = $"Loaded saved definition '{saved.DefinitionId}'.";
+            }
+            else
+            {
+                status = "The selected definition could not be loaded.";
+            }
+
+            window.RefreshActivePage();
         }
 
         private List<DebugChoiceOption> BodyOptions()
         {
             var result = new List<DebugChoiceOption>();
-            if (catalog == null)
-                return result;
-            for (var i = 0; i < catalog.BodyDefinitions.Count; i++)
+            if (catalog != null)
             {
-                var value = catalog.BodyDefinitions[i];
-                if (value != null)
-                    result.Add(new DebugChoiceOption(value.DefinitionId, value.DefinitionId, value));
+                for (var i = 0; i < catalog.BodyDefinitions.Count; i++)
+                {
+                    var value = catalog.BodyDefinitions[i];
+                    if (value != null)
+                    {
+                        result.Add(new DebugChoiceOption(
+                            "asset:" + value.DefinitionId,
+                            value.DefinitionId,
+                            value));
+                    }
+                }
             }
+
+            if (definitionLibrary != null)
+            {
+                for (var i = 0; i < definitionLibrary.Definitions.Count; i++)
+                {
+                    var value = definitionLibrary.Definitions[i];
+                    if (value != null)
+                    {
+                        result.Add(new DebugChoiceOption(
+                            "saved:" + value.DefinitionId,
+                            value.DefinitionId + " [saved]",
+                            value));
+                    }
+                }
+            }
+
             return result;
         }
 
