@@ -29,13 +29,11 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         [Min(1.0f)]
-        private double maximumTimeStepMultiplier =
+        private double maximumTimeZoom =
             1000000.0;
 
         private GravityEngine gravityEngine;
         private DebugTabbedWindow window;
-        private double normalEngineDt;
-        private bool hasNormalEngineDt;
         private bool applicationIsQuitting;
         private string lastAction =
             "Ready.";
@@ -147,20 +145,20 @@ namespace jcan.CelestialSystems
                 GetWorldStepText);
             content.AddReadOnly(
                 "Current Rate",
-                () => GetCurrentMultiplier()
+                () => GetCurrentTimeZoom()
                     .ToString("0.####") + "×");
             content.AddNumberField(
-                "Time Step Multiplier",
-                GetCurrentMultiplier(),
-                SetTimeStepMultiplier,
+                "Time Zoom",
+                GetCurrentTimeZoom(),
+                SetTimeZoom,
                 "×");
             content.AddReadOnly(
                 "Last Action",
                 () => lastAction);
             content.AddReadOnly(
                 "Accuracy",
-                () => GetCurrentMultiplier() > 1.0
-                    ? "High rates reduce off-rails integration accuracy."
+                () => GetCurrentTimeZoom() > 1.0
+                    ? "High zoom increases GE work per frame."
                     : "Normal.");
         }
 
@@ -174,7 +172,7 @@ namespace jcan.CelestialSystems
             content.AddButton(
                 "normal-rate",
                 "1×",
-                () => SetTimeStepMultiplier(
+                () => SetTimeZoom(
                     1.0));
         }
 
@@ -186,16 +184,6 @@ namespace jcan.CelestialSystems
                     GravityEngine.Instance();
             }
 
-            if (!hasNormalEngineDt &&
-                IsEngineReady() &&
-                IsFinitePositive(
-                    gravityEngine.engineDt))
-            {
-                normalEngineDt =
-                    gravityEngine.engineDt;
-                hasNormalEngineDt =
-                    true;
-            }
         }
 
         private bool IsEngineReady()
@@ -205,13 +193,12 @@ namespace jcan.CelestialSystems
                 gravityEngine.IsSetup();
         }
 
-        private void SetTimeStepMultiplier(
-            double requestedMultiplier)
+        private void SetTimeZoom(
+            double requestedTimeZoom)
         {
             ResolveGravityEngine();
 
-            if (!IsEngineReady() ||
-                !hasNormalEngineDt)
+            if (!IsEngineReady())
             {
                 lastAction =
                     "Gravity Engine is not ready.";
@@ -219,24 +206,23 @@ namespace jcan.CelestialSystems
             }
 
             if (!IsFinitePositive(
-                    requestedMultiplier))
+                    requestedTimeZoom))
             {
                 lastAction =
-                    "The time-step multiplier must be greater than zero.";
+                    "Time zoom must be greater than zero.";
                 return;
             }
 
-            var multiplier =
+            var timeZoom =
                 Math.Min(
-                    requestedMultiplier,
+                    requestedTimeZoom,
                     Math.Max(
                         1.0,
-                        maximumTimeStepMultiplier));
-            gravityEngine.engineDt =
-                normalEngineDt *
-                multiplier;
+                        maximumTimeZoom));
+            gravityEngine.SetTimeZoom(
+                (float)timeZoom);
             lastAction =
-                $"Set GE time-step multiplier to {multiplier:0.####}×.";
+                $"Set GE time zoom to {timeZoom:0.####}×.";
         }
 
         private void ToggleEvolution()
@@ -260,21 +246,21 @@ namespace jcan.CelestialSystems
                     : "Paused GE evolution.";
         }
 
-        private double GetCurrentMultiplier()
+        private double GetCurrentTimeZoom()
         {
             ResolveGravityEngine();
 
-            if (!hasNormalEngineDt ||
-                gravityEngine == null ||
-                !IsFinitePositive(
-                    gravityEngine.engineDt))
+            if (!IsEngineReady())
             {
                 return 1.0;
             }
 
-            return
-                gravityEngine.engineDt /
-                normalEngineDt;
+            var timeZoom =
+                gravityEngine.GetTimeZoom();
+            return IsFinitePositive(
+                    timeZoom)
+                ? timeZoom
+                : 1.0;
         }
 
         private string GetSimulationTimeText()
