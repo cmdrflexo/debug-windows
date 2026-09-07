@@ -1,63 +1,47 @@
-# Spherical Contour Fibers: first visual prototype
+# Spherical Streamline Fibers
 
-New MapMagic source under Map/Initial. Existing Spherical Flow Noise and graph
-assets are untouched. This is a static visual field, not a magnetic simulation.
+The existing Spherical Contour Fibers graph node now uses line-integral
+convolution (LIC). Its type and serialized field names remain unchanged so saved
+graph connections survive the upgrade. Spherical Flow Noise remains untouched.
 
-## Method and research
+## Method
 
-- Cabral and Leedom, *Imaging Vector Fields Using Line Integral Convolution*:
-  https://cs.brown.edu/courses/csci2370/2000/1999/cabral.pdf
-  LIC filters a texture along streamlines. The prior five-sample ridge average
-  is too sparse for its chosen length/feature scale; its failure is not evidence
-  against LIC. A dense implementation would need substantially more samples.
-- *Physically Based Rendering*, Noise / Marble:
-  https://pbr-book.org/3ed-2018/Texture/Noise
-  Noise perturbs a phase that feeds a periodic band function. This node adapts
-  that idea to a spherical scalar field rather than a world-Y coordinate.
-  No external implementation is copied.
+A seeded, smooth three-component noise field is projected onto the tangent plane
+at every sphere direction. The evaluator follows that direction both forward and
+backward, repeatedly recomputing the tangent field, and averages fine carrier
+noise along the resulting curved streamline with a cosine kernel.
 
-Two independently seeded and rotated broad value-noise samples define a scalar
-field. A cosine creates multiple level bands through it. Smaller noise adds a
-bounded phase disturbance; a power controls band width. No longitude, latitude,
-fixed global strand axis, or sparse shifted image copies are used.
+This removes the periodic cosine responsible for the nested topographic rings.
+Because a continuous tangent field cannot be nonzero everywhere on a sphere,
+isolated swirl/singularity centers remain. The procedural vector components
+distribute them instead of creating one repeated pattern or a fixed pole pair.
 
-## First test
-
-Connect Spherical Contour Fibers directly to the bright Textures layer. Keep
-the required Height branch and the saved granulation branch unchanged.
+## Starting settings for a Sol-radius body
 
 | Parameter | Start | Meaning |
 |---|---:|---|
-| Seed Offset | 6203 | Added to the surface definition's seed |
-| Region Size (m) | 300000000 | Scale of broad bends and closed contour regions |
-| Bands | 12 | Cycles across the scalar field's full 0-1 range, not bands per region |
-| Distortion Size (m) | 30000000 | Scale of small bends |
-| Distortion (cycles) | 0.15 | Phase disturbance amplitude, independent of Bands |
-| Sharpness | 2 | Larger values narrow bright stripes |
-| Output | Fibers | Field shows the broad source without contour modulation |
-| Intensity / Offset | 1 / 0 | Normalized output multiplier and offset |
+| Seed Offset | 6203 | Added to the surface seed |
+| Flow Scale (m) | 180000000 | Scale of broad turns and activity regions |
+| Streamline Samples | 24 | More makes longer/smoother fibers but costs more |
+| Fiber Width (m) | 8000000 | Carrier-noise scale and integration step |
+| Flow Complexity | 0.35 | Mix between circulating and direct tangent flow |
+| Sharpness | 1.2 | Output contrast shaping |
+| Output | Fibers | Field displays a diagnostic vector component |
+| Intensity / Offset | 1 / 0 | Final normalized adjustment |
 
-The preview radius is only a fallback; runtime spherical context supplies the
-actual radius and seed. Default fallback radius: 696340000 m.
+Existing nodes retain their old saved numeric values. Set the values above for
+the first test after pulling; changing the labels does not rewrite graph assets.
 
-## Verification and limits
+## Performance and validation
 
-The Python numerical prototype passed 10,000 finite/range, repeatability,
-direction normalization, seed variation, and physical scale checks. Approaches
-from either side of all 12 cube-edge ray families differed by at most 7.33e-9.
-This is an independent translation, not a compiled C# or Unity integration test.
+Cost scales roughly linearly with Streamline Samples. At 24, each output pixel
+evaluates 12 steps in both directions. Start there before trying 36 or 48.
 
-Run Tools > Celestial Systems > Validate Contour Fibers in Unity for checks
-against the C# evaluator. Inspect all rendered faces and LOD transitions too.
-Unity compilation and this menu command have not been run in the authoring
-environment. No Unity/MapMagic compiler is installed there.
+The independent Python translation passes range, determinism, direction
+normalization, seed variation, physical-scale invariance, and all 12 cube-edge
+approach tests. Run **Tools > Celestial Systems > Validate Contour Fibers** in
+Unity, then inspect rendered face seams and LOD transitions. Unity compilation
+and rendered integration still require testing in the authoring project.
 
-Spacing varies with the scalar gradient; extrema produce closed rings or broad
-patches. This first version deliberately does not promise constant meter-wide
-fibers, physical activity centers, temporal animation, or anti-aliasing.
-The underlying value lattice may still impart directional bias. Increasing
-Bands or Sharpness can alias in coarse graph maps; use a conservative preview
-first, then address sample-footprint filtering before dense distant rendering.
-
-The prototype render is a mathematical sanity check, not a screenshot from Unity.
-The noise implementation and node mappings from main were reused unchanged.
+Reference: Cabral and Leedom, *Imaging Vector Fields Using Line Integral
+Convolution*: https://cs.brown.edu/courses/csci2370/2000/1999/cabral.pdf
