@@ -2528,6 +2528,18 @@ namespace jcan.CelestialSystems
                 "_LodMaskMode",
                 0.0f);
 
+            var surfaceAppearance =
+                surfaceRuntime.SurfaceDefinition
+                    .SurfaceAppearance;
+
+            if (surfaceAppearance != null)
+            {
+                SetFloatIfPresent(
+                    material,
+                    "_SurfaceLightingMode",
+                    (float)surfaceAppearance.LightingMode);
+            }
+
             for (var index = 0;
                 index < MaximumAdaptedLayerCount;
                 index++)
@@ -2646,6 +2658,11 @@ namespace jcan.CelestialSystems
                     : terrainLayer != null
                         ? terrainLayer.maskMapTexture
                         : null;
+            var emissionTexture =
+                surfaceLayer != null &&
+                surfaceLayer.EmissionTexture != null
+                    ? surfaceLayer.EmissionTexture
+                    : Texture2D.whiteTexture;
             var normalStrength =
                 surfaceLayer != null
                     ? surfaceLayer.NormalStrength
@@ -2672,6 +2689,14 @@ namespace jcan.CelestialSystems
                 surfaceLayer != null
                     ? surfaceLayer.OcclusionStrength
                     : 1.0f;
+            var emissionColor =
+                surfaceLayer != null
+                    ? surfaceLayer.EmissionColor
+                    : Color.white;
+            var emissionIntensity =
+                surfaceLayer != null
+                    ? surfaceLayer.EmissionIntensity
+                    : 0.0f;
 
             SetTextureIfPresent(
                 material,
@@ -2685,6 +2710,10 @@ namespace jcan.CelestialSystems
                 material,
                 "_Mask" + suffix,
                 maskTexture);
+            SetTextureIfPresent(
+                material,
+                "_EmissionMap" + suffix,
+                emissionTexture);
             SetFloatIfPresent(
                 material,
                 "_HasNormal" + suffix,
@@ -2717,6 +2746,14 @@ namespace jcan.CelestialSystems
                 material,
                 "_OcclusionStrength" + suffix,
                 occlusionStrength);
+            SetColorIfPresent(
+                material,
+                "_EmissionColor" + suffix,
+                emissionColor);
+            SetFloatIfPresent(
+                material,
+                "_EmissionIntensity" + suffix,
+                emissionIntensity);
         }
 
         private Material GetDebugMaterial(

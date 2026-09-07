@@ -13,6 +13,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         _Metallic ("Metallic", Range(0, 1)) = 0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.25
         _Occlusion ("Occlusion", Range(0, 1)) = 1
+        [Enum(Lit, 0, Emissive, 1, Lit And Emissive, 2)] _SurfaceLightingMode ("Surface Lighting Mode", Float) = 0
+        [HDR] _EmissionColor ("Emission Color", Color) = (1, 1, 1, 1)
+        _EmissionMap ("Emission Map", 2D) = "white" {}
+        _EmissionIntensity ("Emission Intensity", Float) = 0
 
         [HideInInspector] _Control ("MapMagic Control", 2D) = "white" {}
         [HideInInspector] _LayerCount ("MapMagic Layer Count", Float) = 0
@@ -28,6 +32,10 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         [HideInInspector] _Mask1 ("Layer 1 Mask", 2D) = "white" {}
         [HideInInspector] _Mask2 ("Layer 2 Mask", 2D) = "white" {}
         [HideInInspector] _Mask3 ("Layer 3 Mask", 2D) = "white" {}
+        [HideInInspector] _EmissionMap0 ("Layer 0 Emission", 2D) = "white" {}
+        [HideInInspector] _EmissionMap1 ("Layer 1 Emission", 2D) = "white" {}
+        [HideInInspector] _EmissionMap2 ("Layer 2 Emission", 2D) = "white" {}
+        [HideInInspector] _EmissionMap3 ("Layer 3 Emission", 2D) = "white" {}
         [HideInInspector] _HasNormal0 ("Layer 0 Has Normal", Float) = 0
         [HideInInspector] _HasNormal1 ("Layer 1 Has Normal", Float) = 0
         [HideInInspector] _HasNormal2 ("Layer 2 Has Normal", Float) = 0
@@ -56,6 +64,14 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         [HideInInspector] _OcclusionStrength1 ("Layer 1 Occlusion Strength", Range(0, 1)) = 1
         [HideInInspector] _OcclusionStrength2 ("Layer 2 Occlusion Strength", Range(0, 1)) = 1
         [HideInInspector] _OcclusionStrength3 ("Layer 3 Occlusion Strength", Range(0, 1)) = 1
+        [HideInInspector] [HDR] _EmissionColor0 ("Layer 0 Emission Color", Color) = (1, 1, 1, 1)
+        [HideInInspector] [HDR] _EmissionColor1 ("Layer 1 Emission Color", Color) = (1, 1, 1, 1)
+        [HideInInspector] [HDR] _EmissionColor2 ("Layer 2 Emission Color", Color) = (1, 1, 1, 1)
+        [HideInInspector] [HDR] _EmissionColor3 ("Layer 3 Emission Color", Color) = (1, 1, 1, 1)
+        [HideInInspector] _EmissionIntensity0 ("Layer 0 Emission Intensity", Float) = 0
+        [HideInInspector] _EmissionIntensity1 ("Layer 1 Emission Intensity", Float) = 0
+        [HideInInspector] _EmissionIntensity2 ("Layer 2 Emission Intensity", Float) = 0
+        [HideInInspector] _EmissionIntensity3 ("Layer 3 Emission Intensity", Float) = 0
 
         [HideInInspector] _TileFade ("Tile Fade", Range(0, 1)) = 1
         [HideInInspector] _LodMaskMode ("LOD Mask Mode", Float) = 0
@@ -110,6 +126,11 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         UNITY_DECLARE_TEX2D_NOSAMPLER(_Mask1);
         UNITY_DECLARE_TEX2D_NOSAMPLER(_Mask2);
         UNITY_DECLARE_TEX2D_NOSAMPLER(_Mask3);
+        UNITY_DECLARE_TEX2D_NOSAMPLER(_EmissionMap);
+        UNITY_DECLARE_TEX2D_NOSAMPLER(_EmissionMap0);
+        UNITY_DECLARE_TEX2D_NOSAMPLER(_EmissionMap1);
+        UNITY_DECLARE_TEX2D_NOSAMPLER(_EmissionMap2);
+        UNITY_DECLARE_TEX2D_NOSAMPLER(_EmissionMap3);
 
         float4 _Splat0_ST;
         float4 _Splat1_ST;
@@ -120,6 +141,9 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         half _Metallic;
         half _Smoothness;
         half _Occlusion;
+        half _SurfaceLightingMode;
+        half4 _EmissionColor;
+        half _EmissionIntensity;
         half _LayerCount;
         half _HasNormal0;
         half _HasNormal1;
@@ -149,6 +173,14 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         half _OcclusionStrength1;
         half _OcclusionStrength2;
         half _OcclusionStrength3;
+        half4 _EmissionColor0;
+        half4 _EmissionColor1;
+        half4 _EmissionColor2;
+        half4 _EmissionColor3;
+        half _EmissionIntensity0;
+        half _EmissionIntensity1;
+        half _EmissionIntensity2;
+        half _EmissionIntensity3;
         half _TileFade;
         half _LodMaskMode;
         float _LodFadeStartMeters;
@@ -254,6 +286,29 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                     0.0001h);
         }
 
+        void ApplyLightingMode(
+            inout SurfaceOutputStandard output,
+            half3 emission)
+        {
+            if (_SurfaceLightingMode > 0.5h)
+            {
+                output.Emission =
+                    emission;
+
+                if (_SurfaceLightingMode < 1.5h)
+                {
+                    output.Albedo = 0.0h;
+                    output.Metallic = 0.0h;
+                    output.Smoothness = 0.0h;
+                    output.Occlusion = 1.0h;
+                }
+            }
+            else
+            {
+                output.Emission = 0.0h;
+            }
+        }
+
         void Surface(
             Input input,
             inout SurfaceOutputStandard output)
@@ -318,11 +373,13 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
 
             if (_LayerCount < 0.5h)
             {
-                output.Albedo =
+                half3 baseSurfaceColor =
                     UNITY_SAMPLE_TEX2D(
                         _BaseMap,
                         input.uv_BaseMap).rgb *
                     _BaseColor.rgb;
+                output.Albedo =
+                    baseSurfaceColor;
                 output.Normal =
                     UnpackScaleNormal(
                         UNITY_SAMPLE_TEX2D_SAMPLER(
@@ -334,6 +391,17 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                 output.Smoothness = _Smoothness;
                 output.Occlusion = _Occlusion;
                 output.Alpha = 1.0h;
+                half3 baseEmission =
+                    baseSurfaceColor *
+                    UNITY_SAMPLE_TEX2D_SAMPLER(
+                        _EmissionMap,
+                        _BaseMap,
+                        input.uv_BaseMap).rgb *
+                    _EmissionColor.rgb *
+                    max(_EmissionIntensity, 0.0h);
+                ApplyLightingMode(
+                    output,
+                    baseEmission);
                 return;
             }
 
@@ -349,11 +417,15 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
             half4 diffuse1 = UNITY_SAMPLE_TEX2D_SAMPLER(_Splat1, _BaseMap, uv1);
             half4 diffuse2 = UNITY_SAMPLE_TEX2D_SAMPLER(_Splat2, _BaseMap, uv2);
             half4 diffuse3 = UNITY_SAMPLE_TEX2D_SAMPLER(_Splat3, _BaseMap, uv3);
+            half3 surfaceColor0 = diffuse0.rgb * _Tint0.rgb;
+            half3 surfaceColor1 = diffuse1.rgb * _Tint1.rgb;
+            half3 surfaceColor2 = diffuse2.rgb * _Tint2.rgb;
+            half3 surfaceColor3 = diffuse3.rgb * _Tint3.rgb;
             output.Albedo =
-                diffuse0.rgb * _Tint0.rgb * weights.r +
-                diffuse1.rgb * _Tint1.rgb * weights.g +
-                diffuse2.rgb * _Tint2.rgb * weights.b +
-                diffuse3.rgb * _Tint3.rgb * weights.a;
+                surfaceColor0 * weights.r +
+                surfaceColor1 * weights.g +
+                surfaceColor2 * weights.b +
+                surfaceColor3 * weights.a;
 
             half3 normal0 = lerp(half3(0.0h, 0.0h, 1.0h), UnpackScaleNormal(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal0, _BaseMap, uv0), _NormalScale0), _HasNormal0);
             half3 normal1 = lerp(half3(0.0h, 0.0h, 1.0h), UnpackScaleNormal(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal1, _BaseMap, uv1), _NormalScale1), _HasNormal1);
@@ -386,6 +458,33 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
                 lerp(1.0h, mask2.g, _HasMask2 * _OcclusionStrength2) * weights.b +
                 lerp(1.0h, mask3.g, _HasMask3 * _OcclusionStrength3) * weights.a;
             output.Alpha = 1.0h;
+
+            half3 emission0 =
+                surfaceColor0 *
+                UNITY_SAMPLE_TEX2D_SAMPLER(_EmissionMap0, _BaseMap, uv0).rgb *
+                _EmissionColor0.rgb *
+                max(_EmissionIntensity0, 0.0h);
+            half3 emission1 =
+                surfaceColor1 *
+                UNITY_SAMPLE_TEX2D_SAMPLER(_EmissionMap1, _BaseMap, uv1).rgb *
+                _EmissionColor1.rgb *
+                max(_EmissionIntensity1, 0.0h);
+            half3 emission2 =
+                surfaceColor2 *
+                UNITY_SAMPLE_TEX2D_SAMPLER(_EmissionMap2, _BaseMap, uv2).rgb *
+                _EmissionColor2.rgb *
+                max(_EmissionIntensity2, 0.0h);
+            half3 emission3 =
+                surfaceColor3 *
+                UNITY_SAMPLE_TEX2D_SAMPLER(_EmissionMap3, _BaseMap, uv3).rgb *
+                _EmissionColor3.rgb *
+                max(_EmissionIntensity3, 0.0h);
+            ApplyLightingMode(
+                output,
+                emission0 * weights.r +
+                emission1 * weights.g +
+                emission2 * weights.b +
+                emission3 * weights.a);
         }
         ENDCG
     }

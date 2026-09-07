@@ -31,6 +31,10 @@ namespace jcan.CelestialSystems
         [Tooltip("Optional packed mask: R metallic, G ambient occlusion, B height, A smoothness.")]
         private Texture2D maskTexture;
 
+        [SerializeField]
+        [Tooltip("Optional texture that modulates this layer's emitted light. White emits fully; black does not emit.")]
+        private Texture2D emissionTexture;
+
         [Header("Surface Values")]
         [SerializeField]
         private Color tint =
@@ -61,6 +65,15 @@ namespace jcan.CelestialSystems
         private float occlusionStrength =
             1.0f;
 
+        [SerializeField]
+        [ColorUsage(true, true)]
+        private Color emissionColor =
+            Color.white;
+
+        [SerializeField]
+        [Min(0.0f)]
+        private float emissionIntensity;
+
         public string LayerId =>
             layerId;
 
@@ -75,6 +88,9 @@ namespace jcan.CelestialSystems
 
         public Texture2D MaskTexture =>
             maskTexture;
+
+        public Texture2D EmissionTexture =>
+            emissionTexture;
 
         public Color Tint =>
             tint;
@@ -94,6 +110,12 @@ namespace jcan.CelestialSystems
         public float OcclusionStrength =>
             occlusionStrength;
 
+        public Color EmissionColor =>
+            emissionColor;
+
+        public float EmissionIntensity =>
+            emissionIntensity;
+
         public bool HasValidSettings =>
             !string.IsNullOrWhiteSpace(
                 layerId) &&
@@ -110,7 +132,12 @@ namespace jcan.CelestialSystems
                 occlusionStrength) &&
             IsFinite(
                 normalStrength) &&
-            normalStrength >= 0.0f;
+            normalStrength >= 0.0f &&
+            IsFinite(
+                emissionColor) &&
+            IsFinite(
+                emissionIntensity) &&
+            emissionIntensity >= 0.0f;
 
         private static bool IsUnitValue(
             float value)
