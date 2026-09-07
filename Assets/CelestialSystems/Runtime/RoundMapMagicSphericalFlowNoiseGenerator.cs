@@ -32,6 +32,12 @@ namespace jcan.CelestialSystems
         [Val("Flow Strength")]
         public float flowStrength = 2.5f;
 
+        [Val("Fiber Length (m)")]
+        public float fiberLengthMeters = 120000000.0f;
+
+        [Val("Flow Samples")]
+        public int flowSamples = 5;
+
         [Val("Fiber Octaves")]
         public int fiberOctaves = 2;
 
@@ -131,6 +137,8 @@ namespace jcan.CelestialSystems
                         Math.Max(0.001, fiberSizeMeters),
                         Math.Max(0.001, flowSizeMeters),
                         flowStrength,
+                        Math.Max(0.0, fiberLengthMeters),
+                        flowSamples,
                         fiberOctaves,
                         flowOctaves,
                         persistence,
