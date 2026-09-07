@@ -139,7 +139,9 @@ namespace jcan.CelestialSystems
             }
 
             model.definitionId = saved.definitionId;
-            model.instanceId = saved.instanceId;
+            model.instanceId = string.IsNullOrWhiteSpace(saved.instanceId)
+                ? saved.definitionId + "-01"
+                : saved.instanceId;
             model.massKilograms = saved.massKilograms;
             model.referenceRadiusMeters = saved.referenceRadiusMeters;
             model.generationSeed = saved.generationSeed;
