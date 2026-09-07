@@ -309,6 +309,12 @@ namespace jcan.CelestialSystems
                 new Dictionary<
                     PatchKey,
                     GenerationJob>();
+        private readonly Dictionary<
+            MapMagic.Nodes.Graph,
+            MapMagicObject> ownedGenerationSources =
+                new Dictionary<
+                    MapMagic.Nodes.Graph,
+                    MapMagicObject>();
 
         private int nextClientId = 1;
         private long requestSequence;
@@ -2107,9 +2113,70 @@ namespace jcan.CelestialSystems
                 }
             }
 
+            if (TryResolveOrCreateOwnedGenerationSource(
+                    surface,
+                    out var ownedSource))
+            {
+                surface.GenerationSource =
+                    ownedSource;
+                surface.GenerationSourceName =
+                    ownedSource.name;
+                surface.LastError =
+                    string.Empty;
+                return true;
+            }
+
             surface.LastError =
                 "Waiting for a MapMagic generation source using this surface graph.";
             return false;
+        }
+
+        private bool TryResolveOrCreateOwnedGenerationSource(
+            SurfaceRecord surface,
+            out MapMagicObject source)
+        {
+            source = null;
+            var graph =
+                surface != null
+                    ? surface.Graph
+                    : null;
+
+            if (graph == null)
+            {
+                return false;
+            }
+
+            if (ownedGenerationSources.TryGetValue(
+                    graph,
+                    out source) &&
+                source != null)
+            {
+                return true;
+            }
+
+            ownedGenerationSources.Remove(
+                graph);
+
+            var sourceObject =
+                new GameObject(
+                    $"MapMagic Generation Source [{graph.name}]");
+            sourceObject.hideFlags =
+                HideFlags.DontSave;
+            sourceObject.transform.SetParent(
+                transform,
+                false);
+            sourceObject.SetActive(
+                false);
+
+            source =
+                sourceObject.AddComponent<
+                    MapMagicObject>();
+            source.graph =
+                graph;
+            ownedGenerationSources.Add(
+                graph,
+                source);
+            return true;
         }
 
         private static bool SourceMatchesSurface(
