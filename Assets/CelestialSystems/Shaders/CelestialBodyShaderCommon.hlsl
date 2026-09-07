@@ -5,8 +5,10 @@
 #ifndef JCAN_CELESTIAL_BODY_SHADER_COMMON_INCLUDED
 #define JCAN_CELESTIAL_BODY_SHADER_COMMON_INCLUDED
 
+#ifndef JCAN_CELESTIAL_SLOPE_DEBUG_EXTERNAL
 float _SlopeDebugMinDegrees;
 float _SlopeDebugMaxDegrees;
+#endif
 
 struct CelestialBodySurfaceCoordinates
 {
