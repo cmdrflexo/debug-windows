@@ -1,5 +1,5 @@
 /*
- * Provides a MapMagic source for seamless periodic contour fibers; existing flow nodes are unchanged.
+ * Provides a MapMagic source for seamless LIC fibers following a sphere-tangent flow field.
  */
 
 using System;
@@ -23,20 +23,20 @@ namespace jcan.CelestialSystems
         [Val("Seed Offset")]
         public int seedOffset;
 
-        [Val("Region Size (m)")]
-        public float regionSizeMeters = 300000000f;
+        [Val("Flow Scale (m)")]
+        public float regionSizeMeters = 180000000f;
 
-        [Val("Bands")]
-        public float bands = 12f;
+        [Val("Streamline Samples")]
+        public float bands = 24f;
 
-        [Val("Distortion Size (m)")]
-        public float distortionSizeMeters = 30000000f;
+        [Val("Fiber Width (m)")]
+        public float distortionSizeMeters = 8000000f;
 
-        [Val("Distortion (cycles)")]
-        public float distortion = 0.15f;
+        [Val("Flow Complexity")]
+        public float distortion = 0.35f;
 
         [Val("Sharpness")]
-        public float sharpness = 2f;
+        public float sharpness = 1.2f;
 
         [Val("Output")]
         public SphericalContourFiberOutput outputMode = SphericalContourFiberOutput.Fibers;
@@ -134,4 +134,3 @@ namespace jcan.CelestialSystems
         }
     }
 }
-
