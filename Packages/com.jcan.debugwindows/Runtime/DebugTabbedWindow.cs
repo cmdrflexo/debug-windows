@@ -154,7 +154,8 @@ namespace jcan.DebugWindows
         public TMP_InputField AddTextField(
             string label,
             string value,
-            Action<string> changed)
+            Action<string> changed,
+            bool rightAligned = false)
         {
             var row = CreateRow(label);
             return CreateInput(row, value, changed);
@@ -180,7 +181,8 @@ namespace jcan.DebugWindows
                     {
                         changed?.Invoke(parsed);
                     }
-                });
+                },
+                true);
 
             if (!string.IsNullOrWhiteSpace(units))
             {
@@ -338,7 +340,9 @@ namespace jcan.DebugWindows
                 value ?? string.Empty,
                 manager.TextSize,
                 manager.TextColor,
-                TextAlignmentOptions.MidlineLeft);
+                rightAligned
+                    ? TextAlignmentOptions.MidlineRight
+                    : TextAlignmentOptions.MidlineLeft);
             DebugWindowUi.Stretch(text.rectTransform);
             text.enableWordWrapping = false;
             text.overflowMode = TextOverflowModes.Overflow;
