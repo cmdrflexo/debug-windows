@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43b7d6eb33dd4c38b8898ea64d89f51e, type: 3}
+  m_Name: Sol-Like Surface Quality
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.RoundMapMagicSurfaceQualityProfile
+  adaptivePatchResolution: 129
+  adaptiveMinimumLevel: 0
+  adaptiveMaximumLevel: 20
+  adaptiveCollisionMaximumLevel: 20
+  adaptiveMaximumScreenErrorPixels: 1
+  adaptiveLodHysteresisFraction: 0.15
+  adaptiveMaximumPatchCount: 768
+  adaptiveMaximumMeshBuildsPerFrame: 4
+  adaptiveGenerationMargins: 2
+  adaptivePrewarmCoarseSurface: 1
+  adaptiveLodMorphDurationSeconds: 0.35
+  adaptiveSkirtDepthCellFraction: 0.02
+  adaptiveMinimumSkirtDepthMeters: 1
+  adaptiveCastShadows: 1
+  adaptiveReceiveShadows: 1
+  adaptiveCollisionEnabled: 1
+  adaptiveCollisionFollowsCamera: 1
+  adaptiveCollisionCoverageRadiusMeters: 256
+  adaptiveCollisionPrefetchMarginMeters: 128
+  adaptiveCollisionSampleSpacingMeters: 8
+  adaptiveCollisionActivationAltitudeMeters: 2500
+  adaptiveCollisionMaximumPatchCount: 128
+  adaptiveCollisionMeshBuildsPerFrame: 2
+  adaptiveCollisionRetirementDelaySeconds: 1
+  adaptiveCollisionLayer: 0
+  localMeshResolution: 65
+  localCoverageRadiusMeters: 5000
+  localPrefetchMarginMeters: 1000
+  localColliderCoverageRadiusMeters: 2000
+  localActivationAltitudeMeters: 25000
+  localReleaseAltitudeMeters: 30000
+  midMeshResolution: 17
+  midTileSizeMultiplier: 8
+  midCoverageRadiusMeters: 60000
+  midPrefetchMarginMeters: 8000
+  midActivationAltitudeMeters: 60000
+  midReleaseAltitudeMeters: 75000
+  localMidBlendWidthMeters: 1000
+  tileFadeDurationSeconds: 0.3
+  transitionOverlapMeters: 2000
+  customSurfaceHandoffAltitudeMeters: 3000
+  customSurfaceReleaseAltitudeMeters: 4000
