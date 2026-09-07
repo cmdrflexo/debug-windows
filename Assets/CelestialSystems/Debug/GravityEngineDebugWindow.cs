@@ -5,6 +5,7 @@
 using System;
 using jcan.DebugWindows;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
@@ -28,6 +29,8 @@ namespace jcan.CelestialSystems
                 -12.0f);
 
         [SerializeField]
+        [FormerlySerializedAs(
+            "maximumTimeStepMultiplier")]
         [Min(1.0f)]
         private double maximumTimeZoom =
             1000000.0;
