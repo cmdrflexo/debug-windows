@@ -25,8 +25,8 @@ namespace jcan.CelestialSystems.Editor
                 Require(a == Sample(n), "Determinism");
                 Require(Math.Abs(a - Sample(n * 7)) < 1e-9, "Direction normalization");
                 var scaled = RoundMapMagicSphericalContourFibers.EvaluateNormalized(
-                    n, 1392680000, 18548, 600000000, 12, 60000000,
-                    0.15, 2, SphericalContourFiberOutput.Fibers);
+                    n, 1392680000, 18548, 360000000, 24, 16000000,
+                    0.35, 1.2, SphericalContourFiberOutput.Fibers);
                 Require(Math.Abs(a - scaled) < 1e-9, "Physical scale invariance");
             }
             var maximumGap = 0.0;
@@ -53,15 +53,15 @@ namespace jcan.CelestialSystems.Editor
             }
             Require(maximumGap < 1e-6, "Edge continuity");
             Require(Sample(DoubleVector3.zero) == 0, "Zero direction");
-            Debug.Log("Contour Fibers PASS: 10,000 evaluator samples and all 12 edge families. Max gap: " +
+            Debug.Log("Streamline Fibers PASS: 10,000 evaluator samples and all 12 edge families. Max gap: " +
                 maximumGap.ToString("G6") + ". Rendered tile seams still require visual testing.");
         }
 
         private static double Sample(DoubleVector3 n)
         {
             return RoundMapMagicSphericalContourFibers.EvaluateNormalized(
-                n, 696340000, 18548, 300000000, 12, 30000000,
-                0.15, 2, SphericalContourFiberOutput.Fibers);
+                n, 696340000, 18548, 180000000, 24, 8000000,
+                0.35, 1.2, SphericalContourFiberOutput.Fibers);
         }
 
         private static void Require(bool passed, string check)
