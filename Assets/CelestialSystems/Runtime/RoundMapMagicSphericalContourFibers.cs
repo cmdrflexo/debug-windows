@@ -1,6 +1,5 @@
 /*
- * Generates periodic contour fibers from a smooth body-space scalar field.
- * Inspired by noise-perturbed procedural marble; no latitude/longitude or streamline copies.
+ * Generates spherical fibers by line-integral convolution through a seeded tangent vector field.
  */
 
 using System;
@@ -13,54 +12,70 @@ namespace jcan.CelestialSystems
     {
         public static double EvaluateNormalized(
             DoubleVector3 direction, double radius, int seed,
-            double regionSize, double bands, double distortionSize,
-            double distortion, double sharpness, SphericalContourFiberOutput output)
+            double flowScale, double samples, double fiberWidth,
+            double flowComplexity, double sharpness, SphericalContourFiberOutput output)
         {
             var magnitude = direction.Magnitude;
-            if (!Finite(magnitude) || magnitude <= 0 ||
-                !Finite(radius) || radius <= 0 ||
-                !Finite(regionSize) || regionSize <= 0 ||
-                !Finite(distortionSize) || distortionSize <= 0)
+            if (!Finite(magnitude) || magnitude <= 0 || !Finite(radius) || radius <= 0 ||
+                !Finite(flowScale) || flowScale <= 0 || !Finite(fiberWidth) || fiberWidth <= 0)
                 return 0;
             var n = direction / magnitude;
-            // Fixed orthonormal rotations reduce alignment with the value-noise lattice.
-            var a = Rotate(n);
-            var b = Rotate(new DoubleVector3(n.z, n.x, n.y));
-            var field =
-                0.65 * Noise(a, radius, seed, regionSize) +
-                0.35 * Noise(b, radius, unchecked(seed + 1013), regionSize * 0.73);
-            if (output == SphericalContourFiberOutput.Field) return field;
-            var count = Clamp(Finite(bands) ? bands : 12, 1, 64);
-            var strength = Clamp(Finite(distortion) ? distortion : 0, 0, 2);
-            // Perturb phase in cycles, independently of the broad field's contour count.
-            var detail = Noise(b, radius, unchecked(seed + 7919), distortionSize) * 2 - 1;
-            var phase = field * count + detail * strength;
-            var wave = 0.5 + 0.5 * Math.Cos(2 * Math.PI * phase);
-            return Math.Pow(Clamp(wave, 0, 1),
-                Clamp(Finite(sharpness) ? sharpness : 2, 0.25, 16));
+            var complexity = Clamp(Finite(flowComplexity) ? flowComplexity : 0.35, 0, 1);
+            if (output == SphericalContourFiberOutput.Field)
+            {
+                var field = Flow(n, radius, seed, flowScale, complexity);
+                return Clamp(0.5 + 0.5 * field.z, 0, 1);
+            }
+            var count = (int)Math.Round(Clamp(Finite(samples) ? samples : 24, 4, 48));
+            var half = Math.Max(2, count / 2);
+            var step = Clamp(fiberWidth / radius * 0.65, 0.0000001, 0.08);
+            var carrierSeed = unchecked(seed + 15401);
+            var total = Noise(n, radius, carrierSeed, fiberWidth);
+            var totalWeight = 1.0;
+            var forward = n;
+            var backward = n;
+            for (var i = 1; i <= half; i++)
+            {
+                forward = Normalize(forward + Flow(forward, radius, seed, flowScale, complexity) * step);
+                backward = Normalize(backward - Flow(backward, radius, seed, flowScale, complexity) * step);
+                var weight = 0.5 + 0.5 * Math.Cos(Math.PI * i / (half + 1.0));
+                total += weight * (Noise(forward, radius, carrierSeed, fiberWidth) +
+                                   Noise(backward, radius, carrierSeed, fiberWidth));
+                totalWeight += 2 * weight;
+            }
+            // LIC compresses contrast around 0.5, so restore a useful normalized range.
+            var value = Clamp((total / totalWeight - 0.5) * 3.0 + 0.5, 0, 1);
+            return Math.Pow(value, Clamp(Finite(sharpness) ? sharpness : 1.2, 0.25, 8));
         }
 
-        private static double Noise(DoubleVector3 n, double r, int seed, double size)
+        private static DoubleVector3 Flow(DoubleVector3 n, double radius, int seed, double scale, double complexity)
         {
-            return RoundMapMagicSphericalNoise.EvaluateNormalized(n, r, seed, size, 1, 0.5);
+            var v = new DoubleVector3(
+                Noise(n, radius, unchecked(seed + 1013), scale) * 2 - 1,
+                Noise(new DoubleVector3(n.y, n.z, n.x), radius, unchecked(seed + 3251), scale * 0.83) * 2 - 1,
+                Noise(new DoubleVector3(n.z, n.x, n.y), radius, unchecked(seed + 7919), scale * 1.17) * 2 - 1);
+            var swirl = Cross(n, v);
+            var tangent = v - n * Dot(n, v);
+            return Normalize(swirl * (1 - complexity) + tangent * complexity);
         }
 
-        private static DoubleVector3 Rotate(DoubleVector3 n)
+        private static double Noise(DoubleVector3 n, double radius, int seed, double size)
         {
-            return new DoubleVector3(
-                (n.x + 2 * n.y + 2 * n.z) / 3,
-                (2 * n.x + n.y - 2 * n.z) / 3,
-                (-2 * n.x + 2 * n.y - n.z) / 3);
+            return RoundMapMagicSphericalNoise.EvaluateNormalized(n, radius, seed, size, 1, 0.5);
         }
 
-        private static double Clamp(double v, double lo, double hi)
+        private static DoubleVector3 Normalize(DoubleVector3 v)
         {
-            return Math.Max(lo, Math.Min(hi, v));
+            var magnitude = v.Magnitude;
+            return !Finite(magnitude) || magnitude <= 0 ? DoubleVector3.zero : v / magnitude;
         }
 
-        private static bool Finite(double v)
+        private static double Dot(DoubleVector3 a, DoubleVector3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+        private static DoubleVector3 Cross(DoubleVector3 a, DoubleVector3 b)
         {
-            return !double.IsNaN(v) && !double.IsInfinity(v);
+            return new DoubleVector3(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x);
         }
+        private static double Clamp(double v, double lo, double hi) { return Math.Max(lo, Math.Min(hi, v)); }
+        private static bool Finite(double v) { return !double.IsNaN(v) && !double.IsInfinity(v); }
     }
 }
