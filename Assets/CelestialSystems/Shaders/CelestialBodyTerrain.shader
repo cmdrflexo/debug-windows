@@ -773,10 +773,11 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
             }
 
             half3 meshNormalWS =
-                normalize(
+                (half3)CelestialSafeNormalize(
                     WorldNormalVector(
                         input,
-                        half3(0.0h, 0.0h, 1.0h)));
+                        half3(0.0h, 0.0h, 1.0h)),
+                    half3(0.0h, 1.0h, 0.0h));
             CelestialBodySurfaceCoordinates coordinates =
                 CelestialBuildSurfaceCoordinates(
                     input.worldPos,
