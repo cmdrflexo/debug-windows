@@ -154,8 +154,7 @@ namespace jcan.DebugWindows
         public TMP_InputField AddTextField(
             string label,
             string value,
-            Action<string> changed,
-            bool rightAligned = false)
+            Action<string> changed)
         {
             var row = CreateRow(label);
             return CreateInput(row, value, changed);
@@ -310,7 +309,8 @@ namespace jcan.DebugWindows
         private TMP_InputField CreateInput(
             RectTransform row,
             string value,
-            Action<string> changed)
+            Action<string> changed,
+            bool rightAligned = false)
         {
             var frame = DebugWindowUi.CreateRect("Input", row);
             var frameSize = frame.gameObject.AddComponent<LayoutElement>();
