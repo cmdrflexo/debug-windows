@@ -8,6 +8,13 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
+    public enum SurfaceLightingMode
+    {
+        Lit,
+        Emissive,
+        LitAndEmissive
+    }
+
     [CreateAssetMenu(
         fileName = "Celestial Surface",
         menuName = "Celestial Systems/Surface Appearance/Surface")]
@@ -22,11 +29,18 @@ namespace jcan.CelestialSystems
             "surface";
 
         [SerializeField]
+        private SurfaceLightingMode lightingMode =
+            SurfaceLightingMode.Lit;
+
+        [SerializeField]
         private List<CelestialSurfaceLayerDefinition> layers =
             new List<CelestialSurfaceLayerDefinition>();
 
         public string DefinitionId =>
             definitionId;
+
+        public SurfaceLightingMode LightingMode =>
+            lightingMode;
 
         public IReadOnlyList<CelestialSurfaceLayerDefinition> Layers =>
             layers;
