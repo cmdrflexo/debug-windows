@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 920a3a4a54114cf8ab7f3263030617aa, type: 3}
+  m_Name: Celestial Definition Catalog
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialDefinitionCatalog
+  bodyDefinitions:
+  - {fileID: 11400000, guid: 5dae779ba2951514fa7e8e4ab353d67b, type: 2}
+  - {fileID: 11400000, guid: 894d60c1182104e4bbeabc8c6cb56705, type: 2}
+  - {fileID: 11400000, guid: ad96e2a8213685a4299171f7273b8ed7, type: 2}
+  surfaceDefinitions:
+  - {fileID: 11400000, guid: bbc9fc12d0b6bce4780e04ded7249fa0, type: 2}
+  - {fileID: 11400000, guid: 445efad00ffa8684f8d077d6833d1412, type: 2}
+  - {fileID: 11400000, guid: b1f16f79fa318094a8a148264b250ccb, type: 2}
+  - {fileID: 11400000, guid: 6e77c4fedcb96cb4e86bd9240854e0ff, type: 2}
+  oceanDefinitions:
+  - {fileID: 11400000, guid: 12a6a06f2bda111479b798c39ee745ce, type: 2}
+  qualityProfiles:
+  - {fileID: 11400000, guid: 147103ed4a09b5742b391c5841f0212b, type: 2}
+  - {fileID: 11400000, guid: e2f98a81024d866469a666608d63f90e, type: 2}
+  - {fileID: 11400000, guid: 413ccd4ae702bde4ca8ee7ce58140798, type: 2}
