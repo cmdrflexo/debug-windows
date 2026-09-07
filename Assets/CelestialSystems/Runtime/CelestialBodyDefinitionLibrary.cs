@@ -13,6 +13,7 @@ namespace jcan.CelestialSystems
     public sealed class SavedCelestialBodyDefinition
     {
         public string definitionId;
+        public string instanceId;
         public double massKilograms;
         public double referenceRadiusMeters;
         public int generationSeed;
@@ -138,6 +139,7 @@ namespace jcan.CelestialSystems
             }
 
             model.definitionId = saved.definitionId;
+            model.instanceId = saved.instanceId;
             model.massKilograms = saved.massKilograms;
             model.referenceRadiusMeters = saved.referenceRadiusMeters;
             model.generationSeed = saved.generationSeed;
@@ -175,6 +177,7 @@ namespace jcan.CelestialSystems
             return new SavedCelestialBodyDefinition
             {
                 definitionId = id,
+                instanceId = model.instanceId,
                 massKilograms = model.massKilograms,
                 referenceRadiusMeters = model.referenceRadiusMeters,
                 generationSeed = model.generationSeed,
