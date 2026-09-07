@@ -5,6 +5,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace jcan.DebugWindows
 {
@@ -49,7 +50,19 @@ namespace jcan.DebugWindows
 
             try
             {
-                target.text = valueProvider() ?? string.Empty;
+                var value =
+                    valueProvider() ??
+                    string.Empty;
+                if (target.text ==
+                    value)
+                {
+                    return;
+                }
+
+                target.text =
+                    value;
+                LayoutRebuilder.MarkLayoutForRebuild(
+                    target.rectTransform);
             }
             catch (Exception exception)
             {
