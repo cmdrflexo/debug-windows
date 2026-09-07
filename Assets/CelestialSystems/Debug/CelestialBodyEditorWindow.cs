@@ -203,12 +203,15 @@ namespace jcan.CelestialSystems
 
         private void SaveDefinition()
         {
-            if (definitionLibrary == null ||
-                !definitionLibrary.Save(model, loadedSavedDefinitionId, out var error))
+            if (definitionLibrary == null)
             {
-                status = string.IsNullOrWhiteSpace(error)
-                    ? "The definition library is unavailable."
-                    : error;
+                status = "The definition library is unavailable.";
+                return;
+            }
+
+            if (!definitionLibrary.Save(model, loadedSavedDefinitionId, out var error))
+            {
+                status = error;
                 return;
             }
 
@@ -295,6 +298,7 @@ namespace jcan.CelestialSystems
                 status = $"Loaded catalog definition '{asset.DefinitionId}'.";
             }
             else if (option?.Value is SavedCelestialBodyDefinition saved &&
+                definitionLibrary != null &&
                 definitionLibrary.LoadInto(saved.DefinitionId, model, out var error))
             {
                 loadedSavedDefinitionId = saved.DefinitionId;
