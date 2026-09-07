@@ -28,7 +28,7 @@ namespace jcan.CelestialSystems
                 -12.0f);
 
         [SerializeField]
-        [Min(1.0)]
+        [Min(1.0f)]
         private double maximumTimeStepMultiplier =
             1000000.0;
 
