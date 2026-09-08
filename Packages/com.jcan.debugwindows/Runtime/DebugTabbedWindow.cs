@@ -212,6 +212,27 @@ namespace jcan.DebugWindows
                 changed);
         }
 
+        public DebugSliderField AddSlider(
+            string label,
+            float value,
+            float minimum,
+            float maximum,
+            Action<float> changed,
+            string units = null,
+            float step = 0.0f)
+        {
+            var row = CreateRow(label);
+            return DebugSliderField.Create(
+                manager,
+                row,
+                value,
+                minimum,
+                maximum,
+                changed,
+                units,
+                step);
+        }
+
         public Toggle AddToggle(
             string label,
             bool value,
