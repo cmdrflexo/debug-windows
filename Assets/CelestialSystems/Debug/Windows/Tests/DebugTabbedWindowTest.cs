@@ -134,7 +134,8 @@ namespace jcan.CelestialSystems
                 "Save",
                 () => Debug.Log(
                     $"Tabbed test saved '{displayName}'.",
-                    this));
+                    this),
+                "SAVED");
         }
     }
 }

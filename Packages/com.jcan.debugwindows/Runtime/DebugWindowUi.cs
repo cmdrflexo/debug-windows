@@ -3,6 +3,7 @@
  */
 
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -56,7 +57,9 @@ namespace jcan.DebugWindows
             Action clicked,
             float width,
             float horizontalPadding = 0.0f,
-            float verticalPadding = 4.0f)
+            float verticalPadding = 4.0f,
+            string feedbackMessage = null,
+            float feedbackDuration = 3.0f)
         {
             var rect = CreateRect(name, parent);
             var image = AddImage(rect.gameObject, background);
@@ -77,8 +80,19 @@ namespace jcan.DebugWindows
             label.rectTransform.offsetMin = new Vector2(horizontalPadding, 0.0f);
             label.rectTransform.offsetMax = new Vector2(-horizontalPadding, 0.0f);
 
-            if (clicked != null)
-                button.onClick.AddListener(() => clicked());
+            var feedback = string.IsNullOrWhiteSpace(feedbackMessage)
+                ? null
+                : rect.gameObject.AddComponent<DebugButtonFeedback>();
+            feedback?.Initialize(label, text, feedbackMessage.Trim(), feedbackDuration);
+
+            if (clicked != null || feedback != null)
+            {
+                button.onClick.AddListener(() =>
+                {
+                    clicked?.Invoke();
+                    feedback?.Show();
+                });
+            }
 
             return button;
         }
@@ -143,6 +157,52 @@ namespace jcan.DebugWindows
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
+        }
+    }
+
+    internal sealed class DebugButtonFeedback : MonoBehaviour
+    {
+        private TMP_Text label;
+        private string normalText;
+        private string feedbackText;
+        private float duration;
+        private Coroutine restoreRoutine;
+
+        public void Initialize(
+            TMP_Text targetLabel,
+            string originalText,
+            string message,
+            float seconds)
+        {
+            label = targetLabel;
+            normalText = originalText ?? string.Empty;
+            feedbackText = message ?? string.Empty;
+            duration = Mathf.Max(0.0f, seconds);
+        }
+
+        public void Show()
+        {
+            if (label == null)
+                return;
+
+            if (restoreRoutine != null)
+                StopCoroutine(restoreRoutine);
+
+            label.text = feedbackText;
+            restoreRoutine = StartCoroutine(RestoreLabel());
+        }
+
+        private IEnumerator RestoreLabel()
+        {
+            if (duration > 0.0f)
+                yield return new WaitForSecondsRealtime(duration);
+            else
+                yield return null;
+
+            if (label != null)
+                label.text = normalText;
+
+            restoreRoutine = null;
         }
     }
 }

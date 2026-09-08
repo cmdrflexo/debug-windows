@@ -254,7 +254,9 @@ namespace jcan.DebugWindows
         public Button AddButton(
             string actionId,
             string text,
-            Action clicked)
+            Action clicked,
+            string feedbackMessage = null,
+            float feedbackDuration = 3.0f)
         {
             return DebugWindowUi.CreateButton(
                 actionId,
@@ -266,7 +268,9 @@ namespace jcan.DebugWindows
                 clicked,
                 Mathf.Max(72.0f, manager.MinimumWindowWidth * 0.45f),
                 manager.ControlHorizontalPadding,
-                manager.ControlVerticalPadding);
+                manager.ControlVerticalPadding,
+                feedbackMessage,
+                feedbackDuration);
         }
 
         private static string FormatNumber(double value)
