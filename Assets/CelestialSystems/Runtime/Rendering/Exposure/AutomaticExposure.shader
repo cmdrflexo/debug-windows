@@ -21,6 +21,8 @@ Shader "Hidden/jcan/Celestial Systems/Automatic Exposure"
             #pragma vertex Vert
             #pragma fragment MeterLuminanceFragment
 
+            // CHANGED: URP Core defines TEXTURE2D_X and stereo texture helpers used by Blit.hlsl.
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             float4 MeterLuminanceFragment(
@@ -61,6 +63,8 @@ Shader "Hidden/jcan/Celestial Systems/Automatic Exposure"
             #pragma vertex Vert
             #pragma fragment ApplyExposureFragment
 
+            // CHANGED: URP Core defines TEXTURE2D_X and stereo texture helpers used by Blit.hlsl.
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             StructuredBuffer<float> _ExposureState;
