@@ -1,5 +1,5 @@
 /*
- * Provides a code-defined slider field with value display, optional units, and stepped values.
+ * Provides a code-defined slider field with editable value input, optional units, and stepped values.
  */
 
 using System;
@@ -13,11 +13,10 @@ namespace jcan.DebugWindows
     public sealed class DebugSliderField : MonoBehaviour
     {
         private Slider slider;
-        private TMP_Text valueLabel;
+        private TMP_InputField valueInput;
         private Action<float> changed;
         private float step;
         private float currentValue;
-        private string units;
 
         internal static DebugSliderField Create(
             DebugWindowManager manager,
@@ -59,8 +58,8 @@ namespace jcan.DebugWindows
             var track = DebugWindowUi.CreateRect("Track", sliderRoot);
             track.anchorMin = new Vector2(0.0f, 0.5f);
             track.anchorMax = new Vector2(1.0f, 0.5f);
-            track.offsetMin = new Vector2(4.0f, -3.0f);
-            track.offsetMax = new Vector2(-4.0f, 3.0f);
+            track.offsetMin = new Vector2(4.0f, -1.5f);
+            track.offsetMax = new Vector2(-4.0f, 1.5f);
             DebugWindowUi.AddImage(track.gameObject, manager.ButtonColor);
 
             var fillArea = DebugWindowUi.CreateRect("Fill Area", sliderRoot);
@@ -74,13 +73,13 @@ namespace jcan.DebugWindows
 
             var handleArea = DebugWindowUi.CreateRect("Handle Slide Area", sliderRoot);
             DebugWindowUi.Stretch(handleArea);
-            handleArea.offsetMin = new Vector2(7.0f, 0.0f);
-            handleArea.offsetMax = new Vector2(-7.0f, 0.0f);
+            handleArea.offsetMin = new Vector2(4.0f, 0.0f);
+            handleArea.offsetMax = new Vector2(-4.0f, 0.0f);
 
             var handle = DebugWindowUi.CreateRect("Handle", handleArea);
             handle.anchorMin = new Vector2(0.0f, 0.5f);
             handle.anchorMax = new Vector2(0.0f, 0.5f);
-            handle.sizeDelta = new Vector2(14.0f, 14.0f);
+            handle.sizeDelta = new Vector2(7.0f, 7.0f);
             var handleImage = DebugWindowUi.AddImage(
                 handle.gameObject,
                 manager.AccentColor);
@@ -88,7 +87,6 @@ namespace jcan.DebugWindows
             var field = root.gameObject.AddComponent<DebugSliderField>();
             field.changed = changed;
             field.step = Mathf.Max(0.0f, step);
-            field.units = units?.Trim() ?? string.Empty;
 
             field.slider = sliderRoot.gameObject.AddComponent<Slider>();
             field.slider.fillRect = fill;
@@ -99,18 +97,22 @@ namespace jcan.DebugWindows
             field.slider.maxValue = Mathf.Max(minimum, maximum);
             field.slider.wholeNumbers = false;
 
-            field.valueLabel = DebugWindowUi.CreateText(
-                "Value",
-                root,
-                string.Empty,
-                manager.TextSize,
-                manager.TextColor,
-                TextAlignmentOptions.MidlineRight);
-            var valueSize = field.valueLabel.gameObject.AddComponent<LayoutElement>();
-            valueSize.preferredWidth = manager.TextSize * 4.5f;
-            valueSize.flexibleWidth = 0.0f;
+            field.BuildValueInput(manager, root);
+
+            if (!string.IsNullOrWhiteSpace(units))
+            {
+                var unitsLabel = DebugWindowUi.CreateText(
+                    "Units",
+                    root,
+                    units.Trim(),
+                    manager.TextSize,
+                    manager.TextColor,
+                    TextAlignmentOptions.MidlineLeft);
+                unitsLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 0.0f;
+            }
 
             field.slider.onValueChanged.AddListener(field.HandleSliderChanged);
+            field.valueInput.onEndEdit.AddListener(field.HandleInputCommitted);
             field.SetValue(value, false);
             return field;
         }
@@ -126,10 +128,64 @@ namespace jcan.DebugWindows
             var valueChanged = !Mathf.Approximately(currentValue, adjusted);
             currentValue = adjusted;
             slider.SetValueWithoutNotify(adjusted);
-            RefreshValueLabel(adjusted);
+            RefreshValueInput(adjusted);
 
             if (notify && valueChanged)
                 changed?.Invoke(adjusted);
+        }
+
+        private void BuildValueInput(
+            DebugWindowManager manager,
+            RectTransform parent)
+        {
+            var frame = DebugWindowUi.CreateRect("Value Input", parent);
+            var frameSize = frame.gameObject.AddComponent<LayoutElement>();
+            frameSize.preferredWidth = manager.TextSize * 3.5f;
+            frameSize.preferredHeight =
+                manager.TextSize +
+                manager.ControlVerticalPadding * 2.0f;
+            frameSize.flexibleWidth = 0.0f;
+
+            var image = DebugWindowUi.AddImage(
+                frame.gameObject,
+                manager.ElementColor);
+            if (manager.ListFrameSprite != null)
+            {
+                image.sprite = manager.ListFrameSprite;
+                image.type = Image.Type.Sliced;
+            }
+
+            var viewport = DebugWindowUi.CreateRect("Text Area", frame);
+            DebugWindowUi.Stretch(viewport);
+            viewport.offsetMin = new Vector2(
+                manager.ControlHorizontalPadding * 0.5f,
+                manager.ControlVerticalPadding * 0.5f);
+            viewport.offsetMax = new Vector2(
+                -manager.ControlHorizontalPadding * 0.5f,
+                -manager.ControlVerticalPadding * 0.5f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            var text = DebugWindowUi.CreateText(
+                "Text",
+                viewport,
+                string.Empty,
+                manager.TextSize,
+                manager.TextColor,
+                TextAlignmentOptions.MidlineRight);
+            DebugWindowUi.Stretch(text.rectTransform);
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Overflow;
+
+            valueInput = frame.gameObject.AddComponent<TMP_InputField>();
+            valueInput.textViewport = viewport;
+            valueInput.textComponent = text;
+            valueInput.targetGraphic = image;
+            valueInput.lineType = TMP_InputField.LineType.SingleLine;
+            valueInput.richText = false;
+            valueInput.customCaretColor = true;
+            valueInput.caretColor = manager.AccentColor;
+            valueInput.selectionColor = manager.SelectionColor;
+            valueInput.caretWidth = 2;
         }
 
         private void HandleSliderChanged(float value)
@@ -141,9 +197,24 @@ namespace jcan.DebugWindows
             if (!Mathf.Approximately(slider.value, adjusted))
                 slider.SetValueWithoutNotify(adjusted);
 
-            RefreshValueLabel(adjusted);
+            RefreshValueInput(adjusted);
             if (valueChanged)
                 changed?.Invoke(adjusted);
+        }
+
+        private void HandleInputCommitted(string text)
+        {
+            if (float.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var parsed))
+            {
+                SetValue(parsed, true);
+                return;
+            }
+
+            RefreshValueInput(currentValue);
         }
 
         private float ClampAndSnap(float value)
@@ -159,17 +230,15 @@ namespace jcan.DebugWindows
                 slider.maxValue);
         }
 
-        private void RefreshValueLabel(float value)
+        private void RefreshValueInput(float value)
         {
-            if (valueLabel == null)
+            if (valueInput == null)
                 return;
 
-            var formatted = value.ToString(
-                "0.###",
-                CultureInfo.InvariantCulture);
-            valueLabel.text = string.IsNullOrEmpty(units)
-                ? formatted
-                : formatted + " " + units;
+            valueInput.SetTextWithoutNotify(
+                value.ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture));
         }
     }
 }
