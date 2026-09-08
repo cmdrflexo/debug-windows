@@ -155,17 +155,6 @@ namespace jcan.DebugWindows
             buttonLayout.childForceExpandHeight = true;
 
             DebugWindowUi.CreateButton(
-                "Cancel",
-                buttons,
-                cancelText,
-                manager.TextSize,
-                manager.ButtonColor,
-                manager.TextColor,
-                () => Close(false),
-                buttonWidth,
-                manager.ControlHorizontalPadding,
-                manager.ControlVerticalPadding);
-            DebugWindowUi.CreateButton(
                 "Confirm",
                 buttons,
                 confirmText,
@@ -173,6 +162,17 @@ namespace jcan.DebugWindows
                 manager.AccentColor,
                 manager.TextColor,
                 () => Close(true),
+                buttonWidth,
+                manager.ControlHorizontalPadding,
+                manager.ControlVerticalPadding);
+            DebugWindowUi.CreateButton(
+                "Cancel",
+                buttons,
+                cancelText,
+                manager.TextSize,
+                manager.ButtonColor,
+                manager.TextColor,
+                () => Close(false),
                 buttonWidth,
                 manager.ControlHorizontalPadding,
                 manager.ControlVerticalPadding);

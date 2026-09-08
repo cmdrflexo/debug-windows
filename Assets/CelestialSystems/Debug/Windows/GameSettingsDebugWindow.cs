@@ -11,6 +11,8 @@ namespace jcan.CelestialSystems
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(GameSettingsController))]
+    [RequireComponent(typeof(ImageEffectorReceiver))]
+    [RequireComponent(typeof(DebugImageEffector))]
     public sealed class GameSettingsDebugWindow : MonoBehaviour
     {
         private const string WindowId =
@@ -31,6 +33,12 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private GameSettingsController settings;
+
+        [SerializeField]
+        private ImageEffectorReceiver imageEffectorReceiver;
+
+        [SerializeField]
+        private DebugImageEffector debugEffector;
 
         [SerializeField]
         private Vector2 preferredContentSize =
@@ -59,6 +67,14 @@ namespace jcan.CelestialSystems
                     this);
                 return;
             }
+
+            if (imageEffectorReceiver == null)
+                imageEffectorReceiver = GetComponent<ImageEffectorReceiver>();
+            if (debugEffector == null)
+                debugEffector = GetComponent<DebugImageEffector>();
+
+            settings.BindImageEffectorReceiver(imageEffectorReceiver);
+            debugEffector?.BindReceiver(imageEffectorReceiver);
 
             window = new DebugTabbedWindow(
                 WindowId,
@@ -224,20 +240,209 @@ namespace jcan.CelestialSystems
                 0.25f);
         }
 
-        private static void BuildPostProcessingPage(
+        private void BuildPostProcessingPage(
             DebugWindowFormContent content)
         {
+            content.AddToggle(
+                "Post Processing",
+                settings.PostProcessingEnabled,
+                settings.SetPostProcessingEnabled);
+            content.AddToggle(
+                "Automatic Exposure",
+                settings.AutomaticExposureEnabled,
+                settings.SetAutomaticExposureEnabled);
+            content.AddSlider(
+                "Exposure Compensation",
+                settings.ExposureCompensation,
+                -5.0f,
+                5.0f,
+                settings.SetExposureCompensation,
+                "EV",
+                0.1f);
+            content.AddSlider(
+                "Minimum Exposure",
+                settings.MinimumExposure,
+                -16.0f,
+                16.0f,
+                settings.SetMinimumExposure,
+                "EV",
+                0.25f);
+            content.AddSlider(
+                "Maximum Exposure",
+                settings.MaximumExposure,
+                -16.0f,
+                16.0f,
+                settings.SetMaximumExposure,
+                "EV",
+                0.25f);
+            content.AddSlider(
+                "Middle Gray",
+                settings.MiddleGray,
+                0.01f,
+                1.0f,
+                settings.SetMiddleGray,
+                null,
+                0.01f);
+            content.AddSlider(
+                "Brighten Speed",
+                settings.BrightenSpeed,
+                0.05f,
+                10.0f,
+                settings.SetBrightenSpeed,
+                "EV/s",
+                0.05f);
+            content.AddSlider(
+                "Darken Speed",
+                settings.DarkenSpeed,
+                0.05f,
+                10.0f,
+                settings.SetDarkenSpeed,
+                "EV/s",
+                0.05f);
+            content.AddToggle(
+                "Bloom",
+                settings.BloomEnabled,
+                settings.SetBloomEnabled);
+            content.AddSlider(
+                "Bloom Intensity",
+                settings.BloomIntensity,
+                0.0f,
+                10.0f,
+                settings.SetBloomIntensity,
+                "×",
+                0.05f);
+            content.AddToggle(
+                "Lens Distortion",
+                settings.LensDistortionEnabled,
+                settings.SetLensDistortionEnabled);
+            content.AddSlider(
+                "Lens Distortion Intensity",
+                settings.LensDistortionIntensity,
+                -1.0f,
+                1.0f,
+                settings.SetLensDistortionIntensity,
+                null,
+                0.01f);
+            content.AddToggle(
+                "Motion Blur",
+                settings.MotionBlurEnabled,
+                settings.SetMotionBlurEnabled);
+            content.AddSlider(
+                "Motion Blur Intensity",
+                settings.MotionBlurIntensity,
+                0.0f,
+                1.0f,
+                settings.SetMotionBlurIntensity,
+                null,
+                0.05f);
+            content.AddSlider(
+                "Contrast",
+                settings.Contrast,
+                -100.0f,
+                100.0f,
+                settings.SetContrast,
+                "%",
+                1.0f);
+            content.AddSlider(
+                "Saturation",
+                settings.Saturation,
+                -100.0f,
+                100.0f,
+                settings.SetSaturation,
+                "%",
+                1.0f);
             content.AddReadOnly(
-                "Status",
-                () => "Runtime Volume controls are the next milestone.");
+                "Receiver",
+                () => imageEffectorReceiver != null &&
+                    imageEffectorReceiver.IsReady
+                        ? "Ready"
+                        : imageEffectorReceiver?.LastError ?? "Unavailable");
         }
 
-        private static void BuildDebugEffectorsPage(
+        private void BuildDebugEffectorsPage(
             DebugWindowFormContent content)
         {
+            if (debugEffector == null)
+            {
+                content.AddReadOnly(
+                    "Status",
+                    () => "DebugImageEffector is unavailable.");
+                return;
+            }
+
+            content.AddToggle(
+                "Enable Debug Overrides",
+                debugEffector.OverridesEnabled,
+                debugEffector.SetOverridesEnabled);
+            content.AddToggle(
+                "Star Proximity Enabled",
+                debugEffector.StarProximityEnabled,
+                debugEffector.SetStarProximityEnabled);
+            content.AddSlider(
+                "Star Proximity",
+                debugEffector.StarProximity,
+                0.0f,
+                1.0f,
+                debugEffector.SetStarProximity,
+                null,
+                0.01f);
+            content.AddSlider(
+                "Maximum Bloom Boost",
+                debugEffector.MaximumBloomBoost,
+                0.0f,
+                10.0f,
+                debugEffector.SetMaximumBloomBoost,
+                "×",
+                0.05f);
+            content.AddSlider(
+                "Maximum Exposure Boost",
+                debugEffector.MaximumExposureBoost,
+                0.0f,
+                5.0f,
+                debugEffector.SetMaximumExposureBoost,
+                "EV",
+                0.05f);
+            content.AddToggle(
+                "Atmosphere Enabled",
+                debugEffector.AtmosphereEnabled,
+                debugEffector.SetAtmosphereEnabled);
+            content.AddSlider(
+                "Atmosphere Pressure",
+                debugEffector.AtmospherePressure,
+                0.0f,
+                10.0f,
+                debugEffector.SetAtmospherePressure,
+                "atm",
+                0.05f);
+            content.AddSlider(
+                "Distortion per Atmosphere",
+                debugEffector.LensDistortionPerAtmosphere,
+                -0.5f,
+                0.5f,
+                debugEffector.SetLensDistortionPerAtmosphere,
+                null,
+                0.01f);
+
             content.AddReadOnly(
-                "Status",
-                () => "Waiting for the image-effector receiver.");
+                "Effective Bloom",
+                () => imageEffectorReceiver != null
+                    ? imageEffectorReceiver.EffectiveBloomIntensity.ToString("0.00") + "×"
+                    : "--");
+            content.AddReadOnly(
+                "Effective Exposure",
+                () => imageEffectorReceiver != null
+                    ? imageEffectorReceiver.EffectiveExposureCompensation.ToString("0.00") + " EV"
+                    : "--");
+            content.AddReadOnly(
+                "Effective Distortion",
+                () => imageEffectorReceiver != null
+                    ? imageEffectorReceiver.EffectiveLensDistortionIntensity.ToString("0.00")
+                    : "--");
+            content.AddReadOnly(
+                "Active Sources",
+                () => imageEffectorReceiver != null
+                    ? imageEffectorReceiver.ActiveContributionCount.ToString()
+                    : "0");
         }
 
         private void BuildFooter(
@@ -246,7 +451,8 @@ namespace jcan.CelestialSystems
             content.AddButton(
                 "save",
                 "Save Now",
-                settings.SaveNow);
+                settings.SaveNow,
+                "SAVED");
         }
 
         private List<DebugChoiceOption> BuildResolutionOptions()
