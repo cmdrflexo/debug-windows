@@ -59,7 +59,8 @@ namespace jcan.DebugWindows
             float horizontalPadding = 0.0f,
             float verticalPadding = 4.0f,
             string feedbackMessage = null,
-            float feedbackDuration = 3.0f)
+            float feedbackDuration = 3.0f,
+            bool showFeedbackOnClick = true)
         {
             var rect = CreateRect(name, parent);
             var image = AddImage(rect.gameObject, background);
@@ -85,12 +86,13 @@ namespace jcan.DebugWindows
                 : rect.gameObject.AddComponent<DebugButtonFeedback>();
             feedback?.Initialize(label, text, feedbackMessage.Trim(), feedbackDuration);
 
-            if (clicked != null || feedback != null)
+            if (clicked != null || feedback != null && showFeedbackOnClick)
             {
                 button.onClick.AddListener(() =>
                 {
                     clicked?.Invoke();
-                    feedback?.Show();
+                    if (showFeedbackOnClick)
+                        feedback?.Show();
                 });
             }
 
