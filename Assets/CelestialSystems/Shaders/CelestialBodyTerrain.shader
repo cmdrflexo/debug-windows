@@ -18,6 +18,11 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         _EmissionMap ("Emission Map", 2D) = "white" {}
         _EmissionIntensity ("Emission Intensity", Float) = 0
 
+        [HideInInspector] _Surface ("URP Surface Type", Float) = 0
+        [HideInInspector] _AlphaClip ("URP Alpha Clip", Float) = 0
+        [HideInInspector] _Cutoff ("URP Alpha Cutoff", Range(0, 1)) = 0.5
+        [HideInInspector] _Cull ("URP Cull Mode", Float) = 2
+
         [HideInInspector] _Control ("MapMagic Control", 2D) = "white" {}
         [HideInInspector] _LayerCount ("MapMagic Layer Count", Float) = 0
         [HideInInspector] _Splat0 ("Layer 0 Diffuse", 2D) = "white" {}
@@ -92,6 +97,435 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
         [HideInInspector] _SlopeDebugMaxDegrees ("Slope Debug Maximum Degrees", Float) = 20
         [HideInInspector] _CoordinateDebugScaleMeters ("Coordinate Debug Scale", Float) = 1000
         [HideInInspector] _DebugMode ("Debug Mode", Float) = 0
+    }
+
+
+    SubShader
+    {
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "Queue" = "Geometry"
+            "RenderPipeline" = "UniversalPipeline"
+        }
+
+        LOD 300
+
+        Pass
+        {
+            Name "Universal Forward"
+            Tags { "LightMode" = "UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex CelestialTerrainVertex
+            #pragma fragment CelestialTerrainFragment
+            #pragma multi_compile_instancing
+            #pragma multi_compile_fog
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_Control);
+            SAMPLER(sampler_Control);
+            TEXTURE2D(_NormalMap);
+            TEXTURE2D(_EmissionMap);
+            TEXTURE2D(_Splat0);
+            TEXTURE2D(_Splat1);
+            TEXTURE2D(_Splat2);
+            TEXTURE2D(_Splat3);
+            TEXTURE2D(_Normal0);
+            TEXTURE2D(_Normal1);
+            TEXTURE2D(_Normal2);
+            TEXTURE2D(_Normal3);
+            TEXTURE2D(_Mask0);
+            TEXTURE2D(_Mask1);
+            TEXTURE2D(_Mask2);
+            TEXTURE2D(_Mask3);
+            TEXTURE2D(_EmissionMap0);
+            TEXTURE2D(_EmissionMap1);
+            TEXTURE2D(_EmissionMap2);
+            TEXTURE2D(_EmissionMap3);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _Splat0_ST;
+                float4 _Splat1_ST;
+                float4 _Splat2_ST;
+                float4 _Splat3_ST;
+                half4 _BaseColor;
+                half4 _EmissionColor;
+                half4 _Tint0;
+                half4 _Tint1;
+                half4 _Tint2;
+                half4 _Tint3;
+                half4 _EmissionColor0;
+                half4 _EmissionColor1;
+                half4 _EmissionColor2;
+                half4 _EmissionColor3;
+                half _NormalScale;
+                half _Metallic;
+                half _Smoothness;
+                half _Occlusion;
+                half _SurfaceLightingMode;
+                half _EmissionIntensity;
+                half _LayerCount;
+                half _HasNormal0;
+                half _HasNormal1;
+                half _HasNormal2;
+                half _HasNormal3;
+                half _HasMask0;
+                half _HasMask1;
+                half _HasMask2;
+                half _HasMask3;
+                half _NormalScale0;
+                half _NormalScale1;
+                half _NormalScale2;
+                half _NormalScale3;
+                half _Metallic0;
+                half _Metallic1;
+                half _Metallic2;
+                half _Metallic3;
+                half _Smoothness0;
+                half _Smoothness1;
+                half _Smoothness2;
+                half _Smoothness3;
+                half _OcclusionStrength0;
+                half _OcclusionStrength1;
+                half _OcclusionStrength2;
+                half _OcclusionStrength3;
+                half _EmissionIntensity0;
+                half _EmissionIntensity1;
+                half _EmissionIntensity2;
+                half _EmissionIntensity3;
+                half _TileFade;
+                half _LodMaskMode;
+                float _LodFadeStartMeters;
+                float _LodFadeEndMeters;
+                float4 _LodCenterDirection;
+                float4 _PlanetCenterScenePosition;
+                float4 _BodyNorthDirection;
+                float _PlanetRadiusMeters;
+                float _ElevationDebugMinMeters;
+                float _ElevationDebugMaxMeters;
+                float _SlopeDebugMinDegrees;
+                float _SlopeDebugMaxDegrees;
+                float _CoordinateDebugScaleMeters;
+                float _DebugMode;
+            CBUFFER_END
+
+            #define JCAN_CELESTIAL_SLOPE_DEBUG_EXTERNAL
+            #include "CelestialBodyShaderCommon.hlsl"
+
+            struct CelestialTerrainAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
+                float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct CelestialTerrainVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+                half3 normalWS : TEXCOORD1;
+                half4 tangentWS : TEXCOORD2;
+                float2 uv : TEXCOORD3;
+                half fogFactor : TEXCOORD4;
+                half3 vertexLighting : TEXCOORD5;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            half CelestialInterleavedGradientNoise(float2 pixelPosition)
+            {
+                return frac(52.9829189 * frac(dot(pixelPosition, float2(0.06711056, 0.00583715))));
+            }
+
+            half CelestialResolveLocalVisibility(float3 worldPosition)
+            {
+                float3 surfaceDirection = CelestialSafeNormalize(
+                    worldPosition - _PlanetCenterScenePosition.xyz,
+                    float3(0.0, 1.0, 0.0));
+                float3 lodCenterDirection = CelestialSafeNormalize(
+                    _LodCenterDirection.xyz,
+                    float3(0.0, 1.0, 0.0));
+                float chordDistanceMeters =
+                    length((surfaceDirection - lodCenterDirection) * _PlanetRadiusMeters);
+                float blendWidthMeters = _LodFadeEndMeters - _LodFadeStartMeters;
+
+                if (blendWidthMeters <= 0.0001)
+                {
+                    return chordDistanceMeters <= _LodFadeEndMeters ? 1.0h : 0.0h;
+                }
+
+                return 1.0h - smoothstep(
+                    _LodFadeStartMeters,
+                    _LodFadeEndMeters,
+                    chordDistanceMeters);
+            }
+
+            half4 CelestialResolveLayerWeights(float2 controlUv)
+            {
+                if (_LayerCount < 0.5h)
+                {
+                    return 0.0h;
+                }
+
+                half4 weights = _LayerCount < 1.5h
+                    ? half4(1.0h, 0.0h, 0.0h, 0.0h)
+                    : saturate(SAMPLE_TEXTURE2D(_Control, sampler_Control, controlUv));
+                if (_LayerCount < 3.5h) weights.a = 0.0h;
+                if (_LayerCount < 2.5h) weights.b = 0.0h;
+                if (_LayerCount < 1.5h) weights.g = 0.0h;
+                return weights / max(dot(weights, half4(1.0h, 1.0h, 1.0h, 1.0h)), 0.0001h);
+            }
+
+            void CelestialApplyLightingMode(inout SurfaceData surfaceData, half3 emission)
+            {
+                if (_SurfaceLightingMode > 0.5h)
+                {
+                    surfaceData.emission = emission;
+
+                    if (_SurfaceLightingMode < 1.5h)
+                    {
+                        surfaceData.albedo = 0.0h;
+                        surfaceData.metallic = 0.0h;
+                        surfaceData.smoothness = 0.0h;
+                        surfaceData.occlusion = 1.0h;
+                    }
+                }
+                else
+                {
+                    surfaceData.emission = 0.0h;
+                }
+            }
+
+            CelestialTerrainVaryings CelestialTerrainVertex(CelestialTerrainAttributes input)
+            {
+                CelestialTerrainVaryings output = (CelestialTerrainVaryings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                VertexPositionInputs positionInputs =
+                    GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInputs =
+                    GetVertexNormalInputs(input.normalOS, input.tangentOS);
+                output.positionCS = positionInputs.positionCS;
+                output.positionWS = positionInputs.positionWS;
+                output.normalWS = normalInputs.normalWS;
+                output.tangentWS = half4(
+                    normalInputs.tangentWS,
+                    input.tangentOS.w * GetOddNegativeScale());
+                output.uv = input.uv;
+                output.fogFactor = ComputeFogFactor(positionInputs.positionCS.z);
+                output.vertexLighting =
+                    VertexLighting(positionInputs.positionWS, normalInputs.normalWS);
+                return output;
+            }
+
+            half4 CelestialTerrainFragment(CelestialTerrainVaryings input) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                float2 pixelPosition = floor(input.positionCS.xy);
+                clip(_TileFade - CelestialInterleavedGradientNoise(pixelPosition + float2(17.0, 31.0)));
+
+                if (_LodMaskMode > 0.5h)
+                {
+                    half localVisibility = CelestialResolveLocalVisibility(input.positionWS);
+                    half lodNoise = CelestialInterleavedGradientNoise(pixelPosition);
+                    clip(_LodMaskMode < 1.5h
+                        ? localVisibility - lodNoise
+                        : lodNoise - localVisibility);
+                }
+
+                half3 meshNormalWS = NormalizeNormalPerPixel(input.normalWS);
+                CelestialBodySurfaceCoordinates coordinates =
+                    CelestialBuildSurfaceCoordinates(
+                        input.positionWS,
+                        meshNormalWS,
+                        _PlanetCenterScenePosition.xyz,
+                        _PlanetRadiusMeters,
+                        _BodyNorthDirection.xyz);
+
+                if (_DebugMode > 0.5)
+                {
+                    half3 debugColor = CelestialResolveDebugColor(
+                        _DebugMode,
+                        meshNormalWS,
+                        coordinates,
+                        input.uv,
+                        _ElevationDebugMinMeters,
+                        _ElevationDebugMaxMeters,
+                        _CoordinateDebugScaleMeters);
+                    return half4(debugColor, 1.0h);
+                }
+
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.alpha = 1.0h;
+                surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);
+                surfaceData.occlusion = 1.0h;
+
+                if (_LayerCount < 0.5h)
+                {
+                    float2 baseUv = input.uv * _BaseMap_ST.xy + _BaseMap_ST.zw;
+                    half3 baseSurfaceColor =
+                        SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUv).rgb * _BaseColor.rgb;
+                    surfaceData.albedo = baseSurfaceColor;
+                    surfaceData.normalTS =
+                        UnpackNormalScale(
+                            SAMPLE_TEXTURE2D(_NormalMap, sampler_BaseMap, baseUv),
+                            _NormalScale);
+                    surfaceData.metallic = _Metallic;
+                    surfaceData.smoothness = _Smoothness;
+                    surfaceData.occlusion = _Occlusion;
+                    half3 baseEmission =
+                        baseSurfaceColor *
+                        SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, baseUv).rgb *
+                        _EmissionColor.rgb *
+                        max(_EmissionIntensity, 0.0h);
+                    CelestialApplyLightingMode(surfaceData, baseEmission);
+                }
+                else
+                {
+                    half4 weights = CelestialResolveLayerWeights(input.uv);
+                    float2 uv0 = input.uv * _Splat0_ST.xy + _Splat0_ST.zw;
+                    float2 uv1 = input.uv * _Splat1_ST.xy + _Splat1_ST.zw;
+                    float2 uv2 = input.uv * _Splat2_ST.xy + _Splat2_ST.zw;
+                    float2 uv3 = input.uv * _Splat3_ST.xy + _Splat3_ST.zw;
+                    half4 diffuse0 = SAMPLE_TEXTURE2D(_Splat0, sampler_BaseMap, uv0);
+                    half4 diffuse1 = SAMPLE_TEXTURE2D(_Splat1, sampler_BaseMap, uv1);
+                    half4 diffuse2 = SAMPLE_TEXTURE2D(_Splat2, sampler_BaseMap, uv2);
+                    half4 diffuse3 = SAMPLE_TEXTURE2D(_Splat3, sampler_BaseMap, uv3);
+                    half3 surfaceColor0 = diffuse0.rgb * _Tint0.rgb;
+                    half3 surfaceColor1 = diffuse1.rgb * _Tint1.rgb;
+                    half3 surfaceColor2 = diffuse2.rgb * _Tint2.rgb;
+                    half3 surfaceColor3 = diffuse3.rgb * _Tint3.rgb;
+                    surfaceData.albedo =
+                        surfaceColor0 * weights.r +
+                        surfaceColor1 * weights.g +
+                        surfaceColor2 * weights.b +
+                        surfaceColor3 * weights.a;
+
+                    half3 normal0 = lerp(
+                        half3(0.0h, 0.0h, 1.0h),
+                        UnpackNormalScale(SAMPLE_TEXTURE2D(_Normal0, sampler_BaseMap, uv0), _NormalScale0),
+                        _HasNormal0);
+                    half3 normal1 = lerp(
+                        half3(0.0h, 0.0h, 1.0h),
+                        UnpackNormalScale(SAMPLE_TEXTURE2D(_Normal1, sampler_BaseMap, uv1), _NormalScale1),
+                        _HasNormal1);
+                    half3 normal2 = lerp(
+                        half3(0.0h, 0.0h, 1.0h),
+                        UnpackNormalScale(SAMPLE_TEXTURE2D(_Normal2, sampler_BaseMap, uv2), _NormalScale2),
+                        _HasNormal2);
+                    half3 normal3 = lerp(
+                        half3(0.0h, 0.0h, 1.0h),
+                        UnpackNormalScale(SAMPLE_TEXTURE2D(_Normal3, sampler_BaseMap, uv3), _NormalScale3),
+                        _HasNormal3);
+                    surfaceData.normalTS = normalize(
+                        normal0 * weights.r +
+                        normal1 * weights.g +
+                        normal2 * weights.b +
+                        normal3 * weights.a);
+
+                    half4 mask0 = SAMPLE_TEXTURE2D(_Mask0, sampler_BaseMap, uv0);
+                    half4 mask1 = SAMPLE_TEXTURE2D(_Mask1, sampler_BaseMap, uv1);
+                    half4 mask2 = SAMPLE_TEXTURE2D(_Mask2, sampler_BaseMap, uv2);
+                    half4 mask3 = SAMPLE_TEXTURE2D(_Mask3, sampler_BaseMap, uv3);
+                    surfaceData.metallic =
+                        lerp(_Metallic0, mask0.r, _HasMask0) * weights.r +
+                        lerp(_Metallic1, mask1.r, _HasMask1) * weights.g +
+                        lerp(_Metallic2, mask2.r, _HasMask2) * weights.b +
+                        lerp(_Metallic3, mask3.r, _HasMask3) * weights.a;
+                    surfaceData.smoothness =
+                        lerp(_Smoothness0, mask0.a, _HasMask0) * weights.r +
+                        lerp(_Smoothness1, mask1.a, _HasMask1) * weights.g +
+                        lerp(_Smoothness2, mask2.a, _HasMask2) * weights.b +
+                        lerp(_Smoothness3, mask3.a, _HasMask3) * weights.a;
+                    surfaceData.occlusion =
+                        lerp(1.0h, mask0.g, _HasMask0 * _OcclusionStrength0) * weights.r +
+                        lerp(1.0h, mask1.g, _HasMask1 * _OcclusionStrength1) * weights.g +
+                        lerp(1.0h, mask2.g, _HasMask2 * _OcclusionStrength2) * weights.b +
+                        lerp(1.0h, mask3.g, _HasMask3 * _OcclusionStrength3) * weights.a;
+
+                    half3 emission0 =
+                        surfaceColor0 *
+                        SAMPLE_TEXTURE2D(_EmissionMap0, sampler_BaseMap, uv0).rgb *
+                        _EmissionColor0.rgb *
+                        max(_EmissionIntensity0, 0.0h);
+                    half3 emission1 =
+                        surfaceColor1 *
+                        SAMPLE_TEXTURE2D(_EmissionMap1, sampler_BaseMap, uv1).rgb *
+                        _EmissionColor1.rgb *
+                        max(_EmissionIntensity1, 0.0h);
+                    half3 emission2 =
+                        surfaceColor2 *
+                        SAMPLE_TEXTURE2D(_EmissionMap2, sampler_BaseMap, uv2).rgb *
+                        _EmissionColor2.rgb *
+                        max(_EmissionIntensity2, 0.0h);
+                    half3 emission3 =
+                        surfaceColor3 *
+                        SAMPLE_TEXTURE2D(_EmissionMap3, sampler_BaseMap, uv3).rgb *
+                        _EmissionColor3.rgb *
+                        max(_EmissionIntensity3, 0.0h);
+                    CelestialApplyLightingMode(
+                        surfaceData,
+                        emission0 * weights.r +
+                        emission1 * weights.g +
+                        emission2 * weights.b +
+                        emission3 * weights.a);
+                }
+
+                half3 normalWS = NormalizeNormalPerPixel(
+                    TransformTangentToWorld(
+                        surfaceData.normalTS,
+                        half3x3(
+                            input.tangentWS.xyz,
+                            input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz),
+                            input.normalWS)));
+
+                InputData inputData = (InputData)0;
+                inputData.positionWS = input.positionWS;
+                inputData.positionCS = input.positionCS;
+                inputData.normalWS = normalWS;
+                inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
+                inputData.fogCoord = input.fogFactor;
+                inputData.vertexLighting = input.vertexLighting;
+                inputData.bakedGI = SampleSH(normalWS);
+                inputData.normalizedScreenSpaceUV =
+                    GetNormalizedScreenSpaceUV(input.positionCS);
+                inputData.shadowMask = half4(1.0h, 1.0h, 1.0h, 1.0h);
+                inputData.tangentToWorld = half3x3(
+                    input.tangentWS.xyz,
+                    input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz),
+                    input.normalWS);
+
+                half4 color = UniversalFragmentPBR(inputData, surfaceData);
+                color.rgb = MixFog(color.rgb, inputData.fogCoord);
+                color.a = 1.0h;
+                return color;
+            }
+            ENDHLSL
+        }
+
+        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Lit/DepthOnly"
+        UsePass "Universal Render Pipeline/Lit/DepthNormals"
+        UsePass "Universal Render Pipeline/Lit/Meta"
     }
 
     SubShader
@@ -339,10 +773,11 @@ Shader "jcan/Celestial Systems/Celestial Body Terrain"
             }
 
             half3 meshNormalWS =
-                normalize(
+                (half3)CelestialSafeNormalize(
                     WorldNormalVector(
                         input,
-                        half3(0.0h, 0.0h, 1.0h)));
+                        half3(0.0h, 0.0h, 1.0h)),
+                    half3(0.0h, 1.0h, 0.0h));
             CelestialBodySurfaceCoordinates coordinates =
                 CelestialBuildSurfaceCoordinates(
                     input.worldPos,
