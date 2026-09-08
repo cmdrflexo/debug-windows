@@ -24,8 +24,9 @@ MonoBehaviour:
     probeSamplingDebugMesh: {fileID: 0}
     probeSamplingDebugTexture: {fileID: 0}
     probeVolumeBlendStatesCS: {fileID: 0}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: 5648698636357087375}
+  m_RendererFeatureMap: 8f304c4f7b35644e
   m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -54,3 +55,18 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &5648698636357087375
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 307ce19499f44b309c0cb64350c11a30, type: 3}
+  m_Name: AutomaticExposureRendererFeature
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.AutomaticExposureRendererFeature
+  m_Active: 1
+  exposureComputeShader: {fileID: 7200000, guid: 708d64e9db9a44f5b718db43307d0de2, type: 3}
+  exposureShader: {fileID: 4800000, guid: 29feb92a170d4cc4b0854cc3108ee1b5, type: 3}
