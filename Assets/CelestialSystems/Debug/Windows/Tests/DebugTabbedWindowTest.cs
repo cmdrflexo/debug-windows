@@ -19,6 +19,7 @@ namespace jcan.CelestialSystems
         private double radiusMeters = 6371000.0;
         private double massKilograms = 5.972e24;
         private bool oceansEnabled = true;
+        private float bloomIntensity = 0.25f;
 
         private void OnEnable()
         {
@@ -35,7 +36,7 @@ namespace jcan.CelestialSystems
                     new DebugTabbedPage("motion", "Motion / Orbit", BuildPlaceholder),
                     new DebugTabbedPage("spawn", "Spawn", BuildPlaceholder),
                     new DebugTabbedPage("atmosphere", "Atmosphere", BuildPlaceholder),
-                    new DebugTabbedPage("rendering", "Rendering", BuildPlaceholder),
+                    new DebugTabbedPage("rendering", "Rendering", BuildRendering),
                     new DebugTabbedPage("satellites", "Satellites", BuildPlaceholder),
                     new DebugTabbedPage("metadata", "Metadata", BuildPlaceholder),
                     new DebugTabbedPage("diagnostics", "Diagnostics", BuildPlaceholder)
@@ -98,6 +99,21 @@ namespace jcan.CelestialSystems
                 "Ocean Enabled",
                 oceansEnabled,
                 value => oceansEnabled = value);
+        }
+
+        private void BuildRendering(DebugWindowFormContent content)
+        {
+            content.AddSlider(
+                "Bloom Intensity",
+                bloomIntensity,
+                0.0f,
+                2.0f,
+                value => bloomIntensity = value,
+                "×",
+                0.05f);
+            content.AddReadOnly(
+                "Current Bloom",
+                () => bloomIntensity.ToString("0.00") + "×");
         }
 
         private void BuildPlaceholder(DebugWindowFormContent content)
