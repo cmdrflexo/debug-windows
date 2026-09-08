@@ -7,14 +7,8 @@ using UnityEngine;
 namespace jcan.CelestialSystems
 {
     [DisallowMultipleComponent]
-    public sealed class DebugImageEffector : MonoBehaviour
+    public sealed class DebugImageEffector : ImageEffector
     {
-        private const string SourceId =
-            "jcan.celestialsystems.debug-image-effector";
-
-        [SerializeField]
-        private ImageEffectorReceiver receiver;
-
         [SerializeField]
         private bool overridesEnabled;
 
@@ -56,30 +50,7 @@ namespace jcan.CelestialSystems
         public float LensDistortionPerAtmosphere =>
             lensDistortionPerAtmosphere;
 
-        private void Awake()
-        {
-            if (receiver == null)
-                receiver = GetComponent<ImageEffectorReceiver>();
-        }
-
-        private void OnEnable()
-        {
-            Apply();
-        }
-
-        private void OnDisable()
-        {
-            receiver?.ClearContribution(SourceId);
-        }
-
-        public void BindReceiver(ImageEffectorReceiver value)
-        {
-            if (receiver != null && receiver != value)
-                receiver.ClearContribution(SourceId);
-
-            receiver = value;
-            Apply();
-        }
+        protected override bool ContributionEnabled => overridesEnabled;
 
         public void SetOverridesEnabled(bool value)
         {
@@ -129,34 +100,23 @@ namespace jcan.CelestialSystems
             Apply();
         }
 
-        private void Apply()
+        protected override ImageEffectContribution BuildContribution()
         {
-            if (receiver == null)
-                return;
-
-            if (!isActiveAndEnabled || !overridesEnabled)
-            {
-                receiver.ClearContribution(SourceId);
-                return;
-            }
-
             var starAmount = starProximityEnabled
                 ? starProximity
                 : 0.0f;
             var pressure = atmosphereEnabled
                 ? atmospherePressure
                 : 0.0f;
-            receiver.SetContribution(
-                SourceId,
-                new ImageEffectContribution
-                {
-                    bloomIntensity =
-                        starAmount * maximumBloomBoost,
-                    exposureCompensation =
-                        starAmount * maximumExposureBoost,
-                    lensDistortionIntensity =
-                        pressure * lensDistortionPerAtmosphere
-                });
+            return new ImageEffectContribution
+            {
+                bloomIntensity =
+                    starAmount * maximumBloomBoost,
+                exposureCompensation =
+                    starAmount * maximumExposureBoost,
+                lensDistortionIntensity =
+                    pressure * lensDistortionPerAtmosphere
+            };
         }
     }
 }
