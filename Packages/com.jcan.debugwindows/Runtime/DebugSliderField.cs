@@ -16,6 +16,7 @@ namespace jcan.DebugWindows
         private TMP_Text valueLabel;
         private Action<float> changed;
         private float step;
+        private float currentValue;
         private string units;
 
         internal static DebugSliderField Create(
@@ -122,21 +123,27 @@ namespace jcan.DebugWindows
                 return;
 
             var adjusted = ClampAndSnap(value);
+            var valueChanged = !Mathf.Approximately(currentValue, adjusted);
+            currentValue = adjusted;
             slider.SetValueWithoutNotify(adjusted);
             RefreshValueLabel(adjusted);
 
-            if (notify)
+            if (notify && valueChanged)
                 changed?.Invoke(adjusted);
         }
 
         private void HandleSliderChanged(float value)
         {
             var adjusted = ClampAndSnap(value);
+            var valueChanged = !Mathf.Approximately(currentValue, adjusted);
+            currentValue = adjusted;
+
             if (!Mathf.Approximately(slider.value, adjusted))
                 slider.SetValueWithoutNotify(adjusted);
 
             RefreshValueLabel(adjusted);
-            changed?.Invoke(adjusted);
+            if (valueChanged)
+                changed?.Invoke(adjusted);
         }
 
         private float ClampAndSnap(float value)
