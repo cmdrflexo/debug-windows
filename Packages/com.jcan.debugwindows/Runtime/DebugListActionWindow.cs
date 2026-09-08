@@ -24,14 +24,25 @@ namespace jcan.DebugWindows
 
     public sealed class DebugListAction
     {
-        public DebugListAction(string actionId, string text)
+        public DebugListAction(
+            string actionId,
+            string text,
+            string feedbackMessage = null,
+            float feedbackDuration = 3.0f,
+            bool showFeedbackOnInvoke = true)
         {
             ActionId = actionId ?? string.Empty;
             Text = text ?? string.Empty;
+            FeedbackMessage = feedbackMessage;
+            FeedbackDuration = feedbackDuration;
+            ShowFeedbackOnInvoke = showFeedbackOnInvoke;
         }
 
         public string ActionId { get; }
         public string Text { get; }
+        public string FeedbackMessage { get; }
+        public float FeedbackDuration { get; }
+        public bool ShowFeedbackOnInvoke { get; }
     }
 
     public sealed class DebugListActionInvocation
@@ -97,6 +108,7 @@ namespace jcan.DebugWindows
         public event Action<DebugListActionInvocation> ActionInvoked;
         internal event Action ItemsChanged;
         internal event Action<string> InputTextChanged;
+        internal event Action<string> FeedbackRequested;
 
         public DebugWindowRegistration CreateRegistration()
         {
@@ -112,6 +124,12 @@ namespace jcan.DebugWindows
         {
             inputText = value ?? string.Empty;
             InputTextChanged?.Invoke(inputText);
+        }
+
+        public void ShowActionFeedback(string actionId)
+        {
+            if (!string.IsNullOrWhiteSpace(actionId))
+                FeedbackRequested?.Invoke(actionId);
         }
 
         public void SetItems(IEnumerable<DebugListItem> newItems)
@@ -156,6 +174,8 @@ namespace jcan.DebugWindows
         private RectTransform listContent;
         private TMP_InputField input;
         private DebugListItem selectedItem;
+        private readonly Dictionary<string, DebugButtonFeedback> actionFeedback =
+            new Dictionary<string, DebugButtonFeedback>(StringComparer.Ordinal);
 
         public static void Create(
             DebugWindowContent content,
@@ -189,6 +209,7 @@ namespace jcan.DebugWindows
             BuildInputRow(root);
             definition.ItemsChanged += RebuildItems;
             definition.InputTextChanged += SetInputText;
+            definition.FeedbackRequested += ShowFeedback;
             SetInputText(definition.InputText);
             RebuildItems();
         }
@@ -199,6 +220,7 @@ namespace jcan.DebugWindows
             {
                 definition.ItemsChanged -= RebuildItems;
                 definition.InputTextChanged -= SetInputText;
+                definition.FeedbackRequested -= ShowFeedback;
             }
         }
 
@@ -303,7 +325,7 @@ namespace jcan.DebugWindows
                     continue;
 
                 var captured = action;
-                DebugWindowUi.CreateButton(
+                var button = DebugWindowUi.CreateButton(
                     captured.ActionId,
                     actions,
                     captured.Text,
@@ -313,7 +335,11 @@ namespace jcan.DebugWindows
                     () => Invoke(captured.ActionId),
                     Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f),
                     windowContent.Manager.ControlHorizontalPadding,
-                    windowContent.Manager.ControlVerticalPadding);
+                    windowContent.Manager.ControlVerticalPadding,
+                    captured.FeedbackMessage,
+                    captured.FeedbackDuration,
+                    captured.ShowFeedbackOnInvoke);
+                RememberFeedback(captured.ActionId, button);
             }
         }
 
@@ -390,7 +416,7 @@ namespace jcan.DebugWindows
 
             if (action != null)
             {
-                DebugWindowUi.CreateButton(
+                var button = DebugWindowUi.CreateButton(
                     action.ActionId,
                     row,
                     action.Text,
@@ -400,7 +426,11 @@ namespace jcan.DebugWindows
                     () => Invoke(action.ActionId),
                     Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f),
                     windowContent.Manager.ControlHorizontalPadding,
-                    windowContent.Manager.ControlVerticalPadding);
+                    windowContent.Manager.ControlVerticalPadding,
+                    action.FeedbackMessage,
+                    action.FeedbackDuration,
+                    action.ShowFeedbackOnInvoke);
+                RememberFeedback(action.ActionId, button);
             }
         }
 
@@ -465,6 +495,25 @@ namespace jcan.DebugWindows
         {
             if (input != null && input.text != value)
                 input.SetTextWithoutNotify(value ?? string.Empty);
+        }
+
+        private void RememberFeedback(string actionId, Button button)
+        {
+            if (button == null || string.IsNullOrWhiteSpace(actionId))
+                return;
+
+            var feedback = button.GetComponent<DebugButtonFeedback>();
+            if (feedback != null)
+                actionFeedback[actionId] = feedback;
+        }
+
+        private void ShowFeedback(string actionId)
+        {
+            if (actionFeedback.TryGetValue(actionId, out var feedback) &&
+                feedback != null)
+            {
+                feedback.Show();
+            }
         }
 
         private void Invoke(string actionId)
