@@ -63,9 +63,10 @@ namespace jcan.DebugWindows
             DebugWindowUi.AddImage(track.gameObject, manager.ButtonColor);
 
             var fillArea = DebugWindowUi.CreateRect("Fill Area", sliderRoot);
-            DebugWindowUi.Stretch(fillArea);
-            fillArea.offsetMin = new Vector2(4.0f, 0.0f);
-            fillArea.offsetMax = new Vector2(-4.0f, 0.0f);
+            fillArea.anchorMin = new Vector2(0.0f, 0.5f);
+            fillArea.anchorMax = new Vector2(1.0f, 0.5f);
+            fillArea.offsetMin = new Vector2(4.0f, -1.5f);
+            fillArea.offsetMax = new Vector2(-4.0f, 1.5f);
 
             var fill = DebugWindowUi.CreateRect("Fill", fillArea);
             DebugWindowUi.Stretch(fill);
