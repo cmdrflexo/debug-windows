@@ -162,7 +162,7 @@ namespace jcan.DebugWindows
                 manager.ControlHorizontalPadding * 0.5f,
                 manager.ControlVerticalPadding * 0.5f);
             viewport.offsetMax = new Vector2(
-                -manager.ControlHorizontalPadding,
+                -manager.ControlHorizontalPadding * 1.5f,
                 -manager.ControlVerticalPadding * 0.5f);
             viewport.gameObject.AddComponent<RectMask2D>();
 
