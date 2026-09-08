@@ -292,9 +292,9 @@ namespace jcan.CelestialSystems
                     resolution));
         }
 
-        private static List<DebugChoiceOption> BuildFrameLimitOptions()
+        private List<DebugChoiceOption> BuildFrameLimitOptions()
         {
-            return new List<DebugChoiceOption>
+            var result = new List<DebugChoiceOption>
             {
                 new DebugChoiceOption(
                     "unlimited",
@@ -306,6 +306,23 @@ namespace jcan.CelestialSystems
                 new DebugChoiceOption("144", "144 FPS", 144),
                 new DebugChoiceOption("240", "240 FPS", 240)
             };
+
+            var current = settings.TargetFrameRate;
+            if (current >= 0 &&
+                current != 30 &&
+                current != 60 &&
+                current != 120 &&
+                current != 144 &&
+                current != 240)
+            {
+                result.Add(
+                    new DebugChoiceOption(
+                        FrameLimitId(current),
+                        current + " FPS",
+                        current));
+            }
+
+            return result;
         }
 
         private static List<DebugChoiceOption> EnumOptions<T>()
@@ -343,7 +360,9 @@ namespace jcan.CelestialSystems
                 case 240:
                     return value.ToString();
                 default:
-                    return "unlimited";
+                    return value < 0
+                        ? "unlimited"
+                        : "custom:" + value;
             }
         }
 
