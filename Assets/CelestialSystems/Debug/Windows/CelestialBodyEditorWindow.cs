@@ -196,9 +196,9 @@ namespace jcan.CelestialSystems
         private void BuildFooter(DebugWindowFormContent content)
         {
             content.AddButton("new", "New", ResetAndRefresh);
-            content.AddButton("save", "Save", SaveDefinition);
-            content.AddButton("delete", "Delete", DeleteDefinition);
-            content.AddButton("spawn", "Spawn", Spawn);
+            content.AddButton("save", "Save", SaveDefinition, "SAVED");
+            content.AddButton("delete", "Delete", DeleteDefinition, "DELETED");
+            content.AddButton("spawn", "Spawn", Spawn, "SPAWNED");
         }
 
         private void SaveDefinition()

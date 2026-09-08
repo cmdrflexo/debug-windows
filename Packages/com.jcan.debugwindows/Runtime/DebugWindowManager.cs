@@ -375,6 +375,24 @@ namespace jcan.DebugWindows
             MenuVisibilityChanged?.Invoke(menuVisible);
         }
 
+        public void ShowConfirmation(
+            string message,
+            Action confirmed,
+            Action cancelled = null,
+            string confirmText = "Confirm",
+            string cancelText = "Cancel",
+            Vector2? minimumSize = null)
+        {
+            DebugConfirmationDialog.Show(
+                this,
+                message,
+                confirmed,
+                cancelled,
+                confirmText,
+                cancelText,
+                minimumSize ?? new Vector2(300.0f, 140.0f));
+        }
+
         public void SaveLayout()
         {
             if (!initialized || string.IsNullOrWhiteSpace(layoutFilePath))

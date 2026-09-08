@@ -46,9 +46,14 @@ namespace jcan.CelestialSystems
                 new[]
                 {
                     new DebugListAction("load", "Load"),
-                    new DebugListAction("delete", "Delete")
+                    new DebugListAction(
+                        "delete",
+                        "Delete",
+                        "DELETED",
+                        3.0f,
+                        false)
                 },
-                new DebugListAction("save", "Save"),
+                new DebugListAction("save", "Save", "SAVED"),
                 preferredContentSize,
                 DebugWindowDisplayState.Open,
                 defaultPosition);
@@ -104,10 +109,29 @@ namespace jcan.CelestialSystems
                     break;
 
                 case "delete":
-                    if (invocation.SelectedItem != null)
-                        poseLibrary.DeletePose(invocation.SelectedItem.UniqueId);
+                    ConfirmDelete(invocation.SelectedItem);
                     break;
             }
+        }
+
+        private void ConfirmDelete(DebugListItem selectedItem)
+        {
+            if (selectedItem == null)
+                return;
+
+            var manager = DebugWindowManager.Instance;
+            if (manager == null)
+                return;
+
+            var poseId = selectedItem.UniqueId;
+            var poseName = selectedItem.DisplayName;
+            manager.ShowConfirmation(
+                $"Delete camera pose '{poseName}'?",
+                () =>
+                {
+                    poseLibrary.DeletePose(poseId);
+                    window?.ShowActionFeedback("delete");
+                });
         }
 
         private void RefreshItems()
