@@ -120,9 +120,12 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            var trajectoryError =
+                string.Empty;
+
             if (newTrajectory == null ||
                 !newTrajectory.TryValidate(
-                    out var trajectoryError))
+                    out trajectoryError))
             {
                 return Fail(
                     string.IsNullOrWhiteSpace(
