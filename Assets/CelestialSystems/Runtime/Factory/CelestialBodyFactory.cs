@@ -462,9 +462,9 @@ namespace jcan.CelestialSystems
                     ? surfaceRuntime.QualityProfile
                         .AdaptiveGenerationMargins
                     : 2;
-            // Dynamic roots are requested only when the presentation controller asks for them.
+            // The six root patches also feed the fused simple-presentation texture baker.
             var prewarmCoarseSurface =
-                false;
+                true;
             surfaceCacheManager =
                 CelestialSurfaceCacheManager
                     .ResolveOrCreate(
