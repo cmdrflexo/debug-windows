@@ -420,12 +420,6 @@ namespace jcan.CelestialSystems
                 var isOnScreen =
                     IsOnScreen(
                         screenPoint);
-                var markerScreenPosition =
-                    isOnScreen
-                        ? ClampToScreen(
-                            screenPoint)
-                        : GetOffScreenPosition(
-                            screenPoint);
 
                 markerText.text =
                     isOnScreen
@@ -445,6 +439,16 @@ namespace jcan.CelestialSystems
                 markerText.gameObject.name =
                     GetMarkerObjectName(
                         context);
+
+                var markerScreenPosition =
+                    isOnScreen
+                        ? GetAboveBodyScreenPosition(
+                            context,
+                            trackedTransform.position,
+                            screenPoint,
+                            markerText.preferredHeight)
+                        : GetOffScreenPosition(
+                            screenPoint);
 
                 if (!TryGetCanvasPosition(
                         markerScreenPosition,
@@ -575,6 +579,89 @@ namespace jcan.CelestialSystems
                         verticalInset,
                         Screen.height -
                             verticalInset)));
+        }
+
+        private Vector2 GetAboveBodyScreenPosition(
+            CelestialBodyRuntimeContext context,
+            Vector3 bodyPosition,
+            Vector3 bodyScreenPoint,
+            float textHeightPixels)
+        {
+            var projectedRadiusPixels =
+                GetProjectedRadiusPixels(
+                    context,
+                    bodyPosition);
+            var labelPosition =
+                new Vector3(
+                    bodyScreenPoint.x,
+                    bodyScreenPoint.y +
+                        projectedRadiusPixels +
+                        Mathf.Max(
+                            1.0f,
+                            textHeightPixels),
+                    bodyScreenPoint.z);
+
+            return
+                ClampToScreen(
+                    labelPosition);
+        }
+
+        private float GetProjectedRadiusPixels(
+            CelestialBodyRuntimeContext context,
+            Vector3 bodyPosition)
+        {
+            var radiusWorldUnits =
+                (float)context.ConfiguredReferenceRadiusMeters;
+
+            if (radiusWorldUnits <= 0.0f ||
+                !float.IsFinite(
+                    radiusWorldUnits))
+            {
+                return 0.0f;
+            }
+
+            if (observerCamera.orthographic)
+            {
+                return
+                    radiusWorldUnits /
+                    Mathf.Max(
+                        Mathf.Epsilon,
+                        observerCamera.orthographicSize) *
+                    Screen.height *
+                    0.5f;
+            }
+
+            var distanceWorldUnits =
+                Vector3.Distance(
+                    observerCamera.transform.position,
+                    bodyPosition);
+
+            if (distanceWorldUnits <=
+                radiusWorldUnits)
+            {
+                return
+                    Screen.height;
+            }
+
+            var angularRadiusRadians =
+                Mathf.Asin(
+                    Mathf.Clamp01(
+                        radiusWorldUnits /
+                        distanceWorldUnits));
+            var verticalFocalLengthPixels =
+                Screen.height *
+                0.5f /
+                Mathf.Tan(
+                    observerCamera.fieldOfView *
+                    Mathf.Deg2Rad *
+                    0.5f);
+
+            return
+                Mathf.Min(
+                    Screen.height,
+                    Mathf.Tan(
+                        angularRadiusRadians) *
+                    verticalFocalLengthPixels);
         }
 
         private Vector2 GetOffScreenPosition(
