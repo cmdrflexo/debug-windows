@@ -13,6 +13,12 @@ namespace jcan.CelestialSystems
         Dynamic
     }
 
+    public enum CelestialBodyPresentationSelectionMode
+    {
+        AutomaticDistance,
+        Manual
+    }
+
     [DefaultExecutionOrder(400)]
     [DisallowMultipleComponent]
     public sealed class CelestialBodyPresentationController :
@@ -23,8 +29,25 @@ namespace jcan.CelestialSystems
 
         [Header("Presentation")]
         [SerializeField]
+        private CelestialBodyPresentationSelectionMode selectionMode =
+            CelestialBodyPresentationSelectionMode.AutomaticDistance;
+
+        [SerializeField]
         private CelestialBodyPresentationMode requestedMode =
             CelestialBodyPresentationMode.Simple;
+
+        [Header("Automatic Distance")]
+        [SerializeField]
+        [Min(0.0f)]
+        [Tooltip("Requests dynamic terrain at or below this altitude, measured in body radii above the reference surface.")]
+        private float dynamicEnterAltitudeRadii =
+            3.0f;
+
+        [SerializeField]
+        [Min(0.0f)]
+        [Tooltip("Returns to the simple body above this altitude. Must be greater than the enter threshold.")]
+        private float simpleReturnAltitudeRadii =
+            4.0f;
 
         [Header("Runtime")]
         [SerializeField]
@@ -48,7 +71,14 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private string lastError;
 
+        [SerializeField]
+        private Camera observerCamera;
+
+        [SerializeField]
+        private double observerAltitudeRadii;
+
         private CelestialBodyRuntimeContext body;
+        private CelestialSurfaceRuntime surfaceRuntime;
         private CelestialSurfaceQuadtreeRenderer dynamicRenderer;
         private CelestialSurfaceCollisionRuntime collisionRuntime;
         private CelestialAdaptiveSurfaceRenderMode dynamicRenderMode;
@@ -56,6 +86,9 @@ namespace jcan.CelestialSystems
 
         public CelestialBodyPresentationMode RequestedMode =>
             requestedMode;
+
+        public CelestialBodyPresentationSelectionMode SelectionMode =>
+            selectionMode;
 
         public CelestialBodyPresentationMode ActiveMode =>
             activeMode;
@@ -69,13 +102,18 @@ namespace jcan.CelestialSystems
         public string LastError =>
             lastError;
 
+        public double ObserverAltitudeRadii =>
+            observerAltitudeRadii;
+
         public bool Initialize(
             CelestialBodyRuntimeContext newBody,
+            CelestialSurfaceRuntime newSurfaceRuntime,
             CelestialSurfaceQuadtreeRenderer newDynamicRenderer,
             CelestialSurfaceCollisionRuntime newCollisionRuntime,
             CelestialAdaptiveSurfaceRenderMode newDynamicRenderMode)
         {
             body = newBody;
+            surfaceRuntime = newSurfaceRuntime;
             dynamicRenderer = newDynamicRenderer;
             collisionRuntime = newCollisionRuntime;
             dynamicRenderMode = newDynamicRenderMode;
@@ -85,6 +123,7 @@ namespace jcan.CelestialSystems
             if (body == null ||
                 body.Definition == null ||
                 body.VisualRoot == null ||
+                surfaceRuntime == null ||
                 dynamicRenderer == null)
             {
                 return Fail(
@@ -168,6 +207,8 @@ namespace jcan.CelestialSystems
         public void RequestMode(
             CelestialBodyPresentationMode mode)
         {
+            selectionMode =
+                CelestialBodyPresentationSelectionMode.Manual;
             requestedMode = mode;
 
             if (initialized)
@@ -190,6 +231,13 @@ namespace jcan.CelestialSystems
                 CelestialBodyPresentationMode.Dynamic);
         }
 
+        [ContextMenu("Use Automatic Distance Selection")]
+        private void UseAutomaticDistanceSelection()
+        {
+            selectionMode =
+                CelestialBodyPresentationSelectionMode.AutomaticDistance;
+        }
+
         private void LateUpdate()
         {
             if (!initialized)
@@ -197,8 +245,95 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            UpdateAutomaticRequest();
             ApplyRequestedMode();
             ReportReadiness();
+        }
+
+        private void UpdateAutomaticRequest()
+        {
+            if (selectionMode !=
+                    CelestialBodyPresentationSelectionMode.AutomaticDistance ||
+                !TryMeasureObserverAltitudeRadii(
+                    out var altitudeRadii))
+            {
+                return;
+            }
+
+            observerAltitudeRadii =
+                altitudeRadii;
+
+            if (requestedMode ==
+                CelestialBodyPresentationMode.Dynamic)
+            {
+                if (altitudeRadii >
+                    simpleReturnAltitudeRadii)
+                {
+                    requestedMode =
+                        CelestialBodyPresentationMode.Simple;
+                }
+
+                return;
+            }
+
+            if (altitudeRadii <=
+                dynamicEnterAltitudeRadii)
+            {
+                requestedMode =
+                    CelestialBodyPresentationMode.Dynamic;
+            }
+        }
+
+        private bool TryMeasureObserverAltitudeRadii(
+            out double altitudeRadii)
+        {
+            altitudeRadii = default;
+            observerCamera ??=
+                dynamicRenderer.ObserverCamera != null
+                    ? dynamicRenderer.ObserverCamera
+                    : Camera.main;
+
+            if (observerCamera == null ||
+                !observerCamera.isActiveAndEnabled ||
+                surfaceRuntime == null ||
+                body == null ||
+                body.Definition == null ||
+                !surfaceRuntime.TrySceneToBodyLocal(
+                    observerCamera.transform.position,
+                    out var observerLocalPosition))
+            {
+                return false;
+            }
+
+            var radius =
+                body.Definition.ReferenceRadiusMeters;
+
+            if (!IsFinite(
+                    radius) ||
+                radius <= 0.0)
+            {
+                return false;
+            }
+
+            altitudeRadii =
+                (observerLocalPosition.Magnitude -
+                    radius) /
+                radius;
+            return IsFinite(
+                altitudeRadii);
+        }
+
+        private void OnValidate()
+        {
+            dynamicEnterAltitudeRadii =
+                Mathf.Max(
+                    0.0f,
+                    dynamicEnterAltitudeRadii);
+            simpleReturnAltitudeRadii =
+                Mathf.Max(
+                    dynamicEnterAltitudeRadii +
+                        0.01f,
+                    simpleReturnAltitudeRadii);
         }
 
         private void ApplyRequestedMode()

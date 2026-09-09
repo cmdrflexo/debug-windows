@@ -524,6 +524,7 @@ namespace jcan.CelestialSystems
 
             if (!presentationController.Initialize(
                     instance,
+                    surfaceRuntime,
                     adaptiveRenderer,
                     collisionRuntime,
                     adaptiveSurfaceRenderMode))
