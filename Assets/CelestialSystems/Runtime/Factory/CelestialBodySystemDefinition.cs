@@ -44,6 +44,10 @@ namespace jcan.CelestialSystems
             private DoubleVector3 velocityMetersPerSecond;
 
             [SerializeField]
+            [Tooltip("Optional prescribed trajectory relative to the parent entry.")]
+            private CelestialTrajectoryDefinition trajectory;
+
+            [SerializeField]
             private Vector3 rotationEulerDegrees;
 
             [SerializeField]
@@ -58,7 +62,8 @@ namespace jcan.CelestialSystems
                 DoubleVector3 positionMetersFromSystemOrigin,
                 DoubleVector3 velocityMetersPerSecond,
                 Vector3 rotationEulerDegrees,
-                DoubleVector3 angularVelocityRadiansPerSecond)
+                DoubleVector3 angularVelocityRadiansPerSecond,
+                CelestialTrajectoryDefinition trajectory = null)
             {
                 this.instanceId = instanceId;
                 this.definition = definition;
@@ -69,6 +74,8 @@ namespace jcan.CelestialSystems
                     positionMetersFromSystemOrigin;
                 this.velocityMetersPerSecond =
                     velocityMetersPerSecond;
+                this.trajectory =
+                    trajectory;
                 this.rotationEulerDegrees =
                     rotationEulerDegrees;
                 this.angularVelocityRadiansPerSecond =
@@ -95,6 +102,9 @@ namespace jcan.CelestialSystems
 
             public DoubleVector3 VelocityMetersPerSecond =>
                 velocityMetersPerSecond;
+
+            public CelestialTrajectoryDefinition Trajectory =>
+                trajectory;
 
             public Quaternion Rotation =>
                 Quaternion.Euler(
@@ -219,6 +229,15 @@ namespace jcan.CelestialSystems
                     return false;
                 }
 
+                if (body.Trajectory != null &&
+                    !body.Trajectory.TryValidate(
+                        out var trajectoryError))
+                {
+                    error =
+                        $"The body-system entry '{body.InstanceId}' has an invalid trajectory: {trajectoryError}";
+                    return false;
+                }
+
                 if (!IsFinite(
                         body.PositionMetersFromSystemOrigin) ||
                     !IsFinite(
@@ -255,6 +274,17 @@ namespace jcan.CelestialSystems
                 {
                     error =
                         $"The body-system entry '{body.InstanceId}' references missing parent '{body.ParentInstanceId}'.";
+                    return false;
+                }
+
+                if (body.Trajectory != null &&
+                    !string.Equals(
+                        body.Trajectory.ReferenceInstanceId,
+                        body.ParentInstanceId,
+                        StringComparison.Ordinal))
+                {
+                    error =
+                        $"The body-system entry '{body.InstanceId}' trajectory reference must match parent '{body.ParentInstanceId}'.";
                     return false;
                 }
 

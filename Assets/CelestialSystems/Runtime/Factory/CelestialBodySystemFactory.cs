@@ -170,7 +170,8 @@ namespace jcan.CelestialSystems
                             orbitCenter,
                             Rotate(
                                 rotation,
-                                entry.AngularVelocityRadiansPerSecond));
+                                entry.AngularVelocityRadiansPerSecond),
+                            entry.Trajectory);
 
                     if (!bodyFactory.TrySpawnBody(
                             request,
