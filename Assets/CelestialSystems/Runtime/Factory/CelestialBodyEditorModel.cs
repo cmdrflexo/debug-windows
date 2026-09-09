@@ -10,7 +10,8 @@ namespace jcan.CelestialSystems
     public enum CelestialBodySpawnMode
     {
         FreeSimulation,
-        OnRails
+        OnRails,
+        PrescribedTrajectory
     }
 
     [Serializable]

@@ -28,6 +28,8 @@ namespace jcan.CelestialSystems
 
         public DoubleVector3 InitialAngularVelocityRadiansPerSecond { get; }
 
+        public CelestialTrajectoryDefinition Trajectory { get; }
+
         public CelestialBodySpawnRequest(
             string instanceId,
             CelestialBodyDefinition definition,
@@ -38,7 +40,8 @@ namespace jcan.CelestialSystems
             Transform parentOverride = null,
             CelestialBodySpawnMode motionMode = CelestialBodySpawnMode.FreeSimulation,
             CelestialBodyRuntimeContext orbitCenter = null,
-            DoubleVector3 initialAngularVelocityRadiansPerSecond = default)
+            DoubleVector3 initialAngularVelocityRadiansPerSecond = default,
+            CelestialTrajectoryDefinition trajectory = null)
         {
             InstanceId = instanceId;
             Definition = definition;
@@ -53,6 +56,8 @@ namespace jcan.CelestialSystems
             OrbitCenter = orbitCenter;
             InitialAngularVelocityRadiansPerSecond =
                 initialAngularVelocityRadiansPerSecond;
+            Trajectory =
+                trajectory;
         }
     }
 }
