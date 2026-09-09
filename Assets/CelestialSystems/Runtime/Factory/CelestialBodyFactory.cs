@@ -462,10 +462,9 @@ namespace jcan.CelestialSystems
                     ? surfaceRuntime.QualityProfile
                         .AdaptiveGenerationMargins
                     : 2;
+            // Dynamic roots are requested only when the presentation controller asks for them.
             var prewarmCoarseSurface =
-                surfaceRuntime.QualityProfile == null ||
-                surfaceRuntime.QualityProfile
-                    .AdaptivePrewarmCoarseSurface;
+                false;
             surfaceCacheManager =
                 CelestialSurfaceCacheManager
                     .ResolveOrCreate(
@@ -504,7 +503,45 @@ namespace jcan.CelestialSystems
             if (collisionRuntime == null)
                 collisionRuntime = hierarchy.SurfaceRoot.gameObject.AddComponent<CelestialSurfaceCollisionRuntime>();
             if (generatorReady)
-                collisionRuntime.Initialize(surfaceRuntime);
+            {
+                collisionRuntime.Initialize(
+                    surfaceRuntime);
+            }
+
+            surfaceRuntime.AttachCollisionRuntime(
+                collisionRuntime);
+
+            var presentationController =
+                hierarchy.VisualRoot.GetComponent<
+                    CelestialBodyPresentationController>();
+
+            if (presentationController == null)
+            {
+                presentationController =
+                    hierarchy.VisualRoot.gameObject.AddComponent<
+                        CelestialBodyPresentationController>();
+            }
+
+            if (!presentationController.Initialize(
+                    instance,
+                    surfaceRuntime,
+                    adaptiveRenderer,
+                    collisionRuntime,
+                    adaptiveSurfaceRenderMode))
+            {
+                var presentationError =
+                    presentationController.LastError;
+
+                gravityEngine.RemoveBody(
+                    instance.gameObject);
+                Destroy(
+                    instance.gameObject);
+                return RecordSpawnFailure(
+                    string.IsNullOrWhiteSpace(
+                        presentationError)
+                        ? "The celestial body presentation failed to initialize."
+                        : presentationError);
+            }
 
             spawnedBodies.Add(
                 request.InstanceId,

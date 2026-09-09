@@ -14,4 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialSurfaceDefinition
   definitionId: moon-like-surface-appearance
   lightingMode: 0
-  layers: []
+  layers:
+  - {fileID: 11400000, guid: 32627a0ecc4872b4ca7728519ddfcb61, type: 2}
