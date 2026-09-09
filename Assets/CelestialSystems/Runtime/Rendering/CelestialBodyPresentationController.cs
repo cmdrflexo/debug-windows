@@ -66,7 +66,7 @@ namespace jcan.CelestialSystems
         private Renderer simpleSurfaceRenderer;
 
         [SerializeField]
-        private Renderer simpleOceanRenderer;
+        private CelestialSimpleSurfaceTextureBaker simpleTextureBaker;
 
         [SerializeField]
         private string lastError;
@@ -166,30 +166,48 @@ namespace jcan.CelestialSystems
                     fallbackTerrainMaterial;
             }
 
+            var ocean =
+                definition.OceanDefinition;
+            var simpleRadiusMeters =
+                definition.ReferenceRadiusMeters +
+                (ocean != null &&
+                    ocean.HasValidSettings
+                        ? System.Math.Max(
+                            0.0,
+                            ocean.GlobalSurfaceElevationMeters)
+                        : 0.0);
+
             simpleSurfaceRenderer =
                 BuildSphere(
                     "Simple Surface",
-                    definition.ReferenceRadiusMeters,
+                    simpleRadiusMeters,
                     terrainMaterial);
-
-            var ocean =
-                definition.OceanDefinition;
-
-            if (ocean != null &&
-                ocean.HasValidSettings)
-            {
-                simpleOceanRenderer =
-                    BuildSphere(
-                        "Simple Ocean",
-                        definition.ReferenceRadiusMeters +
-                            ocean.GlobalSurfaceElevationMeters,
-                        ocean.Material);
-            }
 
             if (simpleSurfaceRenderer == null)
             {
                 return Fail(
                     "The simple body surface could not be created.");
+            }
+
+            simpleTextureBaker =
+                simpleRoot.GetComponent<
+                    CelestialSimpleSurfaceTextureBaker>();
+
+            if (simpleTextureBaker == null)
+            {
+                simpleTextureBaker =
+                    simpleRoot.gameObject.AddComponent<
+                        CelestialSimpleSurfaceTextureBaker>();
+            }
+
+            if (!simpleTextureBaker.Initialize(
+                    body,
+                    surfaceRuntime,
+                    surfaceRuntime.PatchGenerator,
+                    simpleSurfaceRenderer))
+            {
+                return Fail(
+                    simpleTextureBaker.LastError);
             }
 
             if (body.VisualRoot.GetComponent<
@@ -466,7 +484,9 @@ namespace jcan.CelestialSystems
                     true,
                     false);
                 body.ReportOceanReadiness(
-                    simpleOceanRenderer != null);
+                    body.Definition.OceanDefinition != null &&
+                    simpleTextureBaker != null &&
+                    simpleTextureBaker.IsReady);
                 return;
             }
 
