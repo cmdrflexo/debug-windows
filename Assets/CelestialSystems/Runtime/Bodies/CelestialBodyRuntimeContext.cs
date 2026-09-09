@@ -431,7 +431,7 @@ namespace jcan.CelestialSystems
             if (!hasValidConfiguration)
             {
                 FailInitialization(
-                    "The celestial body runtime package has invalid definition, frame, or motion-body configuration.");
+                    "The celestial body runtime package has invalid definition, frame, or motion-provider configuration.");
                 return false;
             }
 
@@ -494,12 +494,6 @@ namespace jcan.CelestialSystems
                     this);
             }
 
-            if (gravityBody == null)
-            {
-                Debug.LogError(
-                    "A celestial body runtime context requires an NBody.",
-                    this);
-            }
         }
 
         private void ResolveMotionProvider()
@@ -531,8 +525,7 @@ namespace jcan.CelestialSystems
                     instanceId) &&
                 definition.HasValidPhysicalSettings &&
                 definition.HasValidResolvedSurfaceSettings &&
-                universeFrame != null &&
-                gravityBody != null;
+                universeFrame != null;
         }
 
         private void RefreshReadiness()
