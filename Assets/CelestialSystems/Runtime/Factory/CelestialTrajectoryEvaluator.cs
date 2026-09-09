@@ -152,6 +152,7 @@ namespace jcan.CelestialSystems
             out string error)
         {
             periodSeconds = 0.0;
+            error = string.Empty;
 
             if (definition == null ||
                 !definition.TryValidate(
