@@ -182,10 +182,10 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (!TryCreateLayerMap(
+            if (!TryResolveSurfaceLayers(
                     appearance,
                     patches[0],
-                    out var layerMap))
+                    out var surfaceLayers))
             {
                 return;
             }
@@ -211,15 +211,15 @@ namespace jcan.CelestialSystems
                 BakeFace(
                     faceIndex,
                     patches[faceIndex],
-                    appearance,
-                    layerMap,
                     minimumElevation,
                     definition.OceanDefinition);
                 bakedFaceCount++;
             }
 
             BindAppearance(
-                appearance);
+                appearance,
+                surfaceLayers,
+                patches[0].SurfaceLayerCount);
             BindOcean(
                 definition.OceanDefinition);
             runtimeMaterial.SetFloat(
@@ -234,56 +234,71 @@ namespace jcan.CelestialSystems
             lastError = string.Empty;
         }
 
-        private bool TryCreateLayerMap(
+        private bool TryResolveSurfaceLayers(
             CelestialSurfaceAppearance appearance,
             CelestialSurfacePatchData patch,
-            out int[] layerMap)
+            out CelestialSurfaceLayerDefinition[] surfaceLayers)
         {
-            layerMap =
-                new int[
-                    patch.SurfaceLayerCount];
-
-            if (!patch.HasSurfaceControlData)
+            if (patch.SurfaceLayerCount >
+                MaximumLayerCount)
             {
-                return true;
+                surfaceLayers = null;
+                return Fail(
+                    $"The fused simple presentation supports up to {MaximumLayerCount} generated surface layers.");
             }
 
-            for (var sourceIndex = 0;
-                sourceIndex < layerMap.Length;
-                sourceIndex++)
+            surfaceLayers =
+                new CelestialSurfaceLayerDefinition[
+                    MaximumLayerCount];
+
+            for (var terrainIndex = 0;
+                terrainIndex <
+                    patch.SurfaceLayerCount;
+                terrainIndex++)
             {
                 var terrainLayer =
                     patchGenerator.GetTerrainLayer(
-                        sourceIndex);
-                var appearanceIndex =
-                    -1;
+                        terrainIndex);
 
-                for (var candidate = 0;
-                    candidate < appearance.LayerCount;
-                    candidate++)
+                for (var appearanceIndex = 0;
+                    appearanceIndex <
+                        appearance.LayerCount;
+                    appearanceIndex++)
                 {
-                    if (appearance.GetLayer(
-                            candidate)
-                            .MapMagicTerrainLayer ==
-                        terrainLayer)
+                    var candidate =
+                        appearance.GetLayer(
+                            appearanceIndex);
+
+                    if (candidate != null &&
+                        candidate.MapMagicTerrainLayer != null &&
+                        candidate.MapMagicTerrainLayer ==
+                            terrainLayer)
                     {
-                        appearanceIndex =
-                            candidate;
+                        surfaceLayers[
+                            terrainIndex] =
+                                candidate;
                         break;
                     }
                 }
 
-                if (appearanceIndex < 0 ||
-                    appearanceIndex >=
-                        MaximumLayerCount)
+                if (surfaceLayers[
+                        terrainIndex] != null)
                 {
-                    Fail(
-                        $"The generated TerrainLayer '{terrainLayer?.name}' has no matching fused surface-appearance layer.");
-                    return false;
+                    continue;
                 }
 
-                layerMap[sourceIndex] =
-                    appearanceIndex;
+                var orderedCandidate =
+                    appearance.GetLayer(
+                        terrainIndex);
+
+                if (orderedCandidate != null &&
+                    orderedCandidate.MapMagicTerrainLayer ==
+                        null)
+                {
+                    surfaceLayers[
+                        terrainIndex] =
+                            orderedCandidate;
+                }
             }
 
             return true;
@@ -292,8 +307,6 @@ namespace jcan.CelestialSystems
         private void BakeFace(
             int faceIndex,
             CelestialSurfacePatchData patch,
-            CelestialSurfaceAppearance appearance,
-            int[] layerMap,
             float minimumElevation,
             OceanDefinition ocean)
         {
@@ -358,17 +371,16 @@ namespace jcan.CelestialSystems
 
                     if (patch.HasSurfaceControlData)
                     {
-                        for (var sourceLayer = 0;
-                            sourceLayer <
+                        for (var layerIndex = 0;
+                            layerIndex <
                                 patch.SurfaceLayerCount;
-                            sourceLayer++)
+                            layerIndex++)
                         {
-                            weights[
-                                layerMap[sourceLayer]] +=
+                            weights[layerIndex] =
                                 patch.GetSurfaceControlWeight(
                                     x,
                                     y,
-                                    sourceLayer);
+                                    layerIndex);
                         }
                     }
                     else
@@ -452,54 +464,75 @@ namespace jcan.CelestialSystems
         }
 
         private void BindAppearance(
-            CelestialSurfaceAppearance appearance)
+            CelestialSurfaceAppearance appearance,
+            CelestialSurfaceLayerDefinition[] surfaceLayers,
+            int terrainLayerCount)
         {
             for (var index = 0;
                 index < MaximumLayerCount;
                 index++)
             {
-                var layer =
+                var terrainLayer =
                     index <
-                        appearance.LayerCount
-                        ? appearance.GetLayer(
+                        terrainLayerCount
+                        ? patchGenerator.GetTerrainLayer(
                             index)
                         : null;
+                var surfaceLayer =
+                    surfaceLayers != null
+                        ? surfaceLayers[index]
+                        : null;
+                var albedoTexture =
+                    surfaceLayer != null &&
+                        surfaceLayer.AlbedoTexture != null
+                            ? surfaceLayer.AlbedoTexture
+                            : terrainLayer != null &&
+                                terrainLayer.diffuseTexture != null
+                                ? terrainLayer.diffuseTexture
+                                : Texture2D.whiteTexture;
+                var textureScale =
+                    surfaceLayer != null
+                        ? surfaceLayer.TextureScaleMeters
+                        : terrainLayer != null
+                            ? Mathf.Max(
+                                0.001f,
+                                terrainLayer.tileSize.x)
+                            : 1.0f;
                 runtimeMaterial.SetTexture(
                     $"_LayerMap{index}",
-                    layer != null &&
-                        layer.AlbedoTexture != null
-                            ? layer.AlbedoTexture
-                            : Texture2D.whiteTexture);
+                    albedoTexture);
                 runtimeMaterial.SetColor(
                     $"_LayerTint{index}",
-                    layer != null
-                        ? layer.Tint
+                    surfaceLayer != null
+                        ? surfaceLayer.Tint
                         : Color.white);
                 runtimeMaterial.SetFloat(
                     $"_LayerScale{index}",
-                    layer != null
-                        ? layer.TextureScaleMeters
-                        : 1.0f);
+                    textureScale);
                 runtimeMaterial.SetFloat(
                     $"_LayerMetallic{index}",
-                    layer != null
-                        ? layer.Metallic
-                        : 0.0f);
+                    surfaceLayer != null
+                        ? surfaceLayer.Metallic
+                        : terrainLayer != null
+                            ? terrainLayer.metallic
+                            : 0.0f);
                 runtimeMaterial.SetFloat(
                     $"_LayerSmoothness{index}",
-                    layer != null
-                        ? layer.Smoothness
-                        : 0.25f);
+                    surfaceLayer != null
+                        ? surfaceLayer.Smoothness
+                        : terrainLayer != null
+                            ? terrainLayer.smoothness
+                            : 0.25f);
                 runtimeMaterial.SetFloat(
                     $"_LayerOcclusion{index}",
-                    layer != null
-                        ? layer.OcclusionStrength
+                    surfaceLayer != null
+                        ? surfaceLayer.OcclusionStrength
                         : 1.0f);
                 runtimeMaterial.SetColor(
                     $"_LayerEmission{index}",
-                    layer != null
-                        ? layer.EmissionColor *
-                            layer.EmissionIntensity
+                    surfaceLayer != null
+                        ? surfaceLayer.EmissionColor *
+                            surfaceLayer.EmissionIntensity
                         : Color.black);
             }
         }
