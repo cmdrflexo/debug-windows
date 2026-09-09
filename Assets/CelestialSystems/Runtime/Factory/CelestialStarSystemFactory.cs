@@ -124,6 +124,7 @@ namespace jcan.CelestialSystems
                     plan,
                     out var validationError))
             {
+                plan?.ReleaseOwnedRuntimeObjects();
                 return SetError(
                     validationError);
             }
@@ -167,7 +168,8 @@ namespace jcan.CelestialSystems
                 {
                     RollBack(
                         generatedBodySystems,
-                        rootObject);
+                        rootObject,
+                        plan);
                     return SetError(
                         $"Failed to generate star-system entry '{bodySystemPlan.InstanceId}': {bodySystemFactory.LastError}");
                 }
@@ -219,6 +221,8 @@ namespace jcan.CelestialSystems
                 UnityEngine.Object.Destroy(
                     generatedSystem.Root.gameObject);
             }
+
+            generatedSystem.Plan.ReleaseOwnedRuntimeObjects();
 
             if (!allBodySystemsDespawned)
             {
@@ -312,7 +316,8 @@ namespace jcan.CelestialSystems
 
         private void RollBack(
             Dictionary<string, CelestialBodySystemFactory.GeneratedSystem> generatedBodySystems,
-            GameObject rootObject)
+            GameObject rootObject,
+            CelestialStarSystemPlan plan)
         {
             foreach (var bodySystem in
                 generatedBodySystems.Values)
@@ -329,6 +334,8 @@ namespace jcan.CelestialSystems
                 UnityEngine.Object.Destroy(
                     rootObject);
             }
+
+            plan?.ReleaseOwnedRuntimeObjects();
         }
 
         private bool SetError(

@@ -1,5 +1,5 @@
 /*
- * Provides a deterministic prototype guide that builds a star and simple free-simulation planets from reusable body definitions.
+ * Provides a deterministic prototype guide that varies body properties and builds simple free-simulation star systems.
  */
 
 using System;
@@ -34,6 +34,27 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private RoundMapMagicSurfaceQualityProfile planetQualityProfile;
+
+        [Header("Body Variation")]
+        [SerializeField]
+        [Min(0.01f)]
+        private float minimumStarRadiusScale =
+            0.9f;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float maximumStarRadiusScale =
+            1.1f;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float minimumPlanetRadiusScale =
+            0.5f;
+
+        [SerializeField]
+        [Min(0.01f)]
+        private float maximumPlanetRadiusScale =
+            1.5f;
 
         [Header("Planet Count")]
         [SerializeField]
@@ -88,15 +109,30 @@ namespace jcan.CelestialSystems
             var bodySystems =
                 new List<CelestialStarSystemPlan.BodySystemPlan>(
                     planetCount + 1);
+            var ownedRuntimeObjects =
+                new List<UnityEngine.Object>(
+                    (planetCount + 1) *
+                    2);
+            var star =
+                CreateVariedDefinition(
+                    starDefinition,
+                    "generated-star",
+                    random.NextInt(),
+                    random.NextRange(
+                        minimumStarRadiusScale,
+                        maximumStarRadiusScale));
+            ownedRuntimeObjects.Add(
+                star);
 
             bodySystems.Add(
                 CreateSingleBodySystem(
                     "stellar",
                     "star",
-                    starDefinition,
+                    star,
                     starQualityProfile,
                     new DoubleVector3(),
-                    new DoubleVector3()));
+                    new DoubleVector3(),
+                    ownedRuntimeObjects));
 
             for (var index = 0;
                 index < planetCount;
@@ -135,7 +171,7 @@ namespace jcan.CelestialSystems
                 var orbitalSpeed =
                     Math.Sqrt(
                         GravitationalConstant *
-                        starDefinition.MassKilograms /
+                        star.MassKilograms /
                         orbitRadius);
                 var cosinePhase =
                     Math.Cos(
@@ -174,21 +210,33 @@ namespace jcan.CelestialSystems
                             direction);
                 var instanceId =
                     $"planet-{index + 1}";
+                var planet =
+                    CreateVariedDefinition(
+                        planetDefinition,
+                        $"generated-{instanceId}",
+                        random.NextInt(),
+                        random.NextRange(
+                            minimumPlanetRadiusScale,
+                            maximumPlanetRadiusScale));
+                ownedRuntimeObjects.Add(
+                    planet);
 
                 bodySystems.Add(
                     CreateSingleBodySystem(
                         instanceId,
                         "planet",
-                        planetDefinition,
+                        planet,
                         planetQualityProfile,
                         position,
-                        velocity));
+                        velocity,
+                        ownedRuntimeObjects));
             }
 
             plan =
                 new CelestialStarSystemPlan(
                     planDefinitionId,
-                    bodySystems);
+                    bodySystems,
+                    ownedRuntimeObjects);
             error = string.Empty;
             return true;
         }
@@ -229,6 +277,18 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            if (!IsValidScaleRange(
+                    minimumStarRadiusScale,
+                    maximumStarRadiusScale) ||
+                !IsValidScaleRange(
+                    minimumPlanetRadiusScale,
+                    maximumPlanetRadiusScale))
+            {
+                error =
+                    "The basic system generation guide has an invalid body radius-scale range.";
+                return false;
+            }
+
             if (minimumPlanetCount < 0 ||
                 maximumPlanetCount <
                     minimumPlanetCount)
@@ -255,13 +315,43 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        private static CelestialBodyDefinition CreateVariedDefinition(
+            CelestialBodyDefinition prototype,
+            string definitionId,
+            int generationSeed,
+            double radiusScale)
+        {
+            var definition =
+                CreateInstance<CelestialBodyDefinition>();
+            definition.name =
+                definitionId;
+            definition.hideFlags =
+                HideFlags.DontSave;
+            definition.ConfigureRuntime(
+                definitionId,
+                prototype.MassKilograms *
+                    radiusScale *
+                    radiusScale *
+                    radiusScale,
+                prototype.ReferenceRadiusMeters *
+                    radiusScale,
+                generationSeed,
+                prototype.NorthAxis,
+                prototype.PoleReferenceAxis,
+                prototype.SurfaceSystem,
+                prototype.RoundMapMagicSurface,
+                prototype.OceanDefinition);
+            return definition;
+        }
+
         private static CelestialStarSystemPlan.BodySystemPlan CreateSingleBodySystem(
             string systemInstanceId,
             string bodyInstanceId,
             CelestialBodyDefinition definition,
             RoundMapMagicSurfaceQualityProfile qualityProfile,
             DoubleVector3 position,
-            DoubleVector3 velocity)
+            DoubleVector3 velocity,
+            ICollection<UnityEngine.Object> ownedRuntimeObjects)
         {
             var entry =
                 new CelestialBodySystemDefinition.BodyEntry(
@@ -283,6 +373,8 @@ namespace jcan.CelestialSystems
                     {
                         entry
                     });
+            ownedRuntimeObjects.Add(
+                systemDefinition);
 
             return
                 new CelestialStarSystemPlan.BodySystemPlan(
@@ -300,6 +392,17 @@ namespace jcan.CelestialSystems
                 definition != null &&
                 definition.HasValidPhysicalSettings &&
                 definition.HasValidResolvedSurfaceSettings;
+        }
+
+        private static bool IsValidScaleRange(
+            double minimum,
+            double maximum)
+        {
+            return
+                IsFinite(minimum) &&
+                IsFinite(maximum) &&
+                minimum > 0.0 &&
+                maximum >= minimum;
         }
 
         private static double LogarithmicLerp(
@@ -369,11 +472,27 @@ namespace jcan.CelestialSystems
                         range);
             }
 
+            public int NextInt()
+            {
+                return
+                    unchecked((int)NextUInt());
+            }
+
             public double Next01()
             {
                 return
                     (NextUInt() >> 8) *
                     (1.0 / 16777216.0);
+            }
+
+            public double NextRange(
+                double minimum,
+                double maximum)
+            {
+                return
+                    minimum +
+                    (maximum - minimum) *
+                    Next01();
             }
 
             private uint NextUInt()
