@@ -18,6 +18,10 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
         [HideInInspector] _LayerMap1 ("Layer 1", 2D) = "white" {}
         [HideInInspector] _LayerMap2 ("Layer 2", 2D) = "white" {}
         [HideInInspector] _LayerMap3 ("Layer 3", 2D) = "white" {}
+        [HideInInspector] _LayerEmissionMap0 ("Layer 0 Emission", 2D) = "white" {}
+        [HideInInspector] _LayerEmissionMap1 ("Layer 1 Emission", 2D) = "white" {}
+        [HideInInspector] _LayerEmissionMap2 ("Layer 2 Emission", 2D) = "white" {}
+        [HideInInspector] _LayerEmissionMap3 ("Layer 3 Emission", 2D) = "white" {}
         [HideInInspector] _LayerTint0 ("Layer 0 Tint", Color) = (1,1,1,1)
         [HideInInspector] _LayerTint1 ("Layer 1 Tint", Color) = (1,1,1,1)
         [HideInInspector] _LayerTint2 ("Layer 2 Tint", Color) = (1,1,1,1)
@@ -84,6 +88,10 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
             TEXTURE2D(_LayerMap1); SAMPLER(sampler_LayerMap1);
             TEXTURE2D(_LayerMap2); SAMPLER(sampler_LayerMap2);
             TEXTURE2D(_LayerMap3); SAMPLER(sampler_LayerMap3);
+            TEXTURE2D(_LayerEmissionMap0);
+            TEXTURE2D(_LayerEmissionMap1);
+            TEXTURE2D(_LayerEmissionMap2);
+            TEXTURE2D(_LayerEmissionMap3);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _PlanetCenterScenePosition;
@@ -496,11 +504,43 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
                             _LayerOcclusion1,
                             _LayerOcclusion2,
                             _LayerOcclusion3));
+                half3 emissionMap0 =
+                    SampleTriplanar(
+                        TEXTURE2D_ARGS(_LayerEmissionMap0, sampler_LayerMap0),
+                        direction,
+                        _LayerScale0);
+                half3 emissionMap1 =
+                    SampleTriplanar(
+                        TEXTURE2D_ARGS(_LayerEmissionMap1, sampler_LayerMap1),
+                        direction,
+                        _LayerScale1);
+                half3 emissionMap2 =
+                    SampleTriplanar(
+                        TEXTURE2D_ARGS(_LayerEmissionMap2, sampler_LayerMap2),
+                        direction,
+                        _LayerScale2);
+                half3 emissionMap3 =
+                    SampleTriplanar(
+                        TEXTURE2D_ARGS(_LayerEmissionMap3, sampler_LayerMap3),
+                        direction,
+                        _LayerScale3);
                 half3 emission =
-                    _LayerEmission0.rgb * weights.x +
-                    _LayerEmission1.rgb * weights.y +
-                    _LayerEmission2.rgb * weights.z +
-                    _LayerEmission3.rgb * weights.w;
+                    layer0 *
+                        emissionMap0 *
+                        _LayerEmission0.rgb *
+                        weights.x +
+                    layer1 *
+                        emissionMap1 *
+                        _LayerEmission1.rgb *
+                        weights.y +
+                    layer2 *
+                        emissionMap2 *
+                        _LayerEmission2.rgb *
+                        weights.z +
+                    layer3 *
+                        emissionMap3 *
+                        _LayerEmission3.rgb *
+                        weights.w;
 
                 half3 normalWS =
                     NormalizeNormalPerPixel(

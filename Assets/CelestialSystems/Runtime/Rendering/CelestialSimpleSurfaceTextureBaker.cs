@@ -517,6 +517,12 @@ namespace jcan.CelestialSystems
                     surfaceLayer != null
                         ? surfaceLayer.OcclusionStrength
                         : 1.0f);
+                runtimeMaterial.SetTexture(
+                    $"_LayerEmissionMap{index}",
+                    surfaceLayer != null &&
+                        surfaceLayer.EmissionTexture != null
+                            ? surfaceLayer.EmissionTexture
+                            : Texture2D.whiteTexture);
                 runtimeMaterial.SetColor(
                     $"_LayerEmission{index}",
                     surfaceLayer != null
