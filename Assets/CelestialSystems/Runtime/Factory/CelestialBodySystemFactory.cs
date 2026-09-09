@@ -214,6 +214,51 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        public bool TryDespawn(
+            GeneratedSystem generatedSystem)
+        {
+            LastError = string.Empty;
+
+            if (bodyFactory == null)
+            {
+                return SetError(
+                    "A celestial body system factory requires a celestial body factory.");
+            }
+
+            if (generatedSystem == null)
+            {
+                return SetError(
+                    "A celestial body system is required for despawning.");
+            }
+
+            var allBodiesDespawned = true;
+
+            foreach (var body in
+                generatedSystem.bodies.Values)
+            {
+                if (body != null &&
+                    !bodyFactory.TryDespawnBody(
+                        body.InstanceId))
+                {
+                    allBodiesDespawned = false;
+                }
+            }
+
+            if (generatedSystem.Root != null)
+            {
+                UnityEngine.Object.Destroy(
+                    generatedSystem.Root.gameObject);
+            }
+
+            if (!allBodiesDespawned)
+            {
+                return SetError(
+                    $"One or more bodies in generated system '{generatedSystem.InstanceId}' could not be despawned.");
+            }
+
+            return true;
+        }
+
         private void RollBack(
             Dictionary<string, CelestialBodyRuntimeContext> generatedBodies,
             GameObject rootObject)
