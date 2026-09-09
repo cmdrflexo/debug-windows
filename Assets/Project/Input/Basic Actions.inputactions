@@ -7,7 +7,7 @@
             "id": "9356aaa0-dad5-4fa3-8b1d-80f21cd4c830",
             "actions": [
                 {
-                    "name": "Toggle Minimap",
+                    "name": "Toggle Markers",
                     "type": "Button",
                     "id": "48266f78-7b5c-4a96-b5a9-1394d0c33fa3",
                     "expectedControlType": "",
@@ -65,11 +65,11 @@
                 {
                     "name": "",
                     "id": "ade86d17-2e74-4ffe-ac0a-6976510aa6c1",
-                    "path": "<Keyboard>/comma",
+                    "path": "<Keyboard>/m",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Toggle Minimap",
+                    "action": "Toggle Markers",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -159,7 +159,7 @@
                     "expectedControlType": "Axis",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": false
+                    "initialStateCheck": true
                 },
                 {
                     "name": "Boost",
