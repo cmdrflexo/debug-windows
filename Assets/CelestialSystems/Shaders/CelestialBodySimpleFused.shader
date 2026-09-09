@@ -238,6 +238,154 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
                     face);
             }
 
+            void SampleFusedFaces(
+                float3 direction,
+                out half4 control,
+                out half4 ocean)
+            {
+                float3 absoluteDirection =
+                    abs(direction);
+                float largestComponent =
+                    max(
+                        absoluteDirection.x,
+                        max(
+                            absoluteDirection.y,
+                            absoluteDirection.z));
+                float3 relativeComponents =
+                    absoluteDirection /
+                    max(
+                        largestComponent,
+                        0.0001);
+                half3 faceWeights =
+                    smoothstep(
+                        0.82,
+                        1.0,
+                        relativeComponents);
+                half totalWeight =
+                    max(
+                        faceWeights.x +
+                            faceWeights.y +
+                            faceWeights.z,
+                        0.0001);
+                faceWeights /=
+                    totalWeight;
+
+                control =
+                    half4(
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0);
+                ocean =
+                    half4(
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0);
+
+                if (faceWeights.x > 0.0)
+                {
+                    int face =
+                        direction.x >= 0.0
+                            ? 0
+                            : 1;
+                    float inverseComponent =
+                        rcp(
+                            max(
+                                absoluteDirection.x,
+                                0.0001));
+                    float tangentU =
+                        direction.x >= 0.0
+                            ? -direction.z *
+                                inverseComponent
+                            : direction.z *
+                                inverseComponent;
+                    float2 uv =
+                        DirectionToFaceUv(
+                            tangentU,
+                            direction.y *
+                                inverseComponent);
+                    control +=
+                        SampleControl(
+                            face,
+                            uv) *
+                        faceWeights.x;
+                    ocean +=
+                        SampleOcean(
+                            face,
+                            uv) *
+                        faceWeights.x;
+                }
+
+                if (faceWeights.y > 0.0)
+                {
+                    int face =
+                        direction.y >= 0.0
+                            ? 2
+                            : 3;
+                    float inverseComponent =
+                        rcp(
+                            max(
+                                absoluteDirection.y,
+                                0.0001));
+                    float tangentV =
+                        direction.y >= 0.0
+                            ? -direction.z *
+                                inverseComponent
+                            : direction.z *
+                                inverseComponent;
+                    float2 uv =
+                        DirectionToFaceUv(
+                            direction.x *
+                                inverseComponent,
+                            tangentV);
+                    control +=
+                        SampleControl(
+                            face,
+                            uv) *
+                        faceWeights.y;
+                    ocean +=
+                        SampleOcean(
+                            face,
+                            uv) *
+                        faceWeights.y;
+                }
+
+                if (faceWeights.z > 0.0)
+                {
+                    int face =
+                        direction.z >= 0.0
+                            ? 4
+                            : 5;
+                    float inverseComponent =
+                        rcp(
+                            max(
+                                absoluteDirection.z,
+                                0.0001));
+                    float tangentU =
+                        direction.z >= 0.0
+                            ? direction.x *
+                                inverseComponent
+                            : -direction.x *
+                                inverseComponent;
+                    float2 uv =
+                        DirectionToFaceUv(
+                            tangentU,
+                            direction.y *
+                                inverseComponent);
+                    control +=
+                        SampleControl(
+                            face,
+                            uv) *
+                        faceWeights.z;
+                    ocean +=
+                        SampleOcean(
+                            face,
+                            uv) *
+                        faceWeights.z;
+                }
+            }
+
             half3 TriplanarWeights(float3 direction)
             {
                 half3 weights = pow(abs(direction), 4.0);
@@ -280,24 +428,16 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
             {
                 float3 direction =
                     normalize(input.directionOS);
-                int face;
-                float2 faceUv;
-                ResolveFace(
+                half4 weights;
+                half4 ocean;
+                SampleFusedFaces(
                     direction,
-                    face,
-                    faceUv);
-                half4 weights =
-                    SampleControl(
-                        face,
-                        faceUv);
+                    weights,
+                    ocean);
                 weights /=
                     max(
                         dot(weights, 1.0),
                         0.0001);
-                half4 ocean =
-                    SampleOcean(
-                        face,
-                        faceUv);
                 half oceanMask =
                     step(
                         0.5,
