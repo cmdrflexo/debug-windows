@@ -416,9 +416,8 @@ namespace jcan.CelestialSystems
             }
 
             var sphere =
-                GameObject.CreatePrimitive(
-                    PrimitiveType.Sphere);
-            sphere.name = objectName;
+                new GameObject(
+                    objectName);
             sphere.transform.SetParent(
                 simpleRoot,
                 false);
@@ -432,18 +431,12 @@ namespace jcan.CelestialSystems
                     radiusMeters *
                     2.0);
 
-            var collider =
-                sphere.GetComponent<Collider>();
-
-            if (collider != null)
-            {
-                collider.enabled = false;
-                Destroy(
-                    collider);
-            }
-
+            var meshFilter =
+                sphere.AddComponent<MeshFilter>();
+            meshFilter.sharedMesh =
+                CelestialSimpleSphereMesh.Get();
             var renderer =
-                sphere.GetComponent<MeshRenderer>();
+                sphere.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
             renderer.shadowCastingMode =
                 ShadowCastingMode.Off;
