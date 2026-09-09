@@ -72,6 +72,37 @@ namespace jcan.CelestialSystems
             Normalize();
         }
 
+        public bool TryGetOffsetMetersFrom(
+            UniversePosition origin,
+            out DoubleVector3 offsetMeters)
+        {
+            offsetMeters =
+                new DoubleVector3(
+                    ((double)cellX -
+                        origin.cellX) *
+                        CellSizeMeters +
+                        localXMeters -
+                        origin.localXMeters,
+                    ((double)cellY -
+                        origin.cellY) *
+                        CellSizeMeters +
+                        localYMeters -
+                        origin.localYMeters,
+                    ((double)cellZ -
+                        origin.cellZ) *
+                        CellSizeMeters +
+                        localZMeters -
+                        origin.localZMeters);
+
+            return
+                IsFinite(
+                    offsetMeters.x) &&
+                IsFinite(
+                    offsetMeters.y) &&
+                IsFinite(
+                    offsetMeters.z);
+        }
+
         public override string ToString()
         {
             return $"Cell ({cellX}, {cellY}, {cellZ}), Local m ({localXMeters}, {localYMeters}, {localZMeters})";
@@ -82,6 +113,14 @@ namespace jcan.CelestialSystems
             NormalizeAxis(ref cellX, ref localXMeters);
             NormalizeAxis(ref cellY, ref localYMeters);
             NormalizeAxis(ref cellZ, ref localZMeters);
+        }
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
         }
 
         private static void NormalizeAxis(ref long cell, ref double localMeters)
