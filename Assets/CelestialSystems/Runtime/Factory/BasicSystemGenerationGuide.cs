@@ -339,6 +339,10 @@ namespace jcan.CelestialSystems
                         moonQualityProfile,
                         position,
                         velocity,
+                        orbitRadius,
+                        phaseRadians,
+                        inclinationRadians,
+                        direction,
                         moonOrbitRadius,
                         moonPhaseRadians,
                         moonInclinationRadians,
@@ -517,7 +521,8 @@ namespace jcan.CelestialSystems
                     systemDefinition,
                     position,
                     velocity,
-                    Quaternion.identity);
+                    Quaternion.identity,
+                    CelestialBodySpawnMode.PrescribedTrajectory);
         }
 
         private static CelestialStarSystemPlan.BodySystemPlan CreatePlanetaryBodySystem(
@@ -528,6 +533,10 @@ namespace jcan.CelestialSystems
             RoundMapMagicSurfaceQualityProfile moonQualityProfile,
             DoubleVector3 position,
             DoubleVector3 velocity,
+            double planetOrbitRadius,
+            double planetPhaseRadians,
+            double planetInclinationRadians,
+            double planetDirection,
             double moonOrbitRadius,
             double moonPhaseRadians,
             double moonInclinationRadians,
@@ -611,14 +620,20 @@ namespace jcan.CelestialSystems
                         moon,
                         moonQualityProfile,
                         "planet",
-                        CelestialBodySpawnMode.FreeSimulation,
+                        CelestialBodySpawnMode.PrescribedTrajectory,
                         radialDirection *
                             moonDistance,
                         tangentDirection *
                             (moonSpeed *
                                 moonDirection),
                         Vector3.zero,
-                        new DoubleVector3()));
+                        new DoubleVector3(),
+                        CreateCircularTrajectory(
+                            "planet",
+                            moonOrbitRadius,
+                            moonPhaseRadians,
+                            moonInclinationRadians,
+                            moonDirection)));
             }
 
             entries.Insert(
@@ -649,7 +664,41 @@ namespace jcan.CelestialSystems
                     systemDefinition,
                     position,
                     velocity,
-                    Quaternion.identity);
+                    Quaternion.identity,
+                    CelestialBodySpawnMode.PrescribedTrajectory,
+                    "stellar",
+                    "star",
+                    CreateCircularTrajectory(
+                        "stellar/star",
+                        planetOrbitRadius,
+                        planetPhaseRadians,
+                        planetInclinationRadians,
+                        planetDirection));
+        }
+
+        private static CelestialTrajectoryDefinition CreateCircularTrajectory(
+            string referenceInstanceId,
+            double orbitalRadiusMeters,
+            double phaseRadians,
+            double inclinationRadians,
+            double direction)
+        {
+            return
+                new CelestialTrajectoryDefinition(
+                    referenceInstanceId,
+                    orbitalRadiusMeters,
+                    0.0,
+                    phaseRadians *
+                        180.0 /
+                        Math.PI,
+                    Math.Abs(
+                        inclinationRadians *
+                        180.0 /
+                        Math.PI),
+                    0.0,
+                    direction < 0.0
+                        ? CelestialOrbitDirection.Retrograde
+                        : CelestialOrbitDirection.Prograde);
         }
 
         private static bool IsUsablePrototype(
