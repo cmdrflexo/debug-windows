@@ -614,7 +614,9 @@ namespace jcan.CelestialSystems
                 (float)context.ConfiguredReferenceRadiusMeters;
 
             if (radiusWorldUnits <= 0.0f ||
-                !float.IsFinite(
+                float.IsNaN(
+                    radiusWorldUnits) ||
+                float.IsInfinity(
                     radiusWorldUnits))
             {
                 return 0.0f;
