@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a421c1528ba047e59874bd2aee4600e0, type: 3}
+  m_Name: Basic Prototype Star System Guide
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.BasicSystemGenerationGuide
+  planDefinitionId: basic-prototype-star-system
+  starDefinition: {fileID: 11400000, guid: b505852a8fc45b046b0d7c2593ee01a0, type: 2}
+  starQualityProfile: {fileID: 11400000, guid: e2f98a81024d866469a666608d63f90e, type: 2}
+  planetDefinition: {fileID: 11400000, guid: 5dae779ba2951514fa7e8e4ab353d67b, type: 2}
+  planetQualityProfile: {fileID: 11400000, guid: ba1d5f5d943f2d54abcd356978ea4d8d, type: 2}
+  moonDefinition: {fileID: 11400000, guid: 30166974707195e48aa21a3be19273e0, type: 2}
+  moonQualityProfile: {fileID: 11400000, guid: 413ccd4ae702bde4ca8ee7ce58140798, type: 2}
+  minimumStarRadiusScale: 0.9
+  maximumStarRadiusScale: 1.1
+  minimumPlanetRadiusScale: 0.5
+  maximumPlanetRadiusScale: 1.5
+  minimumMoonRadiusScale: 0.5
+  maximumMoonRadiusScale: 1.5
+  minimumPlanetCount: 1
+  maximumPlanetCount: 10
+  innerOrbitRadiusMeters: 15000000000
+  outerOrbitRadiusMeters: 45000000000
+  maximumInclinationDegrees: 5
+  retrogradeChance: 0
+  moonChance: 1
+  minimumMoonOrbitPlanetRadii: 5
+  maximumMoonOrbitPlanetRadii: 30
+  maximumMoonInclinationDegrees: 15
+  moonRetrogradeChance: 0

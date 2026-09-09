@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace jcan.CelestialSystems
@@ -52,6 +53,18 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private int canvasSortingOrder = 100;
 
+        [SerializeField]
+        [Min(0.0f)]
+        private float overlapPaddingPixels = 2.0f;
+
+        [Header("Input")]
+        [SerializeField]
+        private bool markersVisible = true;
+
+        [Tooltip("Optional button action that toggles all body markers.")]
+        [SerializeField]
+        private InputActionReference toggleMarkersAction;
+
         [Header("Discovery")]
         [SerializeField]
         [Min(0.05f)]
@@ -69,20 +82,34 @@ namespace jcan.CelestialSystems
                 new List<
                     CelestialBodyRuntimeContext>();
 
+        private readonly List<
+            MarkerCandidate> markerCandidates =
+                new List<
+                    MarkerCandidate>();
+
+        private readonly List<
+            MarkerCandidate> acceptedMarkers =
+                new List<
+                    MarkerCandidate>();
+
         private Canvas activeCanvas;
         private RectTransform markerContainer;
         private bool ownsCanvas;
+        private bool toggleActionEnabledByThisComponent;
         private float nextContextRefreshTime;
 
         private void OnEnable()
         {
+            SubscribeToToggleAction();
             ResolveObserverCamera();
             EnsureCanvas();
             RefreshContexts();
+            ApplyMarkerVisibility();
         }
 
         private void OnDisable()
         {
+            UnsubscribeFromToggleAction();
             ClearMarkers();
 
             if (ownsCanvas &&
@@ -119,6 +146,10 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.0f,
                     screenEdgePaddingPixels);
+            overlapPaddingPixels =
+                Mathf.Max(
+                    0.0f,
+                    overlapPaddingPixels);
             contextRefreshIntervalSeconds =
                 Mathf.Max(
                     0.05f,
@@ -130,6 +161,8 @@ namespace jcan.CelestialSystems
                 activeCanvas.sortingOrder =
                     canvasSortingOrder;
             }
+
+            ApplyMarkerVisibility();
         }
 
         private void LateUpdate()
@@ -207,6 +240,8 @@ namespace jcan.CelestialSystems
                 Vector2.zero;
             markerContainer.offsetMax =
                 Vector2.zero;
+
+            ApplyMarkerVisibility();
         }
 
         private void RefreshContexts()
@@ -349,10 +384,14 @@ namespace jcan.CelestialSystems
         {
             if (observerCamera == null ||
                 activeCanvas == null ||
-                markerContainer == null)
+                markerContainer == null ||
+                !markersVisible)
             {
                 return;
             }
+
+            markerCandidates.Clear();
+            acceptedMarkers.Clear();
 
             foreach (var pair in
                 markers)
@@ -368,6 +407,9 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
+                markerText.enabled =
+                    false;
+
                 var trackedTransform =
                     context.VisualRoot != null
                         ? context.VisualRoot
@@ -378,12 +420,6 @@ namespace jcan.CelestialSystems
                 var isOnScreen =
                     IsOnScreen(
                         screenPoint);
-                var markerScreenPosition =
-                    isOnScreen
-                        ? ClampToScreen(
-                            screenPoint)
-                        : GetOffScreenPosition(
-                            screenPoint);
 
                 markerText.text =
                     isOnScreen
@@ -404,21 +440,110 @@ namespace jcan.CelestialSystems
                     GetMarkerObjectName(
                         context);
 
-                if (TryGetCanvasPosition(
+                var markerScreenPosition =
+                    isOnScreen
+                        ? GetAboveBodyScreenPosition(
+                            context,
+                            trackedTransform.position,
+                            screenPoint,
+                            markerText.preferredHeight)
+                        : GetOffScreenPosition(
+                            screenPoint);
+
+                if (!TryGetCanvasPosition(
                         markerScreenPosition,
                         out var canvasPosition))
                 {
-                    markerText.rectTransform.anchoredPosition =
-                        canvasPosition;
-                    markerText.enabled =
-                        true;
+                    continue;
                 }
-                else
+
+                markerText.rectTransform.anchoredPosition =
+                    canvasPosition;
+
+                var renderedSize =
+                    new Vector2(
+                        Mathf.Max(
+                            1.0f,
+                            markerText.preferredWidth) +
+                            overlapPaddingPixels *
+                                2.0f,
+                        Mathf.Max(
+                            1.0f,
+                            markerText.preferredHeight) +
+                            overlapPaddingPixels *
+                                2.0f);
+                var screenRect =
+                    new Rect(
+                        markerScreenPosition -
+                            renderedSize *
+                                0.5f,
+                        renderedSize);
+                var cameraDelta =
+                    trackedTransform.position -
+                    observerCamera.transform.position;
+
+                markerCandidates.Add(
+                    new MarkerCandidate(
+                        markerText,
+                        screenRect,
+                        cameraDelta.sqrMagnitude));
+            }
+
+            markerCandidates.Sort(
+                CompareMarkerCandidates);
+
+            for (var candidateIndex = 0;
+                candidateIndex < markerCandidates.Count;
+                candidateIndex++)
+            {
+                var candidate =
+                    markerCandidates[candidateIndex];
+                var overlapsAcceptedMarker =
+                    false;
+
+                for (var acceptedIndex = 0;
+                    acceptedIndex < acceptedMarkers.Count;
+                    acceptedIndex++)
                 {
-                    markerText.enabled =
-                        false;
+                    if (!candidate.ScreenRect.Overlaps(
+                            acceptedMarkers[
+                                acceptedIndex].ScreenRect))
+                    {
+                        continue;
+                    }
+
+                    overlapsAcceptedMarker =
+                        true;
+                    break;
+                }
+
+                candidate.MarkerText.enabled =
+                    !overlapsAcceptedMarker;
+
+                if (!overlapsAcceptedMarker)
+                {
+                    acceptedMarkers.Add(
+                        candidate);
                 }
             }
+        }
+
+        private static int CompareMarkerCandidates(
+            MarkerCandidate left,
+            MarkerCandidate right)
+        {
+            var distanceComparison =
+                left.DistanceSquared.CompareTo(
+                    right.DistanceSquared);
+
+            if (distanceComparison != 0)
+            {
+                return distanceComparison;
+            }
+
+            return string.CompareOrdinal(
+                left.MarkerText.text,
+                right.MarkerText.text);
         }
 
         private bool IsOnScreen(
@@ -454,6 +579,91 @@ namespace jcan.CelestialSystems
                         verticalInset,
                         Screen.height -
                             verticalInset)));
+        }
+
+        private Vector2 GetAboveBodyScreenPosition(
+            CelestialBodyRuntimeContext context,
+            Vector3 bodyPosition,
+            Vector3 bodyScreenPoint,
+            float textHeightPixels)
+        {
+            var projectedRadiusPixels =
+                GetProjectedRadiusPixels(
+                    context,
+                    bodyPosition);
+            var labelPosition =
+                new Vector3(
+                    bodyScreenPoint.x,
+                    bodyScreenPoint.y +
+                        projectedRadiusPixels +
+                        Mathf.Max(
+                            1.0f,
+                            textHeightPixels),
+                    bodyScreenPoint.z);
+
+            return
+                ClampToScreen(
+                    labelPosition);
+        }
+
+        private float GetProjectedRadiusPixels(
+            CelestialBodyRuntimeContext context,
+            Vector3 bodyPosition)
+        {
+            var radiusWorldUnits =
+                (float)context.ConfiguredReferenceRadiusMeters;
+
+            if (radiusWorldUnits <= 0.0f ||
+                float.IsNaN(
+                    radiusWorldUnits) ||
+                float.IsInfinity(
+                    radiusWorldUnits))
+            {
+                return 0.0f;
+            }
+
+            if (observerCamera.orthographic)
+            {
+                return
+                    radiusWorldUnits /
+                    Mathf.Max(
+                        Mathf.Epsilon,
+                        observerCamera.orthographicSize) *
+                    Screen.height *
+                    0.5f;
+            }
+
+            var distanceWorldUnits =
+                Vector3.Distance(
+                    observerCamera.transform.position,
+                    bodyPosition);
+
+            if (distanceWorldUnits <=
+                radiusWorldUnits)
+            {
+                return
+                    Screen.height;
+            }
+
+            var angularRadiusRadians =
+                Mathf.Asin(
+                    Mathf.Clamp01(
+                        radiusWorldUnits /
+                        distanceWorldUnits));
+            var verticalFocalLengthPixels =
+                Screen.height *
+                0.5f /
+                Mathf.Tan(
+                    observerCamera.fieldOfView *
+                    Mathf.Deg2Rad *
+                    0.5f);
+
+            return
+                Mathf.Min(
+                    Screen.height,
+                    Mathf.Tan(
+                        angularRadiusRadians) *
+                    verticalFocalLengthPixels);
         }
 
         private Vector2 GetOffScreenPosition(
@@ -559,6 +769,86 @@ namespace jcan.CelestialSystems
                     out canvasPosition);
         }
 
+        public void SetMarkersVisible(
+            bool visible)
+        {
+            markersVisible =
+                visible;
+            ApplyMarkerVisibility();
+        }
+
+        public void ToggleMarkers()
+        {
+            SetMarkersVisible(
+                !markersVisible);
+        }
+
+        private void SubscribeToToggleAction()
+        {
+            var action =
+                toggleMarkersAction != null
+                    ? toggleMarkersAction.action
+                    : null;
+
+            if (action == null)
+            {
+                return;
+            }
+
+            action.performed +=
+                OnToggleMarkersPerformed;
+
+            if (!action.enabled)
+            {
+                action.Enable();
+                toggleActionEnabledByThisComponent =
+                    true;
+            }
+        }
+
+        private void UnsubscribeFromToggleAction()
+        {
+            var action =
+                toggleMarkersAction != null
+                    ? toggleMarkersAction.action
+                    : null;
+
+            if (action == null)
+            {
+                toggleActionEnabledByThisComponent =
+                    false;
+                return;
+            }
+
+            action.performed -=
+                OnToggleMarkersPerformed;
+
+            if (toggleActionEnabledByThisComponent)
+            {
+                action.Disable();
+            }
+
+            toggleActionEnabledByThisComponent =
+                false;
+        }
+
+        private void OnToggleMarkersPerformed(
+            InputAction.CallbackContext context)
+        {
+            ToggleMarkers();
+        }
+
+        private void ApplyMarkerVisibility()
+        {
+            if (markerContainer != null &&
+                markerContainer.gameObject.activeSelf !=
+                    markersVisible)
+            {
+                markerContainer.gameObject.SetActive(
+                    markersVisible);
+            }
+        }
+
         private void RemoveMarker(
             CelestialBodyRuntimeContext context)
         {
@@ -601,6 +891,37 @@ namespace jcan.CelestialSystems
             }
 
             markerContainer = null;
+        }
+
+        private readonly struct MarkerCandidate
+        {
+            public MarkerCandidate(
+                Text markerText,
+                Rect screenRect,
+                float distanceSquared)
+            {
+                MarkerText =
+                    markerText;
+                ScreenRect =
+                    screenRect;
+                DistanceSquared =
+                    distanceSquared;
+            }
+
+            public Text MarkerText
+            {
+                get;
+            }
+
+            public Rect ScreenRect
+            {
+                get;
+            }
+
+            public float DistanceSquared
+            {
+                get;
+            }
         }
 
         private static string GetInstanceId(

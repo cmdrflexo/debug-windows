@@ -413,7 +413,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 1
-  far clip plane: 1e+10
+  far clip plane: 1e+11
   field of view: 80
   orthographic: 0
   orthographic size: 5
@@ -471,7 +471,7 @@ MonoBehaviour:
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
   m_RenderPostProcessing: 1
-  m_Antialiasing: 3
+  m_Antialiasing: 2
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
@@ -491,6 +491,72 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &437701173
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 437701174}
+  - component: {fileID: 437701175}
+  m_Layer: 0
+  m_Name: Basic Star System Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &437701174
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 437701173}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2047321528}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &437701175
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 437701173}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41caaac75bd6422eac271e2f00a05dbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialStarSystemSpawner
+  bodyFactory: {fileID: 1349232944}
+  generationGuide: {fileID: 11400000, guid: e4ca6e4a9245841408f006d1c0618152, type: 2}
+  seed: 2
+  instanceId: basic-star-test
+  positionMetersFromFrameOrigin:
+    x: 0
+    y: 0
+    z: 10000000000
+  velocityMetersPerSecond:
+    x: 0
+    y: 0
+    z: 0
+  rotationEulerDegrees: {x: 0, y: 0, z: 0}
+  parentOverride: {fileID: 0}
+  spawnOnStart: 1
+  waitingForFactory: 0
+  spawnAttempted: 0
+  spawnSucceeded: 0
+  generatedSystemRoot: {fileID: 0}
+  generatedBodySystemCount: 0
+  generatedBodyCount: 0
+  lastError: 
 --- !u!1 &451151456
 GameObject:
   m_ObjectHideFlags: 0
@@ -1139,7 +1205,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1084470807
 Transform:
   m_ObjectHideFlags: 0
@@ -3534,10 +3600,13 @@ MonoBehaviour:
   offScreenSymbolFontSize: 12
   instanceIdColor: {r: 1, g: 1, b: 1, a: 1}
   offScreenSymbolColor: {r: 1, g: 1, b: 1, a: 1}
-  font: {fileID: 0}
-  markerSize: {x: 240, y: 40}
-  screenEdgePaddingPixels: 8
+  font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  markerSize: {x: 1, y: 1}
+  screenEdgePaddingPixels: 10
   canvasSortingOrder: 100
+  overlapPaddingPixels: 2
+  markersVisible: 1
+  toggleMarkersAction: {fileID: -8798000705855388634, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
   contextRefreshIntervalSeconds: 0.5
 --- !u!4 &1995782485
 Transform:
@@ -3583,6 +3652,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 437701174}
   - {fileID: 1084470807}
   - {fileID: 1349232945}
   - {fileID: 4196977602610722436}
@@ -3717,8 +3787,8 @@ GameObject:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 1995782485}
   - {fileID: 554659565}
   - {fileID: 1210988294}
   - {fileID: 2047321528}
   - {fileID: 451151457}
-  - {fileID: 1995782485}

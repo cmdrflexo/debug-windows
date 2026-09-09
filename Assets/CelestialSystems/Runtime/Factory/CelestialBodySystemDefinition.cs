@@ -49,6 +49,32 @@ namespace jcan.CelestialSystems
             [SerializeField]
             private DoubleVector3 angularVelocityRadiansPerSecond;
 
+            public BodyEntry(
+                string instanceId,
+                CelestialBodyDefinition definition,
+                RoundMapMagicSurfaceQualityProfile qualityProfile,
+                string parentInstanceId,
+                CelestialBodySpawnMode motionMode,
+                DoubleVector3 positionMetersFromSystemOrigin,
+                DoubleVector3 velocityMetersPerSecond,
+                Vector3 rotationEulerDegrees,
+                DoubleVector3 angularVelocityRadiansPerSecond)
+            {
+                this.instanceId = instanceId;
+                this.definition = definition;
+                this.qualityProfile = qualityProfile;
+                this.parentInstanceId = parentInstanceId;
+                this.motionMode = motionMode;
+                this.positionMetersFromSystemOrigin =
+                    positionMetersFromSystemOrigin;
+                this.velocityMetersPerSecond =
+                    velocityMetersPerSecond;
+                this.rotationEulerDegrees =
+                    rotationEulerDegrees;
+                this.angularVelocityRadiansPerSecond =
+                    angularVelocityRadiansPerSecond;
+            }
+
             public string InstanceId =>
                 instanceId;
 
@@ -91,6 +117,40 @@ namespace jcan.CelestialSystems
 
         public IReadOnlyList<BodyEntry> Bodies =>
             bodies;
+
+        public static CelestialBodySystemDefinition CreateRuntime(
+            string definitionId,
+            IReadOnlyList<BodyEntry> bodies)
+        {
+            var runtimeDefinition =
+                CreateInstance<CelestialBodySystemDefinition>();
+            runtimeDefinition.name =
+                definitionId;
+            runtimeDefinition.hideFlags =
+                HideFlags.DontSave;
+            runtimeDefinition.definitionId =
+                definitionId;
+
+            if (bodies == null)
+            {
+                runtimeDefinition.bodies =
+                    Array.Empty<BodyEntry>();
+                return runtimeDefinition;
+            }
+
+            runtimeDefinition.bodies =
+                new BodyEntry[bodies.Count];
+
+            for (var index = 0;
+                index < bodies.Count;
+                index++)
+            {
+                runtimeDefinition.bodies[index] =
+                    bodies[index];
+            }
+
+            return runtimeDefinition;
+        }
 
         public bool HasValidSettings =>
             TryValidate(
