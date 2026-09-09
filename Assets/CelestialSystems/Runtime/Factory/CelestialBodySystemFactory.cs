@@ -234,7 +234,7 @@ namespace jcan.CelestialSystems
             var allBodiesDespawned = true;
 
             foreach (var body in
-                generatedSystem.bodies.Values)
+                generatedSystem.Bodies.Values)
             {
                 if (body != null &&
                     !bodyFactory.TryDespawnBody(
