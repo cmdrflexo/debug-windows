@@ -11,18 +11,8 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
         [HideInInspector] _PlanetRadiusMeters ("Planet Radius", Float) = 1
         [HideInInspector] _SurfaceLightingMode ("Lighting Mode", Float) = 0
 
-        [HideInInspector] _ControlPositiveX ("Control +X", 2D) = "white" {}
-        [HideInInspector] _ControlNegativeX ("Control -X", 2D) = "white" {}
-        [HideInInspector] _ControlPositiveY ("Control +Y", 2D) = "white" {}
-        [HideInInspector] _ControlNegativeY ("Control -Y", 2D) = "white" {}
-        [HideInInspector] _ControlPositiveZ ("Control +Z", 2D) = "white" {}
-        [HideInInspector] _ControlNegativeZ ("Control -Z", 2D) = "white" {}
-        [HideInInspector] _OceanPositiveX ("Ocean +X", 2D) = "black" {}
-        [HideInInspector] _OceanNegativeX ("Ocean -X", 2D) = "black" {}
-        [HideInInspector] _OceanPositiveY ("Ocean +Y", 2D) = "black" {}
-        [HideInInspector] _OceanNegativeY ("Ocean -Y", 2D) = "black" {}
-        [HideInInspector] _OceanPositiveZ ("Ocean +Z", 2D) = "black" {}
-        [HideInInspector] _OceanNegativeZ ("Ocean -Z", 2D) = "black" {}
+        [HideInInspector] _ControlFaces ("Control Faces", 2DArray) = "" {}
+        [HideInInspector] _OceanFaces ("Ocean Faces", 2DArray) = "" {}
 
         [HideInInspector] _LayerMap0 ("Layer 0", 2D) = "white" {}
         [HideInInspector] _LayerMap1 ("Layer 1", 2D) = "white" {}
@@ -88,18 +78,8 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            TEXTURE2D(_ControlPositiveX); SAMPLER(sampler_ControlPositiveX);
-            TEXTURE2D(_ControlNegativeX); SAMPLER(sampler_ControlNegativeX);
-            TEXTURE2D(_ControlPositiveY); SAMPLER(sampler_ControlPositiveY);
-            TEXTURE2D(_ControlNegativeY); SAMPLER(sampler_ControlNegativeY);
-            TEXTURE2D(_ControlPositiveZ); SAMPLER(sampler_ControlPositiveZ);
-            TEXTURE2D(_ControlNegativeZ); SAMPLER(sampler_ControlNegativeZ);
-            TEXTURE2D(_OceanPositiveX); SAMPLER(sampler_OceanPositiveX);
-            TEXTURE2D(_OceanNegativeX); SAMPLER(sampler_OceanNegativeX);
-            TEXTURE2D(_OceanPositiveY); SAMPLER(sampler_OceanPositiveY);
-            TEXTURE2D(_OceanNegativeY); SAMPLER(sampler_OceanNegativeY);
-            TEXTURE2D(_OceanPositiveZ); SAMPLER(sampler_OceanPositiveZ);
-            TEXTURE2D(_OceanNegativeZ); SAMPLER(sampler_OceanNegativeZ);
+            TEXTURE2D_ARRAY(_ControlFaces); SAMPLER(sampler_ControlFaces);
+            TEXTURE2D_ARRAY(_OceanFaces); SAMPLER(sampler_OceanFaces);
             TEXTURE2D(_LayerMap0); SAMPLER(sampler_LayerMap0);
             TEXTURE2D(_LayerMap1); SAMPLER(sampler_LayerMap1);
             TEXTURE2D(_LayerMap2); SAMPLER(sampler_LayerMap2);
@@ -242,22 +222,20 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
 
             half4 SampleControl(int face, float2 uv)
             {
-                if (face == 0) return SAMPLE_TEXTURE2D(_ControlPositiveX, sampler_ControlPositiveX, uv);
-                if (face == 1) return SAMPLE_TEXTURE2D(_ControlNegativeX, sampler_ControlNegativeX, uv);
-                if (face == 2) return SAMPLE_TEXTURE2D(_ControlPositiveY, sampler_ControlPositiveY, uv);
-                if (face == 3) return SAMPLE_TEXTURE2D(_ControlNegativeY, sampler_ControlNegativeY, uv);
-                if (face == 4) return SAMPLE_TEXTURE2D(_ControlPositiveZ, sampler_ControlPositiveZ, uv);
-                return SAMPLE_TEXTURE2D(_ControlNegativeZ, sampler_ControlNegativeZ, uv);
+                return SAMPLE_TEXTURE2D_ARRAY(
+                    _ControlFaces,
+                    sampler_ControlFaces,
+                    uv,
+                    face);
             }
 
             half4 SampleOcean(int face, float2 uv)
             {
-                if (face == 0) return SAMPLE_TEXTURE2D(_OceanPositiveX, sampler_OceanPositiveX, uv);
-                if (face == 1) return SAMPLE_TEXTURE2D(_OceanNegativeX, sampler_OceanNegativeX, uv);
-                if (face == 2) return SAMPLE_TEXTURE2D(_OceanPositiveY, sampler_OceanPositiveY, uv);
-                if (face == 3) return SAMPLE_TEXTURE2D(_OceanNegativeY, sampler_OceanNegativeY, uv);
-                if (face == 4) return SAMPLE_TEXTURE2D(_OceanPositiveZ, sampler_OceanPositiveZ, uv);
-                return SAMPLE_TEXTURE2D(_OceanNegativeZ, sampler_OceanNegativeZ, uv);
+                return SAMPLE_TEXTURE2D_ARRAY(
+                    _OceanFaces,
+                    sampler_OceanFaces,
+                    uv,
+                    face);
             }
 
             half3 TriplanarWeights(float3 direction)

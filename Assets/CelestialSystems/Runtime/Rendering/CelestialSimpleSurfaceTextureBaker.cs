@@ -16,26 +16,6 @@ namespace jcan.CelestialSystems
         private const string ShaderName =
             "jcan/Celestial Systems/Celestial Body Simple Fused";
 
-        private static readonly string[] ControlTextureNames =
-        {
-            "_ControlPositiveX",
-            "_ControlNegativeX",
-            "_ControlPositiveY",
-            "_ControlNegativeY",
-            "_ControlPositiveZ",
-            "_ControlNegativeZ"
-        };
-
-        private static readonly string[] OceanTextureNames =
-        {
-            "_OceanPositiveX",
-            "_OceanNegativeX",
-            "_OceanPositiveY",
-            "_OceanNegativeY",
-            "_OceanPositiveZ",
-            "_OceanNegativeZ"
-        };
-
         [Header("Runtime")]
         [SerializeField]
         private bool initialized;
@@ -57,8 +37,8 @@ namespace jcan.CelestialSystems
         private CelestialSurfacePatchGenerator patchGenerator;
         private Renderer targetRenderer;
         private Material runtimeMaterial;
-        private Texture2D[] controlTextures;
-        private Texture2D[] oceanTextures;
+        private Texture2DArray controlTextureArray;
+        private Texture2DArray oceanTextureArray;
 
         public bool Initialized => initialized;
         public bool IsReady => isReady;
@@ -197,12 +177,18 @@ namespace jcan.CelestialSystems
                     name =
                         $"{definition.DefinitionId} Simple Fused (Runtime)"
                 };
-            controlTextures =
-                new Texture2D[
-                    patches.Length];
-            oceanTextures =
-                new Texture2D[
-                    patches.Length];
+            controlTextureArray =
+                CreateTextureArray(
+                    $"{definition.DefinitionId} Simple Controls",
+                    bakedResolution,
+                    patches.Length,
+                    true);
+            oceanTextureArray =
+                CreateTextureArray(
+                    $"{definition.DefinitionId} Simple Oceans",
+                    bakedResolution,
+                    patches.Length,
+                    false);
 
             for (var faceIndex = 0;
                 faceIndex < patches.Length;
@@ -215,6 +201,19 @@ namespace jcan.CelestialSystems
                     definition.OceanDefinition);
                 bakedFaceCount++;
             }
+
+            controlTextureArray.Apply(
+                updateMipmaps: true,
+                makeNoLongerReadable: true);
+            oceanTextureArray.Apply(
+                updateMipmaps: true,
+                makeNoLongerReadable: true);
+            runtimeMaterial.SetTexture(
+                "_ControlFaces",
+                controlTextureArray);
+            runtimeMaterial.SetTexture(
+                "_OceanFaces",
+                oceanTextureArray);
 
             BindAppearance(
                 appearance,
@@ -443,24 +442,14 @@ namespace jcan.CelestialSystems
                 }
             }
 
-            controlTextures[faceIndex] =
-                CreateTexture(
-                    $"{body.Definition.DefinitionId} Simple Control {faceIndex}",
-                    patch.Resolution,
-                    controls,
-                    true);
-            oceanTextures[faceIndex] =
-                CreateTexture(
-                    $"{body.Definition.DefinitionId} Simple Ocean {faceIndex}",
-                    patch.Resolution,
-                    oceans,
-                    false);
-            runtimeMaterial.SetTexture(
-                ControlTextureNames[faceIndex],
-                controlTextures[faceIndex]);
-            runtimeMaterial.SetTexture(
-                OceanTextureNames[faceIndex],
-                oceanTextures[faceIndex]);
+            controlTextureArray.SetPixels(
+                controls,
+                faceIndex,
+                0);
+            oceanTextureArray.SetPixels(
+                oceans,
+                faceIndex,
+                0);
         }
 
         private void BindAppearance(
@@ -581,33 +570,27 @@ namespace jcan.CelestialSystems
                     0.5f));
         }
 
-        private static Texture2D CreateTexture(
+        private static Texture2DArray CreateTextureArray(
             string textureName,
             int resolution,
-            Color[] pixels,
+            int depth,
             bool linear)
         {
-            var texture =
-                new Texture2D(
-                    resolution,
-                    resolution,
-                    TextureFormat.RGBA32,
-                    true,
-                    linear)
-                {
-                    name = textureName,
-                    wrapMode =
-                        TextureWrapMode.Clamp,
-                    filterMode =
-                        FilterMode.Trilinear,
-                    anisoLevel = 1
-                };
-            texture.SetPixels(
-                pixels);
-            texture.Apply(
-                updateMipmaps: true,
-                makeNoLongerReadable: true);
-            return texture;
+            return new Texture2DArray(
+                resolution,
+                resolution,
+                depth,
+                TextureFormat.RGBA32,
+                true,
+                linear)
+            {
+                name = textureName,
+                wrapMode =
+                    TextureWrapMode.Clamp,
+                filterMode =
+                    FilterMode.Trilinear,
+                anisoLevel = 1
+            };
         }
 
         private static Color GetMaterialColor(
@@ -659,31 +642,18 @@ namespace jcan.CelestialSystems
                 runtimeMaterial = null;
             }
 
-            DestroyTextures(
-                controlTextures);
-            DestroyTextures(
-                oceanTextures);
-            controlTextures = null;
-            oceanTextures = null;
-        }
-
-        private static void DestroyTextures(
-            Texture2D[] textures)
-        {
-            if (textures == null)
+            if (controlTextureArray != null)
             {
-                return;
+                Destroy(
+                    controlTextureArray);
+                controlTextureArray = null;
             }
 
-            for (var index = 0;
-                index < textures.Length;
-                index++)
+            if (oceanTextureArray != null)
             {
-                if (textures[index] != null)
-                {
-                    Destroy(
-                        textures[index]);
-                }
+                Destroy(
+                    oceanTextureArray);
+                oceanTextureArray = null;
             }
         }
 
