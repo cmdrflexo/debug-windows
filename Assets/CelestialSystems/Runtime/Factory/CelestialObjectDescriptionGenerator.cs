@@ -83,6 +83,7 @@ namespace jcan.CelestialSystems
 
         public static string DescribePlanet(
             CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution,
             int generationSeed)
         {
             var mass =
@@ -102,6 +103,10 @@ namespace jcan.CelestialSystems
             var compositionSentence =
                 DescribePlanetComposition(
                     formation);
+            var evolutionSentence =
+                DescribePlanetEvolution(
+                    formation,
+                    evolution);
             var orbitSentence =
                 DescribePlanetOrbit(
                     formation,
@@ -122,6 +127,7 @@ namespace jcan.CelestialSystems
                         JoinSentences(
                             orbitIntroduction,
                             physicalSentence,
+                            evolutionSentence,
                             compositionSentence,
                             orbitSentence);
 
@@ -130,6 +136,7 @@ namespace jcan.CelestialSystems
                         JoinSentences(
                             $"With an estimated mass of {mass} Earth masses and a radius of {radius} Earth radii, this world is classified as a {classification} planet.",
                             compositionSentence,
+                            evolutionSentence,
                             orbitSentence);
 
                 default:
@@ -138,6 +145,7 @@ namespace jcan.CelestialSystems
                             hasMigration
                                 ? $"This is a {classification} world."
                                 : $"This is a {classification} world located approximately {finalOrbit} astronomical units from its star.",
+                            evolutionSentence,
                             compositionSentence,
                             physicalSentence,
                             orbitSentence);
@@ -178,6 +186,93 @@ namespace jcan.CelestialSystems
             }
 
             return string.Empty;
+        }
+
+        private static string DescribePlanetEvolution(
+            CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution)
+        {
+            var temperature =
+                Math.Round(
+                    evolution.EquilibriumTemperatureKelvin)
+                    .ToString(
+                        "0",
+                        CultureInfo.InvariantCulture);
+            var atmosphere =
+                DescribeAtmosphereRetention(
+                    evolution.AtmosphereRetention);
+            var volatiles =
+                DescribeVolatileState(
+                    evolution.VolatileState);
+            var differentiation =
+                formation.FormationClass ==
+                    CelestialPlanetFormationClass.Rocky ||
+                formation.FormationClass ==
+                    CelestialPlanetFormationClass.VolatileRich
+                        ? DescribeDifferentiation(
+                            evolution.Differentiation)
+                        : string.Empty;
+
+            return
+                JoinSentences(
+                    $"Its modeled equilibrium temperature is approximately {temperature} kelvin.",
+                    atmosphere,
+                    volatiles,
+                    differentiation);
+        }
+
+        private static string DescribeAtmosphereRetention(
+            CelestialAtmosphereRetention retention)
+        {
+            switch (retention)
+            {
+                case CelestialAtmosphereRetention.None:
+                    return "It is not expected to retain a significant atmosphere.";
+                case CelestialAtmosphereRetention.Thin:
+                    return "It is expected to retain only a thin atmosphere.";
+                case CelestialAtmosphereRetention.Substantial:
+                    return "Its gravity allows it to retain a substantial atmosphere.";
+                case CelestialAtmosphereRetention.Massive:
+                    return "It retains a massive atmospheric envelope.";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string DescribeVolatileState(
+            CelestialPlanetVolatileState state)
+        {
+            switch (state)
+            {
+                case CelestialPlanetVolatileState.Depleted:
+                    return "Accessible volatile material is expected to be depleted.";
+                case CelestialPlanetVolatileState.Frozen:
+                    return "Most accessible volatile material is expected to remain frozen.";
+                case CelestialPlanetVolatileState.CondensedPotential:
+                    return "Conditions allow volatile material to remain condensed, though this does not guarantee surface liquid.";
+                case CelestialPlanetVolatileState.VaporDominated:
+                    return "Accessible volatile material is expected to be vapor-dominated.";
+                case CelestialPlanetVolatileState.DeepEnvelope:
+                    return "Its volatiles are incorporated into a deep atmospheric envelope rather than exposed surface reservoirs.";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string DescribeDifferentiation(
+            CelestialPlanetDifferentiation differentiation)
+        {
+            switch (differentiation)
+            {
+                case CelestialPlanetDifferentiation.Undifferentiated:
+                    return "Its interior remains largely undifferentiated in the model.";
+                case CelestialPlanetDifferentiation.PartiallyDifferentiated:
+                    return "Its interior is modeled as partially differentiated.";
+                case CelestialPlanetDifferentiation.Differentiated:
+                    return "Its interior is modeled as differentiated into compositionally distinct layers.";
+                default:
+                    return string.Empty;
+            }
         }
 
         private static string DescribePlanetOrbit(
