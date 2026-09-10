@@ -64,6 +64,31 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double stellarEffectiveTemperatureKelvin;
 
+        [Header("Generated Planet Formation Properties")]
+        [SerializeField]
+        private bool hasPlanetFormationProperties;
+
+        [SerializeField]
+        private CelestialPlanetFormationClass planetFormationClass;
+
+        [SerializeField]
+        private double planetInitialOrbitAstronomicalUnits;
+
+        [SerializeField]
+        private double planetFinalOrbitAstronomicalUnits;
+
+        [SerializeField]
+        private double planetSolidCoreMassEarth;
+
+        [SerializeField]
+        private double planetVolatileMassFraction;
+
+        [SerializeField]
+        private double planetHydrogenHeliumEnvelopeFraction;
+
+        [SerializeField]
+        private double planetInwardMigrationFraction;
+
         [SerializeField]
         [TextArea(3, 8)]
         private string description;
@@ -131,6 +156,30 @@ namespace jcan.CelestialSystems
         public double StellarEffectiveTemperatureKelvin =>
             stellarEffectiveTemperatureKelvin;
 
+        public bool HasPlanetFormationProperties =>
+            hasPlanetFormationProperties;
+
+        public CelestialPlanetFormationClass PlanetFormationClass =>
+            planetFormationClass;
+
+        public double PlanetInitialOrbitAstronomicalUnits =>
+            planetInitialOrbitAstronomicalUnits;
+
+        public double PlanetFinalOrbitAstronomicalUnits =>
+            planetFinalOrbitAstronomicalUnits;
+
+        public double PlanetSolidCoreMassEarth =>
+            planetSolidCoreMassEarth;
+
+        public double PlanetVolatileMassFraction =>
+            planetVolatileMassFraction;
+
+        public double PlanetHydrogenHeliumEnvelopeFraction =>
+            planetHydrogenHeliumEnvelopeFraction;
+
+        public double PlanetInwardMigrationFraction =>
+            planetInwardMigrationFraction;
+
         public string Description =>
             description ?? string.Empty;
 
@@ -192,6 +241,15 @@ namespace jcan.CelestialSystems
             stellarInitialMassSolar = 0.0;
             stellarLuminositySolar = 0.0;
             stellarEffectiveTemperatureKelvin = 0.0;
+            hasPlanetFormationProperties = false;
+            planetFormationClass =
+                CelestialPlanetFormationClass.Rocky;
+            planetInitialOrbitAstronomicalUnits = 0.0;
+            planetFinalOrbitAstronomicalUnits = 0.0;
+            planetSolidCoreMassEarth = 0.0;
+            planetVolatileMassFraction = 0.0;
+            planetHydrogenHeliumEnvelopeFraction = 0.0;
+            planetInwardMigrationFraction = 0.0;
             description = string.Empty;
         }
 
@@ -215,6 +273,26 @@ namespace jcan.CelestialSystems
                 properties.LuminositySolar;
             stellarEffectiveTemperatureKelvin =
                 properties.EffectiveTemperatureKelvin;
+        }
+
+        internal void ConfigureRuntimePlanetFormationProperties(
+            CelestialPlanetFormationResult properties)
+        {
+            hasPlanetFormationProperties = true;
+            planetFormationClass =
+                properties.FormationClass;
+            planetInitialOrbitAstronomicalUnits =
+                properties.InitialOrbitAstronomicalUnits;
+            planetFinalOrbitAstronomicalUnits =
+                properties.FinalOrbitAstronomicalUnits;
+            planetSolidCoreMassEarth =
+                properties.SolidCoreMassEarth;
+            planetVolatileMassFraction =
+                properties.VolatileMassFraction;
+            planetHydrogenHeliumEnvelopeFraction =
+                properties.HydrogenHeliumEnvelopeFraction;
+            planetInwardMigrationFraction =
+                properties.InwardMigrationFraction;
         }
 
         private static bool IsFinite(
