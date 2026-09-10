@@ -98,6 +98,11 @@ namespace jcan.CelestialSystems
             5.0f;
 
         [SerializeField]
+        [Range(0.0f, 0.5f)]
+        private float maximumPlanetEccentricity =
+            0.12f;
+
+        [SerializeField]
         [Range(0.0f, 1.0f)]
         private float retrogradeChance;
 
@@ -120,6 +125,11 @@ namespace jcan.CelestialSystems
         [Range(0.0f, 90.0f)]
         private float maximumMoonInclinationDegrees =
             15.0f;
+
+        [SerializeField]
+        [Range(0.0f, 0.5f)]
+        private float maximumMoonEccentricity =
+            0.08f;
 
         [SerializeField]
         [Range(0.0f, 1.0f)]
@@ -146,6 +156,9 @@ namespace jcan.CelestialSystems
                 random.NextInclusive(
                     minimumPlanetCount,
                     maximumPlanetCount);
+            var safePlanetEccentricityLimit =
+                CalculateNonCrossingPlanetEccentricityLimit(
+                    planetCount);
             var bodySystems =
                 new List<CelestialStarSystemPlan.BodySystemPlan>(
                     planetCount + 1);
@@ -208,6 +221,16 @@ namespace jcan.CelestialSystems
                         retrogradeChance
                             ? -1.0
                             : 1.0;
+                var eccentricity =
+                    random.NextRange(
+                        0.0,
+                        Math.Min(
+                            maximumPlanetEccentricity,
+                            safePlanetEccentricityLimit));
+                var argumentOfPeriapsisRadians =
+                    random.Next01() *
+                    Math.PI *
+                    2.0;
                 var orbitalSpeed =
                     Math.Sqrt(
                         GravitationalConstant *
@@ -270,6 +293,10 @@ namespace jcan.CelestialSystems
                     0.0;
                 var moonDirection =
                     1.0;
+                var moonEccentricity =
+                    0.0;
+                var moonArgumentOfPeriapsisRadians =
+                    0.0;
 
                 if (moonChance > 0.0f &&
                     random.Next01() < moonChance)
@@ -291,10 +318,22 @@ namespace jcan.CelestialSystems
                     var stableMaximumMoonOrbitRadius =
                         hillRadius *
                         0.35;
+                    moonEccentricity =
+                        random.NextRange(
+                            0.0,
+                            maximumMoonEccentricity);
+                    moonArgumentOfPeriapsisRadians =
+                        random.Next01() *
+                        Math.PI *
+                        2.0;
+                    var maximumStablePeriapsis =
+                        stableMaximumMoonOrbitRadius *
+                        (1.0 - moonEccentricity) /
+                        (1.0 + moonEccentricity);
                     var maximumMoonOrbitRadius =
                         Math.Min(
                             configuredMaximumMoonOrbitRadius,
-                            stableMaximumMoonOrbitRadius);
+                            maximumStablePeriapsis);
 
                     if (maximumMoonOrbitRadius >=
                         minimumMoonOrbitRadius)
@@ -343,10 +382,14 @@ namespace jcan.CelestialSystems
                         phaseRadians,
                         inclinationRadians,
                         direction,
+                        eccentricity,
+                        argumentOfPeriapsisRadians,
                         moonOrbitRadius,
                         moonPhaseRadians,
                         moonInclinationRadians,
                         moonDirection,
+                        moonEccentricity,
+                        moonArgumentOfPeriapsisRadians,
                         ownedRuntimeObjects));
             }
 
@@ -434,6 +477,20 @@ namespace jcan.CelestialSystems
             {
                 error =
                     "The basic system generation guide has an invalid planet-count range.";
+                return false;
+            }
+
+            if (!IsFinite(
+                    maximumPlanetEccentricity) ||
+                maximumPlanetEccentricity < 0.0 ||
+                maximumPlanetEccentricity >= 1.0 ||
+                !IsFinite(
+                    maximumMoonEccentricity) ||
+                maximumMoonEccentricity < 0.0 ||
+                maximumMoonEccentricity >= 1.0)
+            {
+                error =
+                    "The basic system generation guide requires eccentricity limits from zero up to, but not including, one.";
                 return false;
             }
 
@@ -537,10 +594,14 @@ namespace jcan.CelestialSystems
             double planetPhaseRadians,
             double planetInclinationRadians,
             double planetDirection,
+            double planetEccentricity,
+            double planetArgumentOfPeriapsisRadians,
             double moonOrbitRadius,
             double moonPhaseRadians,
             double moonInclinationRadians,
             double moonDirection,
+            double moonEccentricity,
+            double moonArgumentOfPeriapsisRadians,
             ICollection<UnityEngine.Object> ownedRuntimeObjects)
         {
             var planetPosition =
@@ -628,11 +689,13 @@ namespace jcan.CelestialSystems
                                 moonDirection),
                         Vector3.zero,
                         new DoubleVector3(),
-                        CreateCircularTrajectory(
+                        CreateConicTrajectory(
                             "planet",
                             moonOrbitRadius,
+                            moonEccentricity,
                             moonPhaseRadians,
                             moonInclinationRadians,
+                            moonArgumentOfPeriapsisRadians,
                             moonDirection)));
             }
 
@@ -668,37 +731,77 @@ namespace jcan.CelestialSystems
                     CelestialBodySpawnMode.PrescribedTrajectory,
                     "stellar",
                     "star",
-                    CreateCircularTrajectory(
+                    CreateConicTrajectory(
                         "stellar/star",
                         planetOrbitRadius,
+                        planetEccentricity,
                         planetPhaseRadians,
                         planetInclinationRadians,
+                        planetArgumentOfPeriapsisRadians,
                         planetDirection));
         }
 
-        private static CelestialTrajectoryDefinition CreateCircularTrajectory(
+        private static CelestialTrajectoryDefinition CreateConicTrajectory(
             string referenceInstanceId,
-            double orbitalRadiusMeters,
-            double phaseRadians,
+            double periapsisDistanceMeters,
+            double eccentricity,
+            double meanAnomalyRadians,
             double inclinationRadians,
+            double argumentOfPeriapsisRadians,
             double direction)
         {
             return
                 new CelestialTrajectoryDefinition(
-                    referenceInstanceId,
-                    orbitalRadiusMeters,
-                    0.0,
-                    phaseRadians *
-                        180.0 /
-                        Math.PI,
-                    Math.Abs(
-                        inclinationRadians *
-                        180.0 /
-                        Math.PI),
-                    0.0,
-                    direction < 0.0
-                        ? CelestialOrbitDirection.Retrograde
-                        : CelestialOrbitDirection.Prograde);
+                    new KeplerianConicTrajectory(
+                        referenceInstanceId,
+                        periapsisDistanceMeters,
+                        eccentricity,
+                        0.0,
+                        meanAnomalyRadians *
+                            180.0 /
+                            Math.PI,
+                        Math.Abs(
+                            inclinationRadians *
+                            180.0 /
+                            Math.PI),
+                        0.0,
+                        argumentOfPeriapsisRadians *
+                            180.0 /
+                            Math.PI,
+                        direction < 0.0
+                            ? CelestialOrbitDirection.Retrograde
+                            : CelestialOrbitDirection.Prograde));
+        }
+
+        private double CalculateNonCrossingPlanetEccentricityLimit(
+            int planetCount)
+        {
+            if (planetCount <= 1 ||
+                innerOrbitRadiusMeters >= outerOrbitRadiusMeters)
+            {
+                return
+                    planetCount <= 1
+                        ? maximumPlanetEccentricity
+                        : 0.0;
+            }
+
+            // Adjacent logarithmic slots can approach to 40% of one slot after jitter.
+            var minimumAdjacentRadiusRatio =
+                Math.Exp(
+                    Math.Log(
+                        outerOrbitRadiusMeters /
+                        innerOrbitRadiusMeters) *
+                    0.4 /
+                    planetCount);
+            var touchingLimit =
+                (minimumAdjacentRadiusRatio - 1.0) /
+                (minimumAdjacentRadiusRatio + 1.0);
+
+            // Leave a small margin between the inner orbit's apoapsis and the next periapsis.
+            return Math.Max(
+                0.0,
+                touchingLimit *
+                    0.9);
         }
 
         private static bool IsUsablePrototype(
