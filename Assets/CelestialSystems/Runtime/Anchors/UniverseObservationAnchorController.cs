@@ -20,6 +20,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private DebugWindowManager debugWindowManager;
 
+        [SerializeField]
+        [Tooltip("Shared owner of the currently selected observation target.")]
+        private UniverseObservationSelectionController selectionController;
+
         [Header("Target")]
         [SerializeField]
         private CelestialBodyRuntimeContext target;
@@ -205,7 +209,12 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
-            ResolveTarget();
+            ResolveSelectionTarget();
+
+            if (selectionController == null)
+            {
+                ResolveTarget();
+            }
 
             if (!listen || debugMenuVisible || target == null)
             {
@@ -371,6 +380,21 @@ namespace jcan.CelestialSystems
             if (automaticallySelectFirstTarget)
             {
                 SelectFirstActiveBody();
+            }
+        }
+
+        private void ResolveSelectionTarget()
+        {
+            if (selectionController == null)
+            {
+                return;
+            }
+
+            var selectedTarget = selectionController.SelectedTarget;
+
+            if (target != selectedTarget)
+            {
+                SelectTarget(selectedTarget);
             }
         }
 
@@ -590,6 +614,18 @@ namespace jcan.CelestialSystems
             if (anchorBridge == null)
             {
                 anchorBridge = FindFirstObjectByType<SgtGravityOriginBridge>();
+            }
+
+            if (selectionController == null)
+            {
+                selectionController =
+                    GetComponentInParent<UniverseObservationSelectionController>();
+            }
+
+            if (selectionController == null)
+            {
+                selectionController =
+                    FindFirstObjectByType<UniverseObservationSelectionController>();
             }
         }
 
