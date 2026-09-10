@@ -17,6 +17,12 @@ namespace jcan.CelestialSystems
         private const double GravitationalConstant =
             6.67430e-11;
 
+        private const double SolarMassKilograms =
+            1.98847e30;
+
+        private const double SolarRadiusMeters =
+            6.957e8;
+
         [Header("Identity")]
         [SerializeField]
         private string planDefinitionId =
@@ -152,6 +158,21 @@ namespace jcan.CelestialSystems
             var random =
                 new DeterministicRandom(
                     request.Seed);
+
+            if (!CelestialStellarPopulationSampler.TrySamplePrimary(
+                    request.Seed,
+                    request.Environment,
+                    out var stellarPopulation,
+                    out error) ||
+                !CelestialStellarEvolutionModel.TryEvaluate(
+                    stellarPopulation,
+                    request.Environment,
+                    out var stellarProperties,
+                    out error))
+            {
+                return false;
+            }
+
             var planetCount =
                 random.NextInclusive(
                     minimumPlanetCount,
@@ -167,13 +188,11 @@ namespace jcan.CelestialSystems
                     (planetCount + 1) *
                     2);
             var star =
-                CreateVariedDefinition(
+                CreateStellarDefinition(
                     starDefinition,
                     "generated-star",
                     random.NextInt(),
-                    random.NextRange(
-                        minimumStarRadiusScale,
-                        maximumStarRadiusScale));
+                    stellarProperties);
             ownedRuntimeObjects.Add(
                 star);
 
@@ -509,6 +528,35 @@ namespace jcan.CelestialSystems
 
             error = string.Empty;
             return true;
+        }
+
+        private static CelestialBodyDefinition CreateStellarDefinition(
+            CelestialBodyDefinition prototype,
+            string definitionId,
+            int generationSeed,
+            CelestialStellarEvolutionResult properties)
+        {
+            var definition =
+                CreateInstance<CelestialBodyDefinition>();
+            definition.name =
+                definitionId;
+            definition.hideFlags =
+                HideFlags.DontSave;
+            definition.ConfigureRuntime(
+                definitionId,
+                properties.CurrentMassSolar *
+                    SolarMassKilograms,
+                properties.RadiusSolar *
+                    SolarRadiusMeters,
+                generationSeed,
+                prototype.NorthAxis,
+                prototype.PoleReferenceAxis,
+                prototype.SurfaceSystem,
+                prototype.RoundMapMagicSurface,
+                prototype.OceanDefinition);
+            definition.ConfigureRuntimeStellarProperties(
+                properties);
+            return definition;
         }
 
         private static CelestialBodyDefinition CreateVariedDefinition(

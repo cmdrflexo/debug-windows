@@ -48,6 +48,22 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private OceanDefinition oceanDefinition;
 
+        [Header("Generated Stellar Properties")]
+        [SerializeField]
+        private bool hasStellarProperties;
+
+        [SerializeField]
+        private CelestialStellarEvolutionState stellarEvolutionState;
+
+        [SerializeField]
+        private double stellarInitialMassSolar;
+
+        [SerializeField]
+        private double stellarLuminositySolar;
+
+        [SerializeField]
+        private double stellarEffectiveTemperatureKelvin;
+
         public string DefinitionId =>
             definitionId;
 
@@ -95,6 +111,21 @@ namespace jcan.CelestialSystems
 
         public OceanDefinition OceanDefinition =>
             oceanDefinition;
+
+        public bool HasStellarProperties =>
+            hasStellarProperties;
+
+        public CelestialStellarEvolutionState StellarEvolutionState =>
+            stellarEvolutionState;
+
+        public double StellarInitialMassSolar =>
+            stellarInitialMassSolar;
+
+        public double StellarLuminositySolar =>
+            stellarLuminositySolar;
+
+        public double StellarEffectiveTemperatureKelvin =>
+            stellarEffectiveTemperatureKelvin;
 
         public bool HasValidPhysicalSettings =>
             !string.IsNullOrWhiteSpace(
@@ -148,6 +179,26 @@ namespace jcan.CelestialSystems
             surfaceSystem = newSurfaceSystem;
             roundMapMagicSurface = newRoundMapMagicSurface;
             oceanDefinition = newOceanDefinition;
+            hasStellarProperties = false;
+            stellarEvolutionState =
+                CelestialStellarEvolutionState.MainSequence;
+            stellarInitialMassSolar = 0.0;
+            stellarLuminositySolar = 0.0;
+            stellarEffectiveTemperatureKelvin = 0.0;
+        }
+
+        internal void ConfigureRuntimeStellarProperties(
+            CelestialStellarEvolutionResult properties)
+        {
+            hasStellarProperties = true;
+            stellarEvolutionState =
+                properties.EvolutionState;
+            stellarInitialMassSolar =
+                properties.InitialMassSolar;
+            stellarLuminositySolar =
+                properties.LuminositySolar;
+            stellarEffectiveTemperatureKelvin =
+                properties.EffectiveTemperatureKelvin;
         }
 
         private static bool IsFinite(
