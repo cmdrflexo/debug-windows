@@ -1045,9 +1045,9 @@ namespace jcan.CelestialSystems
             celestialTime ??=
                 CelestialTimeController.Instance;
             motionBackendReady =
-                (gravityEngine != null &&
-                    gravityEngine.IsSetup()) ||
-                celestialTime != null;
+                gravityEngine != null
+                    ? gravityEngine.IsSetup()
+                    : celestialTime != null;
         }
 
         private bool RecordSpawnFailure(
