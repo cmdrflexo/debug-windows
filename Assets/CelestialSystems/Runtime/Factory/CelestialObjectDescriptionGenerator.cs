@@ -82,7 +82,8 @@ namespace jcan.CelestialSystems
         }
 
         public static string DescribePlanet(
-            CelestialPlanetFormationResult formation)
+            CelestialPlanetFormationResult formation,
+            int generationSeed)
         {
             var mass =
                 Format(
@@ -90,33 +91,149 @@ namespace jcan.CelestialSystems
             var radius =
                 Format(
                     formation.RadiusEarth);
-            var initialOrbit =
-                Format(
-                    formation.InitialOrbitAstronomicalUnits);
             var finalOrbit =
                 Format(
                     formation.FinalOrbitAstronomicalUnits);
-            var volatilePercent =
-                Format(
-                    formation.VolatileMassFraction *
-                    100.0);
-            var envelopePercent =
-                Format(
-                    formation.HydrogenHeliumEnvelopeFraction *
-                    100.0);
             var classification =
                 DescribePlanetFormationClass(
                     formation.FormationClass);
+            var physicalSentence =
+                $"Its estimated mass is {mass} Earth masses, with a radius of {radius} Earth radii.";
+            var compositionSentence =
+                DescribePlanetComposition(
+                    formation);
+            var orbitSentence =
+                DescribePlanetOrbit(
+                    formation,
+                    finalOrbit);
 
-            var formationHistory =
-                formation.InwardMigrationFraction > 0.001
-                    ? $"It formed near {initialOrbit} astronomical units from its star and migrated inward to its present orbit near {finalOrbit} astronomical units."
-                    : $"It formed near its present orbit, approximately {finalOrbit} astronomical units from its star.";
+            switch (SelectVariant(
+                generationSeed,
+                3))
+            {
+                case 0:
+                    return
+                        JoinSentences(
+                            $"This {classification} planet orbits approximately {finalOrbit} astronomical units from its star.",
+                            physicalSentence,
+                            compositionSentence,
+                            orbitSentence);
+
+                case 1:
+                    return
+                        JoinSentences(
+                            $"With an estimated mass of {mass} Earth masses and a radius of {radius} Earth radii, this world is classified as a {classification} planet.",
+                            compositionSentence,
+                            orbitSentence);
+
+                default:
+                    return
+                        JoinSentences(
+                            $"This is a {classification} world located approximately {finalOrbit} astronomical units from its star.",
+                            compositionSentence,
+                            physicalSentence,
+                            orbitSentence);
+            }
+        }
+
+        private static string DescribePlanetComposition(
+            CelestialPlanetFormationResult formation)
+        {
+            var volatilePercent =
+                formation.VolatileMassFraction *
+                100.0;
+            var envelopePercent =
+                formation.HydrogenHeliumEnvelopeFraction *
+                100.0;
+            var hasVolatiles =
+                volatilePercent >= 0.05;
+            var hasEnvelope =
+                envelopePercent >= 0.05;
+
+            if (hasVolatiles &&
+                hasEnvelope)
+            {
+                return
+                    $"The formation model assigns about {Format(volatilePercent)} percent volatile material and a hydrogen-helium envelope containing about {Format(envelopePercent)} percent of its mass.";
+            }
+
+            if (hasEnvelope)
+            {
+                return
+                    $"A hydrogen-helium envelope contains about {Format(envelopePercent)} percent of its mass.";
+            }
+
+            if (hasVolatiles)
+            {
+                return
+                    $"The formation model assigns it a volatile fraction of about {Format(volatilePercent)} percent.";
+            }
+
+            return string.Empty;
+        }
+
+        private static string DescribePlanetOrbit(
+            CelestialPlanetFormationResult formation,
+            string finalOrbit)
+        {
+            if (formation.InwardMigrationFraction <
+                0.0005)
+            {
+                return string.Empty;
+            }
+
+            var initialOrbit =
+                Format(
+                    formation.InitialOrbitAstronomicalUnits);
 
             return
-                $"This is a {classification} planet with an estimated mass of {mass} Earth masses and a radius of {radius} Earth radii. " +
-                $"The formation model assigns it a bulk volatile fraction of about {volatilePercent} percent and a hydrogen-helium envelope containing about {envelopePercent} percent of its mass. " +
-                formationHistory;
+                $"It formed near {initialOrbit} astronomical units before migrating inward to its present orbit near {finalOrbit} astronomical units.";
+        }
+
+        private static int SelectVariant(
+            int generationSeed,
+            int variantCount)
+        {
+            var value =
+                unchecked((uint)generationSeed);
+            value ^=
+                value >> 16;
+            value *=
+                0x7FEB352Du;
+            value ^=
+                value >> 15;
+
+            return
+                (int)(value %
+                    (uint)variantCount);
+        }
+
+        private static string JoinSentences(
+            params string[] sentences)
+        {
+            var result =
+                string.Empty;
+
+            for (var index = 0;
+                index < sentences.Length;
+                index++)
+            {
+                if (string.IsNullOrWhiteSpace(
+                        sentences[index]))
+                {
+                    continue;
+                }
+
+                if (result.Length > 0)
+                {
+                    result += " ";
+                }
+
+                result +=
+                    sentences[index].Trim();
+            }
+
+            return result;
         }
 
         private static string DescribePlanetFormationClass(
