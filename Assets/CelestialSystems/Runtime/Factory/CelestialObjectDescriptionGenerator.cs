@@ -81,6 +81,62 @@ namespace jcan.CelestialSystems
             }
         }
 
+        public static string DescribePlanet(
+            CelestialPlanetFormationResult formation)
+        {
+            var mass =
+                Format(
+                    formation.TotalMassEarth);
+            var radius =
+                Format(
+                    formation.RadiusEarth);
+            var initialOrbit =
+                Format(
+                    formation.InitialOrbitAstronomicalUnits);
+            var finalOrbit =
+                Format(
+                    formation.FinalOrbitAstronomicalUnits);
+            var volatilePercent =
+                Format(
+                    formation.VolatileMassFraction *
+                    100.0);
+            var envelopePercent =
+                Format(
+                    formation.HydrogenHeliumEnvelopeFraction *
+                    100.0);
+            var classification =
+                DescribePlanetFormationClass(
+                    formation.FormationClass);
+
+            var formationHistory =
+                formation.InwardMigrationFraction > 0.001
+                    ? $"It formed near {initialOrbit} astronomical units from its star and migrated inward to its present orbit near {finalOrbit} astronomical units."
+                    : $"It formed near its present orbit, approximately {finalOrbit} astronomical units from its star.";
+
+            return
+                $"This is a {classification} planet with an estimated mass of {mass} Earth masses and a radius of {radius} Earth radii. " +
+                $"The formation model assigns it a bulk volatile fraction of about {volatilePercent} percent and a hydrogen-helium envelope containing about {envelopePercent} percent of its mass. " +
+                formationHistory;
+        }
+
+        private static string DescribePlanetFormationClass(
+            CelestialPlanetFormationClass formationClass)
+        {
+            switch (formationClass)
+            {
+                case CelestialPlanetFormationClass.Rocky:
+                    return "rocky";
+                case CelestialPlanetFormationClass.VolatileRich:
+                    return "volatile-rich";
+                case CelestialPlanetFormationClass.GasRich:
+                    return "gas-rich";
+                case CelestialPlanetFormationClass.Giant:
+                    return "giant";
+                default:
+                    return "unclassified";
+            }
+        }
+
         private static string DescribeMainSequenceMass(
             double massSolar)
         {
