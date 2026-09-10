@@ -339,12 +339,29 @@ namespace jcan.CelestialSystems
                             direction);
                 var instanceId =
                     $"planet-{index + 1}";
+                var planetSeed =
+                    random.NextInt();
+
+                if (!CelestialPlanetaryEvolutionModel.TryEvaluate(
+                        planetSeed,
+                        formation,
+                        stellarProperties,
+                        request.Environment.SystemAgeGigayears,
+                        out var planetaryEvolution,
+                        out error))
+                {
+                    ReleaseOwnedRuntimeObjects(
+                        ownedRuntimeObjects);
+                    return false;
+                }
+
                 var planet =
                     CreatePlanetDefinition(
                         planetDefinition,
                         $"generated-{instanceId}",
-                        random.NextInt(),
-                        formation);
+                        planetSeed,
+                        formation,
+                        planetaryEvolution);
                 ownedRuntimeObjects.Add(
                     planet);
 
@@ -582,11 +599,29 @@ namespace jcan.CelestialSystems
             return definition;
         }
 
+        private static void ReleaseOwnedRuntimeObjects(
+            IList<UnityEngine.Object> ownedRuntimeObjects)
+        {
+            for (var index = 0;
+                index < ownedRuntimeObjects.Count;
+                index++)
+            {
+                if (ownedRuntimeObjects[index] != null)
+                {
+                    Destroy(
+                        ownedRuntimeObjects[index]);
+                }
+            }
+
+            ownedRuntimeObjects.Clear();
+        }
+
         private static CelestialBodyDefinition CreatePlanetDefinition(
             CelestialBodyDefinition prototype,
             string definitionId,
             int generationSeed,
-            CelestialPlanetFormationResult formation)
+            CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution)
         {
             var definition =
                 CreateInstance<CelestialBodyDefinition>();
@@ -608,9 +643,12 @@ namespace jcan.CelestialSystems
                 prototype.OceanDefinition);
             definition.ConfigureRuntimePlanetFormationProperties(
                 formation);
+            definition.ConfigureRuntimePlanetaryEvolutionProperties(
+                evolution);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribePlanet(
                     formation,
+                    evolution,
                     generationSeed));
             return definition;
         }
