@@ -106,8 +106,7 @@ namespace jcan.CelestialSystems
                 Math.Sqrt(
                     formation.FinalOrbitAstronomicalUnits) *
                 Math.Pow(
-                    (1.0 - albedo) /
-                    0.7,
+                    1.0 - albedo,
                     0.25);
             var escapeVelocity =
                 EarthEscapeVelocityMetersPerSecond *
