@@ -64,9 +64,11 @@ namespace jcan.CelestialSystems
         public CelestialStarSystemPlan(
             string definitionId,
             IReadOnlyList<BodySystemPlan> bodySystems,
-            IReadOnlyList<UnityEngine.Object> ownedRuntimeObjects = null)
+            IReadOnlyList<UnityEngine.Object> ownedRuntimeObjects = null,
+            CelestialProtoplanetaryDiskResult? formationDisk = null)
         {
             DefinitionId = definitionId;
+            FormationDisk = formationDisk;
             this.bodySystems =
                 bodySystems == null
                     ? Array.Empty<BodySystemPlan>()
@@ -78,6 +80,8 @@ namespace jcan.CelestialSystems
         }
 
         public string DefinitionId { get; }
+
+        public CelestialProtoplanetaryDiskResult? FormationDisk { get; }
 
         public IReadOnlyList<BodySystemPlan> BodySystems =>
             bodySystems;

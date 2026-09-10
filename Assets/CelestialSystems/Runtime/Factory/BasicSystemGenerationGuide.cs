@@ -23,6 +23,9 @@ namespace jcan.CelestialSystems
         private const double SolarRadiusMeters =
             6.957e8;
 
+        private const double AstronomicalUnitMeters =
+            149597870700.0;
+
         [Header("Identity")]
         [SerializeField]
         private string planDefinitionId =
@@ -50,16 +53,6 @@ namespace jcan.CelestialSystems
         [Header("Body Variation")]
         [SerializeField]
         [Min(0.01f)]
-        private float minimumStarRadiusScale =
-            0.9f;
-
-        [SerializeField]
-        [Min(0.01f)]
-        private float maximumStarRadiusScale =
-            1.1f;
-
-        [SerializeField]
-        [Min(0.01f)]
         private float minimumPlanetRadiusScale =
             0.5f;
 
@@ -78,26 +71,7 @@ namespace jcan.CelestialSystems
         private float maximumMoonRadiusScale =
             1.5f;
 
-        [Header("Planet Count")]
-        [SerializeField]
-        [Min(0)]
-        private int minimumPlanetCount = 1;
-
-        [SerializeField]
-        [Min(0)]
-        private int maximumPlanetCount = 3;
-
         [Header("Prototype Orbits")]
-        [SerializeField]
-        [Min(1.0f)]
-        private double innerOrbitRadiusMeters =
-            10000000000.0;
-
-        [SerializeField]
-        [Min(1.0f)]
-        private double outerOrbitRadiusMeters =
-            200000000000.0;
-
         [SerializeField]
         [Range(0.0f, 45.0f)]
         private float maximumInclinationDegrees =
@@ -173,13 +147,44 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            if (!CelestialProtoplanetaryDiskModel.TryGenerate(
+                    request.Seed,
+                    stellarPopulation,
+                    stellarProperties,
+                    request.Environment,
+                    out var formationDisk,
+                    out error))
+            {
+                return false;
+            }
+
             var planetCount =
-                random.NextInclusive(
-                    minimumPlanetCount,
-                    maximumPlanetCount);
+                SelectPlanetCount(
+                    formationDisk.FormationCapacity,
+                    ref random);
+            var innerPlanetOrbitMeters =
+                Math.Max(
+                    formationDisk.InnerBoundaryAstronomicalUnits *
+                        1.5,
+                    0.01) *
+                AstronomicalUnitMeters;
+            var outerPlanetOrbitMeters =
+                Math.Max(
+                    formationDisk.FrostLineAstronomicalUnits *
+                        1.5,
+                    formationDisk.OuterBoundaryAstronomicalUnits *
+                        0.45) *
+                AstronomicalUnitMeters;
+            outerPlanetOrbitMeters =
+                Math.Max(
+                    outerPlanetOrbitMeters,
+                    innerPlanetOrbitMeters *
+                        2.0);
             var safePlanetEccentricityLimit =
                 CalculateNonCrossingPlanetEccentricityLimit(
-                    planetCount);
+                    planetCount,
+                    innerPlanetOrbitMeters,
+                    outerPlanetOrbitMeters);
             var bodySystems =
                 new List<CelestialStarSystemPlan.BodySystemPlan>(
                     planetCount + 1);
@@ -229,8 +234,8 @@ namespace jcan.CelestialSystems
                         jitterRange);
                 var orbitRadius =
                     LogarithmicLerp(
-                        innerOrbitRadiusMeters,
-                        outerOrbitRadiusMeters,
+                        innerPlanetOrbitMeters,
+                        outerPlanetOrbitMeters,
                         orbitFraction);
                 var phaseRadians =
                     random.Next01() *
@@ -422,7 +427,8 @@ namespace jcan.CelestialSystems
                 new CelestialStarSystemPlan(
                     planDefinitionId,
                     bodySystems,
-                    ownedRuntimeObjects);
+                    ownedRuntimeObjects,
+                    formationDisk);
             error = string.Empty;
             return true;
         }
@@ -454,8 +460,7 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            if (maximumPlanetCount > 0 &&
-                !IsUsablePrototype(
+            if (!IsUsablePrototype(
                     planetDefinition))
             {
                 error =
@@ -473,9 +478,6 @@ namespace jcan.CelestialSystems
             }
 
             if (!IsValidScaleRange(
-                    minimumStarRadiusScale,
-                    maximumStarRadiusScale) ||
-                !IsValidScaleRange(
                     minimumPlanetRadiusScale,
                     maximumPlanetRadiusScale) ||
                 !IsValidScaleRange(
@@ -496,15 +498,6 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            if (minimumPlanetCount < 0 ||
-                maximumPlanetCount <
-                    minimumPlanetCount)
-            {
-                error =
-                    "The basic system generation guide has an invalid planet-count range.";
-                return false;
-            }
-
             if (!IsFinite(
                     maximumPlanetEccentricity) ||
                 maximumPlanetEccentricity < 0.0 ||
@@ -516,19 +509,6 @@ namespace jcan.CelestialSystems
             {
                 error =
                     "The basic system generation guide requires eccentricity limits from zero up to, but not including, one.";
-                return false;
-            }
-
-            if (!IsFinite(
-                    innerOrbitRadiusMeters) ||
-                !IsFinite(
-                    outerOrbitRadiusMeters) ||
-                innerOrbitRadiusMeters <= 0.0 ||
-                outerOrbitRadiusMeters <
-                    innerOrbitRadiusMeters)
-            {
-                error =
-                    "The basic system generation guide has an invalid orbital-radius range.";
                 return false;
             }
 
@@ -830,11 +810,44 @@ namespace jcan.CelestialSystems
                             : CelestialOrbitDirection.Prograde));
         }
 
+        private static int SelectPlanetCount(
+            CelestialPlanetFormationCapacity capacity,
+            ref DeterministicRandom random)
+        {
+            switch (capacity)
+            {
+                case CelestialPlanetFormationCapacity.StronglyInhibited:
+                    return random.NextInclusive(
+                        0,
+                        1);
+
+                case CelestialPlanetFormationCapacity.Low:
+                    return random.NextInclusive(
+                        1,
+                        3);
+
+                case CelestialPlanetFormationCapacity.Typical:
+                    return random.NextInclusive(
+                        3,
+                        8);
+
+                case CelestialPlanetFormationCapacity.High:
+                    return random.NextInclusive(
+                        6,
+                        12);
+
+                default:
+                    return 0;
+            }
+        }
+
         private double CalculateNonCrossingPlanetEccentricityLimit(
-            int planetCount)
+            int planetCount,
+            double innerOrbitMeters,
+            double outerOrbitMeters)
         {
             if (planetCount <= 1 ||
-                innerOrbitRadiusMeters >= outerOrbitRadiusMeters)
+                innerOrbitMeters >= outerOrbitMeters)
             {
                 return
                     planetCount <= 1
@@ -846,8 +859,8 @@ namespace jcan.CelestialSystems
             var minimumAdjacentRadiusRatio =
                 Math.Exp(
                     Math.Log(
-                        outerOrbitRadiusMeters /
-                        innerOrbitRadiusMeters) *
+                        outerOrbitMeters /
+                        innerOrbitMeters) *
                     0.4 /
                     planetCount);
             var touchingLimit =
