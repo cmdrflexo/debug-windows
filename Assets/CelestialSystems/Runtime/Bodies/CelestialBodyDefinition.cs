@@ -89,6 +89,28 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double planetInwardMigrationFraction;
 
+        [Header("Generated Planetary Evolution Properties")]
+        [SerializeField]
+        private bool hasPlanetaryEvolutionProperties;
+
+        [SerializeField]
+        private double planetAssumedBondAlbedo;
+
+        [SerializeField]
+        private double planetEquilibriumTemperatureKelvin;
+
+        [SerializeField]
+        private double planetEscapeVelocityMetersPerSecond;
+
+        [SerializeField]
+        private CelestialAtmosphereRetention planetAtmosphereRetention;
+
+        [SerializeField]
+        private CelestialPlanetDifferentiation planetDifferentiation;
+
+        [SerializeField]
+        private CelestialPlanetVolatileState planetVolatileState;
+
         [SerializeField]
         [TextArea(3, 8)]
         private string description;
@@ -180,6 +202,27 @@ namespace jcan.CelestialSystems
         public double PlanetInwardMigrationFraction =>
             planetInwardMigrationFraction;
 
+        public bool HasPlanetaryEvolutionProperties =>
+            hasPlanetaryEvolutionProperties;
+
+        public double PlanetAssumedBondAlbedo =>
+            planetAssumedBondAlbedo;
+
+        public double PlanetEquilibriumTemperatureKelvin =>
+            planetEquilibriumTemperatureKelvin;
+
+        public double PlanetEscapeVelocityMetersPerSecond =>
+            planetEscapeVelocityMetersPerSecond;
+
+        public CelestialAtmosphereRetention PlanetAtmosphereRetention =>
+            planetAtmosphereRetention;
+
+        public CelestialPlanetDifferentiation PlanetDifferentiation =>
+            planetDifferentiation;
+
+        public CelestialPlanetVolatileState PlanetVolatileState =>
+            planetVolatileState;
+
         public string Description =>
             description ?? string.Empty;
 
@@ -250,6 +293,16 @@ namespace jcan.CelestialSystems
             planetVolatileMassFraction = 0.0;
             planetHydrogenHeliumEnvelopeFraction = 0.0;
             planetInwardMigrationFraction = 0.0;
+            hasPlanetaryEvolutionProperties = false;
+            planetAssumedBondAlbedo = 0.0;
+            planetEquilibriumTemperatureKelvin = 0.0;
+            planetEscapeVelocityMetersPerSecond = 0.0;
+            planetAtmosphereRetention =
+                CelestialAtmosphereRetention.None;
+            planetDifferentiation =
+                CelestialPlanetDifferentiation.Undifferentiated;
+            planetVolatileState =
+                CelestialPlanetVolatileState.Depleted;
             description = string.Empty;
         }
 
@@ -293,6 +346,24 @@ namespace jcan.CelestialSystems
                 properties.HydrogenHeliumEnvelopeFraction;
             planetInwardMigrationFraction =
                 properties.InwardMigrationFraction;
+        }
+
+        internal void ConfigureRuntimePlanetaryEvolutionProperties(
+            CelestialPlanetaryEvolutionResult properties)
+        {
+            hasPlanetaryEvolutionProperties = true;
+            planetAssumedBondAlbedo =
+                properties.AssumedBondAlbedo;
+            planetEquilibriumTemperatureKelvin =
+                properties.EquilibriumTemperatureKelvin;
+            planetEscapeVelocityMetersPerSecond =
+                properties.EscapeVelocityMetersPerSecond;
+            planetAtmosphereRetention =
+                properties.AtmosphereRetention;
+            planetDifferentiation =
+                properties.Differentiation;
+            planetVolatileState =
+                properties.VolatileState;
         }
 
         private static bool IsFinite(
