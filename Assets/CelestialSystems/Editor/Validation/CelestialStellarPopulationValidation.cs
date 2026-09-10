@@ -82,13 +82,16 @@ namespace jcan.CelestialSystems.Editor
                 }
             }
 
-            if (belowHalfSolar <=
-                    sampleCount / 2 ||
-                aboveEightSolar >=
-                    sampleCount / 100)
+            if (belowHalfSolar < 6500 ||
+                belowHalfSolar > 8500 ||
+                aboveEightSolar < 10 ||
+                aboveEightSolar > 150 ||
+                evolved < 100 ||
+                evolved > 1500)
             {
                 Debug.LogError(
-                    "Stellar population validation produced an implausible mass distribution.");
+                    "Stellar population validation produced an implausible mass or age distribution. " +
+                    $"Low mass: {belowHalfSolar}; massive births: {aboveEightSolar}; evolved: {evolved}.");
                 return;
             }
 

@@ -203,14 +203,26 @@ namespace jcan.CelestialSystems
             public DeterministicRandom(
                 int seed)
             {
+                // Avalanche sequential or visually similar seeds before the
+                // first xorshift output so nearby system seeds do not sample
+                // the same narrow part of a distribution.
+                var value =
+                    unchecked((uint)seed) +
+                    0x9E3779B9u;
+                value ^=
+                    value >> 16;
+                value *=
+                    0x85EBCA6Bu;
+                value ^=
+                    value >> 13;
+                value *=
+                    0xC2B2AE35u;
+                value ^=
+                    value >> 16;
                 state =
-                    unchecked((uint)seed);
-
-                if (state == 0)
-                {
-                    state =
-                        0x6D2B79F5u;
-                }
+                    value == 0
+                        ? 0x6D2B79F5u
+                        : value;
             }
 
             public double Next01()
