@@ -65,6 +65,10 @@ namespace jcan.CelestialSystems.Editor
                 first.VolatileState ==
                     repeated.VolatileState,
                 "Repeated evaluation changed a classification.");
+            Assert(
+                first.EquilibriumTemperatureKelvin >= 240.0 &&
+                first.EquilibriumTemperatureKelvin <= 275.0,
+                "The Solar-distance equilibrium temperature fell outside its expected calibration range.");
 
             var hotFormation =
                 CreateFormation(
