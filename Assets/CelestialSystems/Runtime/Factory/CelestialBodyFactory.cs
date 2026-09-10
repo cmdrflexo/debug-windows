@@ -309,6 +309,17 @@ namespace jcan.CelestialSystems
             var hierarchy =
                 EnsureRuntimeHierarchy(
                     instance);
+            var trajectoryGizmos =
+                instance.GetComponent<
+                    CelestialTrajectoryDebugGizmos>();
+
+            if (trajectoryGizmos == null)
+            {
+                trajectoryGizmos =
+                    instance.gameObject.AddComponent<
+                        CelestialTrajectoryDebugGizmos>();
+            }
+
             MonoBehaviour motionProvider;
 
             if (usesPrescribedTrajectory)
