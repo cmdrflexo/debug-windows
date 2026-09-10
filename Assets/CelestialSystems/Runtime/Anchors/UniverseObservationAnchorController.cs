@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 
 namespace jcan.CelestialSystems
 {
-    [DefaultExecutionOrder(410)]
+    [DefaultExecutionOrder(50)]
     [DisallowMultipleComponent]
     public sealed class UniverseObservationAnchorController : MonoBehaviour
     {
