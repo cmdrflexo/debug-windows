@@ -287,10 +287,17 @@ namespace jcan.CelestialSystems
             if (!usesPrescribedTrajectory &&
                 gravityBody == null)
             {
+                gravityBody =
+                    instance.gameObject.AddComponent<NBody>();
+            }
+
+            if (!usesPrescribedTrajectory &&
+                gravityBody == null)
+            {
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
-                    "A Gravity Engine celestial body requires an NBody assigned to its runtime context or attached to the same GameObject.");
+                    "The celestial body factory could not create the NBody required by its Gravity Engine motion mode.");
             }
 
             var massKilograms =
