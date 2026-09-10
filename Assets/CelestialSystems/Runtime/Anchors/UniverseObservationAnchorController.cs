@@ -57,10 +57,28 @@ namespace jcan.CelestialSystems
         private float minimumDistanceInTargetRadii = 1.05f;
 
         [SerializeField]
-        [Min(1.0f)]
+        [Min(1.0)]
         private double maximumDistanceMeters = 1.0e18;
 
         [Header("Controls")]
+        [SerializeField]
+        private InputActionReference pointerDeltaAction;
+
+        [SerializeField]
+        private InputActionReference orbitAction;
+
+        [SerializeField]
+        private InputActionReference panAction;
+
+        [SerializeField]
+        private InputActionReference zoomAction;
+
+        [SerializeField]
+        private InputActionReference recenterAction;
+
+        [SerializeField]
+        private bool invertPitch;
+
         [SerializeField]
         [Tooltip("Degrees of orbit rotation per mouse pixel.")]
         [Min(0.0f)]
@@ -70,6 +88,16 @@ namespace jcan.CelestialSystems
         [Tooltip("Plate movement per mouse pixel, as a fraction of camera distance.")]
         [Min(0.0f)]
         private float panDistanceFractionPerPixel = 0.0015f;
+
+        [SerializeField]
+        [Tooltip("How quickly drag movement becomes fling velocity.")]
+        [Min(0.0f)]
+        private float panVelocityResponse = 20.0f;
+
+        [SerializeField]
+        [Tooltip("How quickly a released pan fling slows down.")]
+        [Min(0.0f)]
+        private float panDamping = 4.0f;
 
         [SerializeField]
         [Tooltip("Base-2 logarithmic zoom applied per mouse-wheel unit.")]
@@ -90,6 +118,12 @@ namespace jcan.CelestialSystems
         private double plateOffsetForwardMeters;
 
         [SerializeField]
+        private double panVelocityRightMetersPerSecond;
+
+        [SerializeField]
+        private double panVelocityForwardMetersPerSecond;
+
+        [SerializeField]
         private bool hasTargetMotion;
 
         [SerializeField]
@@ -98,6 +132,12 @@ namespace jcan.CelestialSystems
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
         private bool viewInitialized;
+        private bool enabledPointerDeltaAction;
+        private bool enabledOrbitAction;
+        private bool enabledPanAction;
+        private bool enabledZoomAction;
+        private bool enabledRecenterAction;
+        private bool recenterZoomArmed;
 
         public CelestialBodyRuntimeContext Target => target;
 
@@ -120,6 +160,11 @@ namespace jcan.CelestialSystems
         private void OnEnable()
         {
             ResolveReferences();
+            enabledPointerDeltaAction = EnableAction(pointerDeltaAction);
+            enabledOrbitAction = EnableAction(orbitAction);
+            enabledPanAction = EnableAction(panAction);
+            enabledZoomAction = EnableAction(zoomAction);
+            enabledRecenterAction = EnableAction(recenterAction);
             SubscribeToDebugMenu();
         }
 
@@ -131,6 +176,17 @@ namespace jcan.CelestialSystems
         private void OnDisable()
         {
             UnsubscribeFromDebugMenu();
+            DisableAction(pointerDeltaAction, enabledPointerDeltaAction);
+            DisableAction(orbitAction, enabledOrbitAction);
+            DisableAction(panAction, enabledPanAction);
+            DisableAction(zoomAction, enabledZoomAction);
+            DisableAction(recenterAction, enabledRecenterAction);
+            enabledPointerDeltaAction = false;
+            enabledOrbitAction = false;
+            enabledPanAction = false;
+            enabledZoomAction = false;
+            enabledRecenterAction = false;
+            ClearPanVelocity();
         }
 
         private void OnValidate()
@@ -141,6 +197,8 @@ namespace jcan.CelestialSystems
             maximumDistanceMeters = Math.Max(1.0, maximumDistanceMeters);
             orbitDegreesPerPixel = Mathf.Max(0.0f, orbitDegreesPerPixel);
             panDistanceFractionPerPixel = Mathf.Max(0.0f, panDistanceFractionPerPixel);
+            panVelocityResponse = Mathf.Max(0.0f, panVelocityResponse);
+            panDamping = Mathf.Max(0.0f, panDamping);
             zoomExponentPerWheelUnit = Mathf.Max(0.0f, zoomExponentPerWheelUnit);
             NormalizeReferencePlane();
         }
@@ -154,7 +212,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            ReadControls();
+            ReadControls(Time.unscaledDeltaTime);
         }
 
         private void LateUpdate()
@@ -241,6 +299,7 @@ namespace jcan.CelestialSystems
                     : string.Empty;
             viewInitialized = false;
             hasTargetMotion = false;
+            recenterZoomArmed = false;
         }
 
         public bool SelectTargetByInstanceId(string instanceId)
@@ -281,6 +340,7 @@ namespace jcan.CelestialSystems
         {
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            ClearPanVelocity();
         }
 
         [ContextMenu("Reset Target View")]
@@ -288,9 +348,11 @@ namespace jcan.CelestialSystems
         {
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            ClearPanVelocity();
             pitchDegrees = 35.0f;
             yawDegrees = 0.0f;
             viewInitialized = false;
+            recenterZoomArmed = false;
         }
 
         private void ResolveTarget()
@@ -319,53 +381,148 @@ namespace jcan.CelestialSystems
                 1.0);
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            ClearPanVelocity();
+            recenterZoomArmed = false;
             viewInitialized = true;
         }
 
-        private void ReadControls()
+        private void ReadControls(float deltaTime)
         {
-            var mouse = Mouse.current;
+            var pointerDelta = ReadVector2(pointerDeltaAction);
 
-            if (mouse != null)
+            if (IsPressed(orbitAction))
             {
-                var pointerDelta = mouse.delta.ReadValue();
-
-                if (mouse.rightButton.isPressed)
+                if (pointerDelta.sqrMagnitude > Mathf.Epsilon)
                 {
-                    yawDegrees += pointerDelta.x * orbitDegreesPerPixel;
-                    pitchDegrees = Mathf.Clamp(
-                        pitchDegrees - pointerDelta.y * orbitDegreesPerPixel,
-                        -80.0f,
-                        80.0f);
+                    recenterZoomArmed = false;
                 }
 
-                if (mouse.middleButton.isPressed)
-                {
-                    var metersPerPixel =
-                        distanceMeters * panDistanceFractionPerPixel;
-
-                    plateOffsetRightMeters +=
-                        -pointerDelta.x * metersPerPixel;
-                    plateOffsetForwardMeters +=
-                        -pointerDelta.y * metersPerPixel;
-                }
-
-                var wheel = mouse.scroll.ReadValue().y;
-
-                if (!Mathf.Approximately(wheel, 0.0f))
-                {
-                    distanceMeters *= Math.Pow(
-                        2.0,
-                        -wheel * zoomExponentPerWheelUnit);
-                }
+                yawDegrees += pointerDelta.x * orbitDegreesPerPixel;
+                var pitchDirection = invertPitch ? 1.0f : -1.0f;
+                pitchDegrees = Mathf.Clamp(
+                    pitchDegrees +
+                        pointerDelta.y * orbitDegreesPerPixel * pitchDirection,
+                    -80.0f,
+                    80.0f);
             }
 
-            var keyboard = Keyboard.current;
-
-            if (keyboard != null && keyboard.homeKey.wasPressedThisFrame)
+            if (IsPressed(panAction))
             {
-                RecenterOnTarget();
+                if (pointerDelta.sqrMagnitude > Mathf.Epsilon)
+                {
+                    recenterZoomArmed = false;
+                }
+
+                ApplyPanDrag(pointerDelta, deltaTime);
             }
+            else
+            {
+                ApplyPanFling(deltaTime);
+            }
+
+            var zoomInput = ReadFloat(zoomAction);
+
+            if (!Mathf.Approximately(zoomInput, 0.0f))
+            {
+                recenterZoomArmed = false;
+                distanceMeters *= Math.Pow(
+                    2.0,
+                    -zoomInput * zoomExponentPerWheelUnit);
+            }
+
+            if (WasPressedThisFrame(recenterAction))
+            {
+                HandleRecenterPressed();
+            }
+        }
+
+        private void HandleRecenterPressed()
+        {
+            if (recenterZoomArmed)
+            {
+                distanceMeters = Math.Max(
+                    GetTargetRadiusMeters() * initialDistanceInTargetRadii,
+                    1.0);
+                recenterZoomArmed = false;
+                return;
+            }
+
+            RecenterOnTarget();
+            recenterZoomArmed = true;
+        }
+
+        private void ApplyPanDrag(Vector2 pointerDelta, float deltaTime)
+        {
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            GetReferencePlaneAxes(
+                out var planeRight,
+                out var planeForward,
+                out var planeUp);
+
+            var yawRotation = Quaternion.AngleAxis(yawDegrees, planeUp);
+            var cameraRightOnPlane = yawRotation * planeRight;
+            var cameraForwardOnPlane = yawRotation * planeForward;
+            var metersPerPixel = distanceMeters * panDistanceFractionPerPixel;
+            var movement =
+                ToDoubleVector(cameraRightOnPlane) *
+                    (-pointerDelta.x * metersPerPixel) +
+                ToDoubleVector(cameraForwardOnPlane) *
+                    (-pointerDelta.y * metersPerPixel);
+            var rightMovement = Dot(movement, planeRight);
+            var forwardMovement = Dot(movement, planeForward);
+
+            plateOffsetRightMeters += rightMovement;
+            plateOffsetForwardMeters += forwardMovement;
+
+            var instantRightVelocity = rightMovement / deltaTime;
+            var instantForwardVelocity = forwardMovement / deltaTime;
+            var response = 1.0 - Math.Exp(-panVelocityResponse * deltaTime);
+
+            panVelocityRightMetersPerSecond = Lerp(
+                panVelocityRightMetersPerSecond,
+                instantRightVelocity,
+                response);
+            panVelocityForwardMetersPerSecond = Lerp(
+                panVelocityForwardMetersPerSecond,
+                instantForwardVelocity,
+                response);
+        }
+
+        private void ApplyPanFling(float deltaTime)
+        {
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            plateOffsetRightMeters +=
+                panVelocityRightMetersPerSecond * deltaTime;
+            plateOffsetForwardMeters +=
+                panVelocityForwardMetersPerSecond * deltaTime;
+
+            var dampingFactor = Math.Exp(-panDamping * deltaTime);
+            panVelocityRightMetersPerSecond *= dampingFactor;
+            panVelocityForwardMetersPerSecond *= dampingFactor;
+
+            if (Math.Abs(panVelocityRightMetersPerSecond) < 1.0e-9)
+            {
+                panVelocityRightMetersPerSecond = 0.0;
+            }
+
+            if (Math.Abs(panVelocityForwardMetersPerSecond) < 1.0e-9)
+            {
+                panVelocityForwardMetersPerSecond = 0.0;
+            }
+        }
+
+        private void ClearPanVelocity()
+        {
+            panVelocityRightMetersPerSecond = 0.0;
+            panVelocityForwardMetersPerSecond = 0.0;
         }
 
         private void GetReferencePlaneAxes(
@@ -476,6 +633,83 @@ namespace jcan.CelestialSystems
         private void OnDebugMenuVisibilityChanged(bool visible)
         {
             debugMenuVisible = visible;
+
+            if (visible)
+            {
+                ClearPanVelocity();
+                recenterZoomArmed = false;
+            }
+        }
+
+        private static bool EnableAction(InputActionReference actionReference)
+        {
+            var action = actionReference != null
+                ? actionReference.action
+                : null;
+
+            if (action == null || action.enabled)
+            {
+                return false;
+            }
+
+            action.Enable();
+            return true;
+        }
+
+        private static void DisableAction(
+            InputActionReference actionReference,
+            bool enabledByThisComponent)
+        {
+            if (!enabledByThisComponent ||
+                actionReference == null ||
+                actionReference.action == null)
+            {
+                return;
+            }
+
+            actionReference.action.Disable();
+        }
+
+        private static Vector2 ReadVector2(InputActionReference actionReference)
+        {
+            return actionReference != null && actionReference.action != null
+                ? actionReference.action.ReadValue<Vector2>()
+                : Vector2.zero;
+        }
+
+        private static float ReadFloat(InputActionReference actionReference)
+        {
+            return actionReference != null && actionReference.action != null
+                ? actionReference.action.ReadValue<float>()
+                : 0.0f;
+        }
+
+        private static bool IsPressed(InputActionReference actionReference)
+        {
+            return actionReference != null &&
+                actionReference.action != null &&
+                actionReference.action.IsPressed();
+        }
+
+        private static bool WasPressedThisFrame(
+            InputActionReference actionReference)
+        {
+            return actionReference != null &&
+                actionReference.action != null &&
+                actionReference.action.WasPressedThisFrame();
+        }
+
+        private static double Dot(DoubleVector3 value, Vector3 axis)
+        {
+            return
+                value.x * axis.x +
+                value.y * axis.y +
+                value.z * axis.z;
+        }
+
+        private static double Lerp(double from, double to, double amount)
+        {
+            return from + (to - from) * Math.Max(0.0, Math.Min(1.0, amount));
         }
 
         private static DoubleVector3 ToDoubleVector(Vector3 value)
