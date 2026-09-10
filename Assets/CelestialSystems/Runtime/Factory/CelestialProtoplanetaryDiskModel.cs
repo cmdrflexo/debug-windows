@@ -6,11 +6,12 @@ using System;
 
 namespace jcan.CelestialSystems
 {
-    public enum CelestialPlanetFormationOutlook
+    public enum CelestialPlanetFormationCapacity
     {
-        Suppressed = 0,
-        Limited = 1,
-        Favorable = 2
+        StronglyInhibited = 0,
+        Low = 1,
+        Typical = 2,
+        High = 3
     }
 
     public readonly struct CelestialProtoplanetaryDiskResult
@@ -23,7 +24,7 @@ namespace jcan.CelestialSystems
             double frostLineAstronomicalUnits,
             double planetFormationWindowMegayears,
             double environmentalRetentionFraction,
-            CelestialPlanetFormationOutlook formationOutlook)
+            CelestialPlanetFormationCapacity formationOutlook)
         {
             InitialGasMassSolar = initialGasMassSolar;
             InitialSolidMassEarth = initialSolidMassEarth;
@@ -37,7 +38,7 @@ namespace jcan.CelestialSystems
                 planetFormationWindowMegayears;
             EnvironmentalRetentionFraction =
                 environmentalRetentionFraction;
-            FormationOutlook = formationOutlook;
+            FormationCapacity = formationOutlook;
         }
 
         public double InitialGasMassSolar { get; }
@@ -54,7 +55,7 @@ namespace jcan.CelestialSystems
 
         public double EnvironmentalRetentionFraction { get; }
 
-        public CelestialPlanetFormationOutlook FormationOutlook { get; }
+        public CelestialPlanetFormationCapacity FormationCapacity { get; }
     }
 
     public static class CelestialProtoplanetaryDiskModel
@@ -108,12 +109,12 @@ namespace jcan.CelestialSystems
                     0.7);
             var diskToStarMassRatio =
                 Clamp(
-                    0.005 *
+                    0.03 *
                     Math.Pow(
                         10.0,
                         diskMassScatterDex),
-                    0.001,
-                    0.1);
+                    0.003,
+                    0.15);
             var unperturbedGasMassSolar =
                 hostMassSolar *
                 diskToStarMassRatio;
@@ -238,7 +239,7 @@ namespace jcan.CelestialSystems
             return true;
         }
 
-        private static CelestialPlanetFormationOutlook ResolveOutlook(
+        private static CelestialPlanetFormationCapacity ResolveOutlook(
             double solidMassEarth,
             double outerBoundaryAu,
             double formationWindowMegayears)
@@ -248,18 +249,24 @@ namespace jcan.CelestialSystems
                 formationWindowMegayears < 0.75)
             {
                 return
-                    CelestialPlanetFormationOutlook.Suppressed;
+                    CelestialPlanetFormationCapacity.StronglyInhibited;
             }
 
             if (solidMassEarth < 10.0 ||
                 formationWindowMegayears < 1.5)
             {
                 return
-                    CelestialPlanetFormationOutlook.Limited;
+                    CelestialPlanetFormationCapacity.Low;
+            }
+
+            if (solidMassEarth < 50.0)
+            {
+                return
+                    CelestialPlanetFormationCapacity.Typical;
             }
 
             return
-                CelestialPlanetFormationOutlook.Favorable;
+                CelestialPlanetFormationCapacity.High;
         }
 
         private static double EstimateFormationLuminositySolar(

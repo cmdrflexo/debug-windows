@@ -72,14 +72,18 @@ namespace jcan.CelestialSystems.Editor
                 return;
             }
 
-            if (first.FrostLineAstronomicalUnits < 2.6 ||
+            if (first.InitialSolidMassEarth < 10.0 ||
+                first.InitialSolidMassEarth > 100.0 ||
+                (int)first.FormationCapacity <
+                    (int)CelestialPlanetFormationCapacity.Typical ||
+                first.FrostLineAstronomicalUnits < 2.6 ||
                 first.FrostLineAstronomicalUnits > 2.8 ||
                 first.InnerBoundaryAstronomicalUnits <= 0.0 ||
                 first.OuterBoundaryAstronomicalUnits <=
                     first.InnerBoundaryAstronomicalUnits)
             {
                 Debug.LogError(
-                    "Protoplanetary disk validation failed: Solar-analog boundaries were outside the expected v1 range.");
+                    "Protoplanetary disk validation failed: Solar-analog material budget or boundaries were outside the expected v1 range.");
                 return;
             }
 
@@ -150,7 +154,7 @@ namespace jcan.CelestialSystems.Editor
             }
 
             Debug.Log(
-                $"Protoplanetary disk PASS. Model v{CelestialProtoplanetaryDiskModel.ModelVersion}; deterministic, metallicity, radiation, and boundary checks passed. Solar analog: {first.InitialSolidMassEarth:0.##} Earth masses of solids, frost line {first.FrostLineAstronomicalUnits:0.##} AU, outer boundary {first.OuterBoundaryAstronomicalUnits:0.##} AU, formation window {first.PlanetFormationWindowMegayears:0.##} Myr, outlook {first.FormationOutlook}.");
+                $"Protoplanetary disk PASS. Model v{CelestialProtoplanetaryDiskModel.ModelVersion}; deterministic, metallicity, radiation, and boundary checks passed. Solar analog: {first.InitialSolidMassEarth:0.##} Earth masses of solids, frost line {first.FrostLineAstronomicalUnits:0.##} AU, outer boundary {first.OuterBoundaryAstronomicalUnits:0.##} AU, formation window {first.PlanetFormationWindowMegayears:0.##} Myr, capacity {first.FormationCapacity}.");
         }
 
         private static bool TryGenerate(
@@ -206,8 +210,8 @@ namespace jcan.CelestialSystems.Editor
                     right.PlanetFormationWindowMegayears &&
                 left.EnvironmentalRetentionFraction ==
                     right.EnvironmentalRetentionFraction &&
-                left.FormationOutlook ==
-                    right.FormationOutlook;
+                left.FormationCapacity ==
+                    right.FormationCapacity;
         }
     }
 }
