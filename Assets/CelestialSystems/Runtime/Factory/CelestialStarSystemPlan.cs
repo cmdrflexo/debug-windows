@@ -17,7 +17,11 @@ namespace jcan.CelestialSystems
                 CelestialBodySystemDefinition definition,
                 DoubleVector3 positionMetersFromStarSystemOrigin,
                 DoubleVector3 velocityMetersPerSecond,
-                Quaternion rotation)
+                Quaternion rotation,
+                CelestialBodySpawnMode? rootMotionModeOverride = null,
+                string referenceBodySystemInstanceId = null,
+                string referenceBodyInstanceId = null,
+                CelestialTrajectoryDefinition trajectory = null)
             {
                 InstanceId = instanceId;
                 Definition = definition;
@@ -26,6 +30,12 @@ namespace jcan.CelestialSystems
                 VelocityMetersPerSecond =
                     velocityMetersPerSecond;
                 Rotation = rotation;
+                RootMotionModeOverride = rootMotionModeOverride;
+                ReferenceBodySystemInstanceId =
+                    referenceBodySystemInstanceId;
+                ReferenceBodyInstanceId =
+                    referenceBodyInstanceId;
+                Trajectory = trajectory;
             }
 
             public string InstanceId { get; }
@@ -37,6 +47,14 @@ namespace jcan.CelestialSystems
             public DoubleVector3 VelocityMetersPerSecond { get; }
 
             public Quaternion Rotation { get; }
+
+            public CelestialBodySpawnMode? RootMotionModeOverride { get; }
+
+            public string ReferenceBodySystemInstanceId { get; }
+
+            public string ReferenceBodyInstanceId { get; }
+
+            public CelestialTrajectoryDefinition Trajectory { get; }
         }
 
         private readonly BodySystemPlan[] bodySystems;

@@ -69,6 +69,31 @@ namespace jcan.CelestialSystems
             Transform parent,
             out GeneratedSystem generatedSystem)
         {
+            return TryGenerate(
+                systemInstanceId,
+                definition,
+                positionMetersFromFrameOrigin,
+                velocityMetersPerSecond,
+                rotation,
+                parent,
+                null,
+                null,
+                null,
+                out generatedSystem);
+        }
+
+        public bool TryGenerate(
+            string systemInstanceId,
+            CelestialBodySystemDefinition definition,
+            DoubleVector3 positionMetersFromFrameOrigin,
+            DoubleVector3 velocityMetersPerSecond,
+            Quaternion rotation,
+            Transform parent,
+            CelestialBodySpawnMode? rootMotionModeOverride,
+            CelestialBodyRuntimeContext externalRootOrbitCenter,
+            CelestialTrajectoryDefinition externalRootTrajectory,
+            out GeneratedSystem generatedSystem)
+        {
             generatedSystem = null;
             LastError = string.Empty;
 
@@ -148,6 +173,23 @@ namespace jcan.CelestialSystems
                         continue;
                     }
 
+                    var isRootEntry =
+                        string.IsNullOrWhiteSpace(
+                            entry.ParentInstanceId);
+                    var effectiveMotionMode =
+                        isRootEntry &&
+                        rootMotionModeOverride.HasValue
+                            ? rootMotionModeOverride.Value
+                            : entry.MotionMode;
+                    var effectiveOrbitCenter =
+                        isRootEntry
+                            ? externalRootOrbitCenter
+                            : orbitCenter;
+                    var effectiveTrajectory =
+                        isRootEntry &&
+                        externalRootTrajectory != null
+                            ? externalRootTrajectory
+                            : entry.Trajectory;
                     var bodyInstanceId =
                         $"{systemInstanceId}/{entry.InstanceId}";
                     var request =
@@ -166,11 +208,12 @@ namespace jcan.CelestialSystems
                                 entry.Rotation,
                             entry.QualityProfile,
                             root,
-                            entry.MotionMode,
-                            orbitCenter,
+                            effectiveMotionMode,
+                            effectiveOrbitCenter,
                             Rotate(
                                 rotation,
-                                entry.AngularVelocityRadiansPerSecond));
+                                entry.AngularVelocityRadiansPerSecond),
+                            effectiveTrajectory);
 
                     if (!bodyFactory.TrySpawnBody(
                             request,

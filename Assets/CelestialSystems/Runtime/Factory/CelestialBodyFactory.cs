@@ -45,6 +45,9 @@ namespace jcan.CelestialSystems
         private UniverseFrameController universeFrame;
 
         [SerializeField]
+        private CelestialTimeController celestialTime;
+
+        [SerializeField]
         private CelestialBodyRuntimeContext bodyPrefab;
 
         [SerializeField]
@@ -269,6 +272,9 @@ namespace jcan.CelestialSystems
                     "The celestial body factory could not instantiate its body prefab.");
             }
 
+            var usesPrescribedTrajectory =
+                request.MotionMode ==
+                    CelestialBodySpawnMode.PrescribedTrajectory;
             var gravityBody =
                 instance.GravityBody;
 
@@ -278,19 +284,21 @@ namespace jcan.CelestialSystems
                     instance.GetComponent<NBody>();
             }
 
-            if (gravityBody == null)
+            if (!usesPrescribedTrajectory &&
+                gravityBody == null)
             {
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
-                    "The celestial body prefab requires an NBody assigned to its runtime context or attached to the same GameObject.");
+                    "A Gravity Engine celestial body requires an NBody assigned to its runtime context or attached to the same GameObject.");
             }
 
             var massKilograms =
                 request.Definition.MassKilograms;
 
-            if (massKilograms >
-                float.MaxValue)
+            if (!usesPrescribedTrajectory &&
+                massKilograms >
+                    float.MaxValue)
             {
                 Destroy(
                     instance.gameObject);
@@ -301,35 +309,69 @@ namespace jcan.CelestialSystems
             var hierarchy =
                 EnsureRuntimeHierarchy(
                     instance);
-            var motionProvider =
-                hierarchy.MotionRoot.GetComponent<
-                    GravityEngineCelestialBodyMotionProvider>();
+            var trajectoryGizmos =
+                instance.GetComponent<
+                    CelestialTrajectoryDebugGizmos>();
 
-            if (motionProvider == null)
+            if (trajectoryGizmos == null)
             {
-                motionProvider =
-                    hierarchy.MotionRoot.gameObject.AddComponent<
-                        GravityEngineCelestialBodyMotionProvider>();
+                trajectoryGizmos =
+                    instance.gameObject.AddComponent<
+                        CelestialTrajectoryDebugGizmos>();
             }
 
-            gravityBody.mass =
-                (float)massKilograms;
+            MonoBehaviour motionProvider;
 
-            gravityBody.SetPosVel3d(
-                new Vector3d(
-                    request.InitialPositionMetersFromFrameOrigin.x /
-                        positionMetersPerPhysicsUnit,
-                    request.InitialPositionMetersFromFrameOrigin.y /
-                        positionMetersPerPhysicsUnit,
-                    request.InitialPositionMetersFromFrameOrigin.z /
-                        positionMetersPerPhysicsUnit),
-                new Vector3d(
-                    request.InitialVelocityMetersPerSecond.x /
-                        velocityMetersPerSecondPerPhysicsUnit,
-                    request.InitialVelocityMetersPerSecond.y /
-                        velocityMetersPerSecondPerPhysicsUnit,
-                    request.InitialVelocityMetersPerSecond.z /
-                        velocityMetersPerSecondPerPhysicsUnit));
+            if (usesPrescribedTrajectory)
+            {
+                var trajectoryProvider =
+                    hierarchy.MotionRoot.GetComponent<
+                        TrajectoryCelestialBodyMotionProvider>();
+
+                if (trajectoryProvider == null)
+                {
+                    trajectoryProvider =
+                        hierarchy.MotionRoot.gameObject.AddComponent<
+                            TrajectoryCelestialBodyMotionProvider>();
+                }
+
+                motionProvider =
+                    trajectoryProvider;
+            }
+            else
+            {
+                var gravityProvider =
+                    hierarchy.MotionRoot.GetComponent<
+                        GravityEngineCelestialBodyMotionProvider>();
+
+                if (gravityProvider == null)
+                {
+                    gravityProvider =
+                        hierarchy.MotionRoot.gameObject.AddComponent<
+                            GravityEngineCelestialBodyMotionProvider>();
+                }
+
+                motionProvider =
+                    gravityProvider;
+                gravityBody.mass =
+                    (float)massKilograms;
+
+                gravityBody.SetPosVel3d(
+                    new Vector3d(
+                        request.InitialPositionMetersFromFrameOrigin.x /
+                            positionMetersPerPhysicsUnit,
+                        request.InitialPositionMetersFromFrameOrigin.y /
+                            positionMetersPerPhysicsUnit,
+                        request.InitialPositionMetersFromFrameOrigin.z /
+                            positionMetersPerPhysicsUnit),
+                    new Vector3d(
+                        request.InitialVelocityMetersPerSecond.x /
+                            velocityMetersPerSecondPerPhysicsUnit,
+                        request.InitialVelocityMetersPerSecond.y /
+                            velocityMetersPerSecondPerPhysicsUnit,
+                        request.InitialVelocityMetersPerSecond.z /
+                            velocityMetersPerSecondPerPhysicsUnit));
+            }
 
             instance.transform.rotation =
                 request.InitialRotation;
@@ -339,25 +381,28 @@ namespace jcan.CelestialSystems
             var gravityBodyAdded = false;
             try
             {
-                gravityEngine.AddBody(
-                    instance.gameObject);
-                gravityBodyAdded = true;
-
-                if (request.MotionMode ==
-                    CelestialBodySpawnMode.OnRails)
+                if (!usesPrescribedTrajectory)
                 {
-                    var orbit =
-                        instance.GetComponent<OrbitUniversal>();
-                    if (orbit == null)
-                    {
-                        orbit =
-                            instance.gameObject.AddComponent<OrbitUniversal>();
-                    }
+                    gravityEngine.AddBody(
+                        instance.gameObject);
+                    gravityBodyAdded = true;
 
-                    orbit.InitFromActiveNBody(
-                        gravityBody,
-                        request.OrbitCenter.GravityBody,
-                        OrbitUniversal.EvolveMode.KEPLERS_EQN);
+                    if (request.MotionMode ==
+                        CelestialBodySpawnMode.OnRails)
+                    {
+                        var orbit =
+                            instance.GetComponent<OrbitUniversal>();
+                        if (orbit == null)
+                        {
+                            orbit =
+                                instance.gameObject.AddComponent<OrbitUniversal>();
+                        }
+
+                        orbit.InitFromActiveNBody(
+                            gravityBody,
+                            request.OrbitCenter.GravityBody,
+                            OrbitUniversal.EvolveMode.KEPLERS_EQN);
+                    }
                 }
             }
             catch (Exception exception)
@@ -373,9 +418,50 @@ namespace jcan.CelestialSystems
                     $"Gravity Engine rejected the spawned celestial body: {exception.Message}");
             }
 
-            motionProvider.Initialize(
-                universeFrame,
-                gravityBody);
+            if (usesPrescribedTrajectory)
+            {
+                var trajectoryProvider =
+                    (TrajectoryCelestialBodyMotionProvider)motionProvider;
+                var providerInitialized =
+                    request.Trajectory == null
+                        ? trajectoryProvider.InitializeInertial(
+                            universeFrame,
+                            celestialTime,
+                            instance.transform,
+                            request.InitialPositionMetersFromFrameOrigin,
+                            request.InitialVelocityMetersPerSecond,
+                            request.InitialRotation,
+                            request.InitialAngularVelocityRadiansPerSecond)
+                        : trajectoryProvider.InitializeTrajectory(
+                            universeFrame,
+                            celestialTime,
+                            instance.transform,
+                            request.Trajectory,
+                            request.OrbitCenter,
+                            massKilograms,
+                            request.InitialRotation,
+                            request.InitialAngularVelocityRadiansPerSecond);
+
+                if (!providerInitialized)
+                {
+                    Destroy(
+                        instance.gameObject);
+                    return RecordSpawnFailure(
+                        string.IsNullOrWhiteSpace(
+                            trajectoryProvider.LastError)
+                            ? "The prescribed trajectory provider failed to initialize."
+                            : trajectoryProvider.LastError);
+                }
+
+                gravityBody = null;
+            }
+            else
+            {
+                ((GravityEngineCelestialBodyMotionProvider)motionProvider)
+                    .Initialize(
+                        universeFrame,
+                        gravityBody);
+            }
 
             if (!instance.InitializePackage(
                     request,
@@ -391,8 +477,11 @@ namespace jcan.CelestialSystems
                 var initializationError =
                     instance.LastError;
 
-                gravityEngine.RemoveBody(
-                    instance.gameObject);
+                if (gravityBodyAdded)
+                {
+                    gravityEngine.RemoveBody(
+                        instance.gameObject);
+                }
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
@@ -419,8 +508,11 @@ namespace jcan.CelestialSystems
                 var surfaceError =
                     surfaceRuntime.LastError;
 
-                gravityEngine.RemoveBody(
-                    instance.gameObject);
+                if (gravityBodyAdded)
+                {
+                    gravityEngine.RemoveBody(
+                        instance.gameObject);
+                }
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
@@ -532,8 +624,11 @@ namespace jcan.CelestialSystems
                 var presentationError =
                     presentationController.LastError;
 
-                gravityEngine.RemoveBody(
-                    instance.gameObject);
+                if (gravityBodyAdded)
+                {
+                    gravityEngine.RemoveBody(
+                        instance.gameObject);
+                }
                 Destroy(
                     instance.gameObject);
                 return RecordSpawnFailure(
@@ -720,10 +815,39 @@ namespace jcan.CelestialSystems
                     request.OrbitCenter.Definition == null))
             {
                 return RecordSpawnFailure(
-                    "An on-rails celestial body requires an active orbit-center body.");
+                    "A Gravity Engine on-rails celestial body requires an active GE orbit-center body.");
+            }
+
+            if (request.MotionMode ==
+                    CelestialBodySpawnMode.PrescribedTrajectory &&
+                request.Trajectory != null &&
+                (request.OrbitCenter == null ||
+                    request.OrbitCenter.Definition == null))
+            {
+                return RecordSpawnFailure(
+                    "A prescribed trajectory requires an active reference body.");
             }
 
             RefreshMotionBackendState();
+
+            if (request.MotionMode ==
+                CelestialBodySpawnMode.PrescribedTrajectory)
+            {
+                celestialTime ??=
+                    CelestialTimeController.Instance;
+
+                if (celestialTime == null)
+                {
+                    return RecordSpawnFailure(
+                        "A prescribed trajectory requires an active Celestial Time Controller.");
+                }
+
+                positionMetersPerPhysicsUnit =
+                    1.0;
+                velocityMetersPerSecondPerPhysicsUnit =
+                    1.0;
+                return true;
+            }
 
             if (gravityEngine == null)
             {
@@ -918,9 +1042,12 @@ namespace jcan.CelestialSystems
         {
             gravityEngine ??=
                 GravityEngine.Instance();
+            celestialTime ??=
+                CelestialTimeController.Instance;
             motionBackendReady =
-                gravityEngine != null &&
-                gravityEngine.IsSetup();
+                (gravityEngine != null &&
+                    gravityEngine.IsSetup()) ||
+                celestialTime != null;
         }
 
         private bool RecordSpawnFailure(
