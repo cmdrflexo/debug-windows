@@ -44,7 +44,9 @@ namespace jcan.CelestialSystems
 
         public string ProviderName =>
             usesTrajectory
-                ? "Prescribed Circular Trajectory"
+                ? (trajectory.Kind == CelestialTrajectoryKind.KeplerianConic
+                    ? "Prescribed Keplerian Conic Trajectory"
+                    : "Prescribed Circular Trajectory")
                 : "Prescribed Inertial State";
 
         public bool IsReady =>

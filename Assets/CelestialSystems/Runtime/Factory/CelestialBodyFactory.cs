@@ -814,7 +814,7 @@ namespace jcan.CelestialSystems
                     request.OrbitCenter.Definition == null))
             {
                 return RecordSpawnFailure(
-                    "A prescribed circular trajectory requires an active reference body.");
+                    "A prescribed trajectory requires an active reference body.");
             }
 
             RefreshMotionBackendState();
