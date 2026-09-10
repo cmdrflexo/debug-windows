@@ -57,7 +57,7 @@ namespace jcan.CelestialSystems
         private float minimumDistanceInTargetRadii = 1.05f;
 
         [SerializeField]
-        [Min(1.0)]
+        [Min(1.0f)]
         private double maximumDistanceMeters = 1.0e18;
 
         [Header("Controls")]
