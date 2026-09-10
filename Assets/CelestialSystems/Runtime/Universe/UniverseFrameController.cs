@@ -1,5 +1,5 @@
 /*
- * Owns the active universe frame, applies origin shifts to Gravity Engine, and notifies scene-space listeners.
+ * Owns the active universe frame and notifies scene-space listeners when its origin shifts.
  */
 
 using System;
@@ -19,7 +19,6 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private UniversePosition frameOrigin;
 
-        private GravityEngine gravityEngine;
         private bool frameOriginInitialized;
 
         public UniverseAnchorSource ActiveAnchorSource =>
@@ -35,12 +34,7 @@ namespace jcan.CelestialSystems
             UniverseAnchorSource,
             UniverseAnchorSource> ActiveAnchorSourceChanged;
 
-        private void Awake()
-        {
-            gravityEngine = GravityEngine.Instance();
-        }
-
-        private void Start()
+         private void Start()
         {
             activeAnchorSource?.SetSourceActive(true);
         }
@@ -120,33 +114,6 @@ namespace jcan.CelestialSystems
             {
                 return false;
             }
-
-            gravityEngine ??= GravityEngine.Instance();
-
-            if (gravityEngine == null)
-            {
-                Debug.LogError(
-                    "Cannot shift the universe frame because no Gravity Engine exists in the scene.",
-                    this);
-                return false;
-            }
-
-            var physicalScale = gravityEngine.GetPhysicalScale();
-
-            if (Mathf.Approximately(physicalScale, 0.0f))
-            {
-                Debug.LogError(
-                    "Cannot shift the universe frame because Gravity Engine's physical scale is zero.",
-                    this);
-                return false;
-            }
-
-            var physicsDelta = new Vector3d(
-                -originAdvanceMeters.x / physicalScale,
-                -originAdvanceMeters.y / physicalScale,
-                -originAdvanceMeters.z / physicalScale);
-
-            gravityEngine.MoveAll(physicsDelta);
 
             frameOrigin.AddLocalMeters(
                 originAdvanceMeters.x,
