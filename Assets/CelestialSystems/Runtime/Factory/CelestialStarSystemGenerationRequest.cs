@@ -7,11 +7,15 @@ namespace jcan.CelestialSystems
     public sealed class CelestialStarSystemGenerationRequest
     {
         public CelestialStarSystemGenerationRequest(
-            int seed)
+            int seed,
+            CelestialGalacticEnvironmentDefinition environment = null)
         {
             Seed = seed;
+            Environment = environment;
         }
 
         public int Seed { get; }
+
+        public CelestialGalacticEnvironmentDefinition Environment { get; }
     }
 }

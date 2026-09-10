@@ -20,6 +20,10 @@ namespace jcan.CelestialSystems
         private CelestialSystemGenerationGuide generationGuide;
 
         [SerializeField]
+        [Tooltip("Optional galactic conditions supplied to environment-aware generation guides.")]
+        private CelestialGalacticEnvironmentDefinition galacticEnvironment;
+
+        [SerializeField]
         private int seed = 1;
 
         [SerializeField]
@@ -74,6 +78,9 @@ namespace jcan.CelestialSystems
 
         public CelestialSystemGenerationGuide GenerationGuide =>
             generationGuide;
+
+        public CelestialGalacticEnvironmentDefinition GalacticEnvironment =>
+            galacticEnvironment;
 
         public int Seed =>
             seed;
@@ -177,6 +184,7 @@ namespace jcan.CelestialSystems
                     instanceId,
                     seed,
                     generationGuide,
+                    galacticEnvironment,
                     positionMetersFromFrameOrigin,
                     velocityMetersPerSecond,
                     Quaternion.Euler(

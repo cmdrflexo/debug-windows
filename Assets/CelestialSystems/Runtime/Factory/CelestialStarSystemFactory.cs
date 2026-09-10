@@ -20,6 +20,7 @@ namespace jcan.CelestialSystems
                 string instanceId,
                 int seed,
                 CelestialSystemGenerationGuide guide,
+                CelestialGalacticEnvironmentDefinition environment,
                 CelestialStarSystemPlan plan,
                 Transform root,
                 Dictionary<string, CelestialBodySystemFactory.GeneratedSystem> bodySystems)
@@ -27,6 +28,7 @@ namespace jcan.CelestialSystems
                 InstanceId = instanceId;
                 Seed = seed;
                 Guide = guide;
+                Environment = environment;
                 Plan = plan;
                 Root = root;
                 this.bodySystems = bodySystems;
@@ -37,6 +39,8 @@ namespace jcan.CelestialSystems
             public int Seed { get; }
 
             public CelestialSystemGenerationGuide Guide { get; }
+
+            public CelestialGalacticEnvironmentDefinition Environment { get; }
 
             public CelestialStarSystemPlan Plan { get; }
 
@@ -70,6 +74,29 @@ namespace jcan.CelestialSystems
             Transform parent,
             out GeneratedSystem generatedSystem)
         {
+            return TryGenerate(
+                starSystemInstanceId,
+                seed,
+                guide,
+                null,
+                positionMetersFromFrameOrigin,
+                velocityMetersPerSecond,
+                rotation,
+                parent,
+                out generatedSystem);
+        }
+
+        public bool TryGenerate(
+            string starSystemInstanceId,
+            int seed,
+            CelestialSystemGenerationGuide guide,
+            CelestialGalacticEnvironmentDefinition environment,
+            DoubleVector3 positionMetersFromFrameOrigin,
+            DoubleVector3 velocityMetersPerSecond,
+            Quaternion rotation,
+            Transform parent,
+            out GeneratedSystem generatedSystem)
+        {
             generatedSystem = null;
             LastError = string.Empty;
 
@@ -84,6 +111,14 @@ namespace jcan.CelestialSystems
             {
                 return SetError(
                     "A celestial star system factory requires a generation guide.");
+            }
+
+            if (environment != null &&
+                !environment.TryValidate(
+                    out var environmentError))
+            {
+                return SetError(
+                    environmentError);
             }
 
             if (!IsFinite(
@@ -103,7 +138,8 @@ namespace jcan.CelestialSystems
             {
                 if (!guide.TryGenerate(
                         new CelestialStarSystemGenerationRequest(
-                            seed),
+                            seed,
+                            environment),
                         out plan,
                         out var guideError))
                 {
@@ -240,6 +276,7 @@ namespace jcan.CelestialSystems
                     starSystemInstanceId,
                     seed,
                     guide,
+                    environment,
                     plan,
                     root,
                     generatedBodySystems);
