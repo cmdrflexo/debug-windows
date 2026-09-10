@@ -106,6 +106,12 @@ namespace jcan.CelestialSystems
                 DescribePlanetOrbit(
                     formation,
                     finalOrbit);
+            var hasMigration =
+                orbitSentence.Length > 0;
+            var orbitIntroduction =
+                hasMigration
+                    ? $"This is a {classification} planet."
+                    : $"This {classification} planet orbits approximately {finalOrbit} astronomical units from its star.";
 
             switch (SelectVariant(
                 generationSeed,
@@ -114,7 +120,7 @@ namespace jcan.CelestialSystems
                 case 0:
                     return
                         JoinSentences(
-                            $"This {classification} planet orbits approximately {finalOrbit} astronomical units from its star.",
+                            orbitIntroduction,
                             physicalSentence,
                             compositionSentence,
                             orbitSentence);
@@ -129,7 +135,9 @@ namespace jcan.CelestialSystems
                 default:
                     return
                         JoinSentences(
-                            $"This is a {classification} world located approximately {finalOrbit} astronomical units from its star.",
+                            hasMigration
+                                ? $"This is a {classification} world."
+                                : $"This is a {classification} world located approximately {finalOrbit} astronomical units from its star.",
                             compositionSentence,
                             physicalSentence,
                             orbitSentence);
