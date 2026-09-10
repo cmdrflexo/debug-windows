@@ -309,6 +309,17 @@ namespace jcan.CelestialSystems
             var hierarchy =
                 EnsureRuntimeHierarchy(
                     instance);
+            var trajectoryGizmos =
+                instance.GetComponent<
+                    CelestialTrajectoryDebugGizmos>();
+
+            if (trajectoryGizmos == null)
+            {
+                trajectoryGizmos =
+                    instance.gameObject.AddComponent<
+                        CelestialTrajectoryDebugGizmos>();
+            }
+
             MonoBehaviour motionProvider;
 
             if (usesPrescribedTrajectory)
@@ -814,7 +825,7 @@ namespace jcan.CelestialSystems
                     request.OrbitCenter.Definition == null))
             {
                 return RecordSpawnFailure(
-                    "A prescribed circular trajectory requires an active reference body.");
+                    "A prescribed trajectory requires an active reference body.");
             }
 
             RefreshMotionBackendState();

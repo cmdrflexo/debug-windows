@@ -1,5 +1,5 @@
 /*
- * Stores serializable, seed-friendly trajectory data that defines a body's prescribed circular orbit.
+ * Stores serializable, seed-friendly trajectory data that defines a body's prescribed circular or Keplerian conic orbit.
  */
 
 using System;
@@ -9,7 +9,8 @@ namespace jcan.CelestialSystems
 {
     public enum CelestialTrajectoryKind
     {
-        CircularOrbit = 0
+        CircularOrbit = 0,
+        KeplerianConic = 1
     }
 
     public enum CelestialOrbitDirection
@@ -51,6 +52,18 @@ namespace jcan.CelestialSystems
         private CelestialOrbitDirection direction =
             CelestialOrbitDirection.Prograde;
 
+        [SerializeField]
+        [Tooltip("Used only when Kind is Keplerian Conic. Its reference ID is authoritative.")]
+        private KeplerianConicTrajectory conic;
+
+        public CelestialTrajectoryDefinition(KeplerianConicTrajectory conic)
+        {
+            kind = CelestialTrajectoryKind.KeplerianConic;
+            this.conic = conic;
+        }
+
+        public KeplerianConicTrajectory Conic => conic;
+
         public CelestialTrajectoryDefinition(
             string referenceInstanceId,
             double orbitalRadiusMeters,
@@ -82,25 +95,29 @@ namespace jcan.CelestialSystems
             kind;
 
         public string ReferenceInstanceId =>
-            referenceInstanceId;
+            kind == CelestialTrajectoryKind.KeplerianConic
+                ? conic?.ReferenceInstanceId
+                : referenceInstanceId;
 
+        /// <summary>Legacy circular radius. For conics use Conic.PeriapsisDistanceMeters.</summary>
         public double OrbitalRadiusMeters =>
             orbitalRadiusMeters;
 
         public double EpochUniversalTimeSeconds =>
-            epochUniversalTimeSeconds;
+            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.EpochUniversalTimeSeconds : epochUniversalTimeSeconds;
 
+        /// <summary>Legacy circular phase. For conics use Conic.MeanAnomalyAtEpochDegrees.</summary>
         public double PhaseAtEpochDegrees =>
             phaseAtEpochDegrees;
 
         public double InclinationDegrees =>
-            inclinationDegrees;
+            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.InclinationDegrees : inclinationDegrees;
 
         public double LongitudeOfAscendingNodeDegrees =>
-            longitudeOfAscendingNodeDegrees;
+            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.LongitudeOfAscendingNodeDegrees : longitudeOfAscendingNodeDegrees;
 
         public CelestialOrbitDirection Direction =>
-            direction;
+            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.Direction : direction;
 
         public bool HasValidSettings =>
             TryValidate(
@@ -109,6 +126,16 @@ namespace jcan.CelestialSystems
         public bool TryValidate(
             out string error)
         {
+            if (kind == CelestialTrajectoryKind.KeplerianConic)
+            {
+                if (conic == null)
+                {
+                    error = "A Keplerian conic trajectory requires conic settings.";
+                    return false;
+                }
+                return conic.TryValidate(out error);
+            }
+
             if (kind !=
                 CelestialTrajectoryKind.CircularOrbit)
             {

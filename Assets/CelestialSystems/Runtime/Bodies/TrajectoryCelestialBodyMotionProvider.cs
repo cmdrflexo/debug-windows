@@ -44,7 +44,9 @@ namespace jcan.CelestialSystems
 
         public string ProviderName =>
             usesTrajectory
-                ? "Prescribed Circular Trajectory"
+                ? (trajectory.Kind == CelestialTrajectoryKind.KeplerianConic
+                    ? "Prescribed Keplerian Conic Trajectory"
+                    : "Prescribed Circular Trajectory")
                 : "Prescribed Inertial State";
 
         public bool IsReady =>
@@ -52,6 +54,111 @@ namespace jcan.CelestialSystems
 
         public string LastError =>
             lastError;
+
+        public bool UsesTrajectory =>
+            usesTrajectory;
+
+        public CelestialTrajectoryDefinition Trajectory =>
+            trajectory;
+
+        public CelestialBodyRuntimeContext ReferenceBody =>
+            referenceBody;
+
+        public bool TryEvaluateRelativeState(
+            double universalTimeSeconds,
+            out DoubleVector3 relativePositionMeters,
+            out DoubleVector3 relativeVelocityMetersPerSecond)
+        {
+            relativePositionMeters = default;
+            relativeVelocityMetersPerSecond = default;
+
+            if (!isReady || !usesTrajectory || trajectory == null)
+            {
+                return false;
+            }
+
+            return CelestialTrajectoryEvaluator.TryEvaluateRelativeState(
+                trajectory,
+                referenceMassKilograms,
+                orbitingMassKilograms,
+                universalTimeSeconds,
+                out relativePositionMeters,
+                out relativeVelocityMetersPerSecond,
+                out _);
+        }
+
+        public bool TryGetClosedOrbitPeriodSeconds(
+            out double periodSeconds)
+        {
+            periodSeconds = 0.0;
+
+            return isReady &&
+                usesTrajectory &&
+                trajectory != null &&
+                CelestialTrajectoryEvaluator.TryCalculatePeriodSeconds(
+                    trajectory,
+                    referenceMassKilograms,
+                    orbitingMassKilograms,
+                    out periodSeconds,
+                    out _);
+        }
+
+        public bool TryGetConicApsisStates(
+            out DoubleVector3 periapsisPositionMeters,
+            out DoubleVector3 apoapsisPositionMeters,
+            out bool hasApoapsis)
+        {
+            periapsisPositionMeters = default;
+            apoapsisPositionMeters = default;
+            hasApoapsis = false;
+
+            if (!isReady ||
+                !usesTrajectory ||
+                trajectory?.Kind != CelestialTrajectoryKind.KeplerianConic ||
+                trajectory.Conic == null)
+            {
+                return false;
+            }
+
+            var conic = trajectory.Conic;
+            var meanMotion =
+                System.Math.Sqrt(
+                    CelestialTrajectoryEvaluator.GravitationalConstant *
+                    (referenceMassKilograms + orbitingMassKilograms) /
+                    System.Math.Pow(System.Math.Abs(conic.SemiMajorAxisMeters), 3.0));
+            var direction = (double)conic.Direction;
+            var meanAtEpochRadians =
+                conic.MeanAnomalyAtEpochDegrees *
+                System.Math.PI /
+                180.0;
+            var periapsisTime =
+                conic.EpochUniversalTimeSeconds -
+                meanAtEpochRadians /
+                (direction * meanMotion);
+
+            if (!TryEvaluateRelativeState(
+                    periapsisTime,
+                    out periapsisPositionMeters,
+                    out _))
+            {
+                return false;
+            }
+
+            if (!conic.IsClosed ||
+                !TryGetClosedOrbitPeriodSeconds(
+                    out var periodSeconds) ||
+                !TryEvaluateRelativeState(
+                    periapsisTime +
+                        periodSeconds * 0.5,
+                    out apoapsisPositionMeters,
+                    out _))
+            {
+                return true;
+            }
+
+            hasApoapsis = true;
+            return true;
+        }
 
         private void LateUpdate()
         {

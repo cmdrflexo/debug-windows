@@ -1732,6 +1732,7 @@ GameObject:
   - component: {fileID: 1210988294}
   - component: {fileID: 1210988297}
   - component: {fileID: 1210988295}
+  - component: {fileID: 1210988298}
   m_Layer: 0
   m_Name: Universe
   m_TagString: Untagged
@@ -1794,6 +1795,23 @@ MonoBehaviour:
     localXMeters: 0
     localYMeters: 0
     localZMeters: 0
+--- !u!114 &1210988298
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1210988292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8eab281e721541e7aa500602a2af0d5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialTimeController
+  initialUniversalTimeSeconds: 0
+  timeScale: 1
+  runOnStart: 1
+  universalTimeSeconds: 0
+  isRunning: 0
 --- !u!1 &1349232943
 GameObject:
   m_ObjectHideFlags: 0
@@ -1824,6 +1842,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialBodyFactory
   universeFrame: {fileID: 1210988297}
+  celestialTime: {fileID: 0}
   bodyPrefab: {fileID: 1620258169682584018, guid: 3ed4e135af5bfe4478d6969fd8bbb515, type: 3}
   spawnedBodyParent: {fileID: 2047321528}
   surfaceCacheManager: {fileID: 0}

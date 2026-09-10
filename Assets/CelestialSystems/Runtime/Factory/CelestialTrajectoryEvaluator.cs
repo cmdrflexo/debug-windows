@@ -38,6 +38,13 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            if (definition.Kind == CelestialTrajectoryKind.KeplerianConic)
+            {
+                return KeplerianConicTrajectoryEvaluator.TryEvaluateRelativeState(
+                    definition.Conic, referenceMassKilograms, orbitingMassKilograms,
+                    universalTimeSeconds, out positionMeters, out velocityMetersPerSecond, out error);
+            }
+
             if (!IsFinite(
                     referenceMassKilograms) ||
                 referenceMassKilograms <= 0.0 ||
@@ -165,6 +172,13 @@ namespace jcan.CelestialSystems
                 }
 
                 return false;
+            }
+
+            if (definition.Kind == CelestialTrajectoryKind.KeplerianConic)
+            {
+                return KeplerianConicTrajectoryEvaluator.TryCalculatePeriodSeconds(
+                    definition.Conic, referenceMassKilograms, orbitingMassKilograms,
+                    out periodSeconds, out error);
             }
 
             if (!IsFinite(
