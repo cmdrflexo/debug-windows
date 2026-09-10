@@ -440,7 +440,7 @@ namespace jcan.CelestialSystems
             double value)
         {
             return
-                IsFinite(value) &&
+                double.IsNaN(value) == false && double.IsInfinity(value) == false &&
                 value >= 0.0 &&
                 value <= 1.0;
         }

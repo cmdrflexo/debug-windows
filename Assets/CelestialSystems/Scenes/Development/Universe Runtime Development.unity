@@ -286,7 +286,7 @@ GameObject:
   - component: {fileID: 288112566}
   - component: {fileID: 288112568}
   m_Layer: 0
-  m_Name: Free Universal Anchor
+  m_Name: Universal Observer Anchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -363,13 +363,23 @@ MonoBehaviour:
   initialDistanceInTargetRadii: 3
   minimumDistanceInTargetRadii: 1.05
   maximumDistanceMeters: 1e+18
+  pointerDeltaAction: {fileID: 8468614314426882343, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  orbitAction: {fileID: 5128496647766509628, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  panAction: {fileID: -7838522926709464524, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  zoomAction: {fileID: 4369740539164405390, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  recenterAction: {fileID: -1466553362185345752, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  invertPitch: 1
   orbitDegreesPerPixel: 0.2
-  panDistanceFractionPerPixel: 0.005
-  zoomExponentPerWheelUnit: 0.1
+  panDistanceFractionPerPixel: 0.0025
+  panVelocityResponse: 20
+  panDamping: 4
+  zoomExponentPerWheelUnit: 0.2
   listen: 1
   distanceMeters: 0
   plateOffsetRightMeters: 0
   plateOffsetForwardMeters: 0
+  panVelocityRightMetersPerSecond: 0
+  panVelocityForwardMetersPerSecond: 0
   hasTargetMotion: 0
   lastError: 
 --- !u!1 &316926647
