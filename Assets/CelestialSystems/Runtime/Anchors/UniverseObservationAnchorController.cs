@@ -301,14 +301,27 @@ namespace jcan.CelestialSystems
 
         public void SelectTarget(CelestialBodyRuntimeContext newTarget)
         {
+            if (target == newTarget)
+            {
+                return;
+            }
+
+            var preserveDistance =
+                target != null &&
+                newTarget != null &&
+                viewInitialized;
+
             target = newTarget;
             targetInstanceId =
                 newTarget != null
                     ? newTarget.InstanceId
                     : string.Empty;
-            viewInitialized = false;
+            plateOffsetRightMeters = 0.0;
+            plateOffsetForwardMeters = 0.0;
+            ClearPanVelocity();
+            viewInitialized = preserveDistance;
             hasTargetMotion = false;
-            recenterZoomArmed = false;
+            recenterZoomArmed = preserveDistance;
         }
 
         public bool SelectTargetByInstanceId(string instanceId)
