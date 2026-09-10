@@ -108,6 +108,11 @@ namespace jcan.CelestialSystems
         public CelestialBodyDefinition Definition =>
             definition;
 
+        public string Description =>
+            definition != null
+                ? definition.Description
+                : string.Empty;
+
         public UniverseFrameController UniverseFrame =>
             universeFrame;
 

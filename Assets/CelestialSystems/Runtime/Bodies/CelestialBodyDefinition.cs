@@ -64,6 +64,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double stellarEffectiveTemperatureKelvin;
 
+        [SerializeField]
+        [TextArea(3, 8)]
+        private string description;
+
         public string DefinitionId =>
             definitionId;
 
@@ -127,6 +131,9 @@ namespace jcan.CelestialSystems
         public double StellarEffectiveTemperatureKelvin =>
             stellarEffectiveTemperatureKelvin;
 
+        public string Description =>
+            description ?? string.Empty;
+
         public bool HasValidPhysicalSettings =>
             !string.IsNullOrWhiteSpace(
                 definitionId) &&
@@ -185,6 +192,15 @@ namespace jcan.CelestialSystems
             stellarInitialMassSolar = 0.0;
             stellarLuminositySolar = 0.0;
             stellarEffectiveTemperatureKelvin = 0.0;
+            description = string.Empty;
+        }
+
+        internal void ConfigureRuntimeDescription(
+            string newDescription)
+        {
+            description =
+                newDescription?.Trim() ??
+                string.Empty;
         }
 
         internal void ConfigureRuntimeStellarProperties(

@@ -187,12 +187,18 @@ namespace jcan.CelestialSystems
                 new List<UnityEngine.Object>(
                     (planetCount + 1) *
                     2);
+            var starDescription =
+                CelestialObjectDescriptionGenerator.DescribeStar(
+                    stellarPopulation,
+                    stellarProperties,
+                    request.Environment);
             var star =
                 CreateStellarDefinition(
                     starDefinition,
                     "generated-star",
                     random.NextInt(),
-                    stellarProperties);
+                    stellarProperties,
+                    starDescription);
             ownedRuntimeObjects.Add(
                 star);
 
@@ -534,7 +540,8 @@ namespace jcan.CelestialSystems
             CelestialBodyDefinition prototype,
             string definitionId,
             int generationSeed,
-            CelestialStellarEvolutionResult properties)
+            CelestialStellarEvolutionResult properties,
+            string description)
         {
             var definition =
                 CreateInstance<CelestialBodyDefinition>();
@@ -556,6 +563,8 @@ namespace jcan.CelestialSystems
                 prototype.OceanDefinition);
             definition.ConfigureRuntimeStellarProperties(
                 properties);
+            definition.ConfigureRuntimeDescription(
+                description);
             return definition;
         }
 
