@@ -89,6 +89,16 @@ namespace jcan.CelestialSystems
         private float orbitDegreesPerPixel = 0.2f;
 
         [SerializeField]
+        [Tooltip("How quickly pointer movement becomes orbit velocity.")]
+        [Min(0.0f)]
+        private float orbitVelocityResponse = 25.0f;
+
+        [SerializeField]
+        [Tooltip("How quickly orbit motion stops after pointer input ends.")]
+        [Min(0.0f)]
+        private float orbitDamping = 20.0f;
+
+        [SerializeField]
         [Tooltip("Plate movement per mouse pixel, as a fraction of camera distance.")]
         [Min(0.0f)]
         private float panDistanceFractionPerPixel = 0.0015f;
@@ -142,6 +152,8 @@ namespace jcan.CelestialSystems
         private bool enabledZoomAction;
         private bool enabledRecenterAction;
         private bool recenterZoomArmed;
+        private double yawVelocityDegreesPerSecond;
+        private double pitchVelocityDegreesPerSecond;
 
         public CelestialBodyRuntimeContext Target => target;
 
@@ -191,6 +203,7 @@ namespace jcan.CelestialSystems
             enabledZoomAction = false;
             enabledRecenterAction = false;
             ClearPanVelocity();
+            ClearOrbitVelocity();
         }
 
         private void OnValidate()
@@ -200,6 +213,8 @@ namespace jcan.CelestialSystems
             minimumDistanceInTargetRadii = Mathf.Max(1.001f, minimumDistanceInTargetRadii);
             maximumDistanceMeters = Math.Max(1.0, maximumDistanceMeters);
             orbitDegreesPerPixel = Mathf.Max(0.0f, orbitDegreesPerPixel);
+            orbitVelocityResponse = Mathf.Max(0.0f, orbitVelocityResponse);
+            orbitDamping = Mathf.Max(0.0f, orbitDamping);
             panDistanceFractionPerPixel = Mathf.Max(0.0f, panDistanceFractionPerPixel);
             panVelocityResponse = Mathf.Max(0.0f, panVelocityResponse);
             panDamping = Mathf.Max(0.0f, panDamping);
@@ -373,6 +388,7 @@ namespace jcan.CelestialSystems
             ClearPanVelocity();
             pitchDegrees = 35.0f;
             yawDegrees = 0.0f;
+            ClearOrbitVelocity();
             viewInitialized = false;
             recenterZoomArmed = false;
         }
@@ -427,21 +443,7 @@ namespace jcan.CelestialSystems
         {
             var pointerDelta = ReadVector2(pointerDeltaAction);
 
-            if (IsPressed(orbitAction))
-            {
-                if (pointerDelta.sqrMagnitude > Mathf.Epsilon)
-                {
-                    recenterZoomArmed = false;
-                }
-
-                yawDegrees += pointerDelta.x * orbitDegreesPerPixel;
-                var pitchDirection = invertPitch ? 1.0f : -1.0f;
-                pitchDegrees = Mathf.Clamp(
-                    pitchDegrees +
-                        pointerDelta.y * orbitDegreesPerPixel * pitchDirection,
-                    -80.0f,
-                    80.0f);
-            }
+            ApplyOrbitInput(pointerDelta, deltaTime);
 
             if (IsPressed(panAction))
             {
@@ -486,6 +488,69 @@ namespace jcan.CelestialSystems
 
             RecenterOnTarget();
             recenterZoomArmed = true;
+        }
+
+        private void ApplyOrbitInput(Vector2 pointerDelta, float deltaTime)
+        {
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            if (IsPressed(orbitAction))
+            {
+                if (pointerDelta.sqrMagnitude > Mathf.Epsilon)
+                {
+                    recenterZoomArmed = false;
+                }
+
+                var pitchDirection = invertPitch ? 1.0f : -1.0f;
+                var instantYawVelocity =
+                    pointerDelta.x * orbitDegreesPerPixel / deltaTime;
+                var instantPitchVelocity =
+                    pointerDelta.y * orbitDegreesPerPixel *
+                    pitchDirection / deltaTime;
+                var response =
+                    1.0 - Math.Exp(-orbitVelocityResponse * deltaTime);
+
+                yawVelocityDegreesPerSecond = Lerp(
+                    yawVelocityDegreesPerSecond,
+                    instantYawVelocity,
+                    response);
+                pitchVelocityDegreesPerSecond = Lerp(
+                    pitchVelocityDegreesPerSecond,
+                    instantPitchVelocity,
+                    response);
+            }
+            else
+            {
+                var dampingFactor = Math.Exp(-orbitDamping * deltaTime);
+                yawVelocityDegreesPerSecond *= dampingFactor;
+                pitchVelocityDegreesPerSecond *= dampingFactor;
+            }
+
+            yawDegrees +=
+                (float)(yawVelocityDegreesPerSecond * deltaTime);
+
+            var nextPitch =
+                pitchDegrees +
+                (float)(pitchVelocityDegreesPerSecond * deltaTime);
+            pitchDegrees = Mathf.Clamp(nextPitch, -80.0f, 80.0f);
+
+            if (!Mathf.Approximately(nextPitch, pitchDegrees))
+            {
+                pitchVelocityDegreesPerSecond = 0.0;
+            }
+
+            if (Math.Abs(yawVelocityDegreesPerSecond) < 1.0e-6)
+            {
+                yawVelocityDegreesPerSecond = 0.0;
+            }
+
+            if (Math.Abs(pitchVelocityDegreesPerSecond) < 1.0e-6)
+            {
+                pitchVelocityDegreesPerSecond = 0.0;
+            }
         }
 
         private void ApplyPanDrag(Vector2 pointerDelta, float deltaTime)
@@ -560,6 +625,12 @@ namespace jcan.CelestialSystems
         {
             panVelocityRightMetersPerSecond = 0.0;
             panVelocityForwardMetersPerSecond = 0.0;
+        }
+
+        private void ClearOrbitVelocity()
+        {
+            yawVelocityDegreesPerSecond = 0.0;
+            pitchVelocityDegreesPerSecond = 0.0;
         }
 
         private void GetReferencePlaneAxes(
@@ -686,6 +757,7 @@ namespace jcan.CelestialSystems
             if (visible)
             {
                 ClearPanVelocity();
+                ClearOrbitVelocity();
                 recenterZoomArmed = false;
             }
         }
