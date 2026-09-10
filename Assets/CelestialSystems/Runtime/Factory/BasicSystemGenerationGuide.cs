@@ -610,7 +610,8 @@ namespace jcan.CelestialSystems
                 formation);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribePlanet(
-                    formation));
+                    formation,
+                    generationSeed));
             return definition;
         }
 
