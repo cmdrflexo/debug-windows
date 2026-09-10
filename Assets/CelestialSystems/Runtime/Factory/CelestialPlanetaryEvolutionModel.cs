@@ -75,6 +75,26 @@ namespace jcan.CelestialSystems
             out CelestialPlanetaryEvolutionResult result,
             out string error)
         {
+            return
+                TryEvaluate(
+                    seed,
+                    formation,
+                    star,
+                    systemAgeGigayears,
+                    formation.FinalOrbitAstronomicalUnits,
+                    out result,
+                    out error);
+        }
+
+        public static bool TryEvaluate(
+            int seed,
+            CelestialPlanetFormationResult formation,
+            CelestialStellarEvolutionResult star,
+            double systemAgeGigayears,
+            double presentOrbitAstronomicalUnits,
+            out CelestialPlanetaryEvolutionResult result,
+            out string error)
+        {
             result = default;
             error = string.Empty;
 
@@ -83,7 +103,7 @@ namespace jcan.CelestialSystems
                 !IsFinitePositive(
                     formation.RadiusEarth) ||
                 !IsFinitePositive(
-                    formation.FinalOrbitAstronomicalUnits) ||
+                    presentOrbitAstronomicalUnits) ||
                 !IsFinitePositive(
                     star.LuminositySolar) ||
                 !IsFiniteNonNegative(
@@ -104,7 +124,7 @@ namespace jcan.CelestialSystems
                     star.LuminositySolar,
                     0.25) /
                 Math.Sqrt(
-                    formation.FinalOrbitAstronomicalUnits) *
+                    presentOrbitAstronomicalUnits) *
                 Math.Pow(
                     1.0 - albedo,
                     0.25);

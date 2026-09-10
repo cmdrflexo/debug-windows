@@ -86,15 +86,38 @@ namespace jcan.CelestialSystems
             CelestialPlanetaryEvolutionResult evolution,
             int generationSeed)
         {
+            var unchangedOrbit =
+                new CelestialPostMainSequencePlanetResult(
+                    CelestialPostMainSequencePlanetOutcome.Unchanged,
+                    formation.FinalOrbitAstronomicalUnits,
+                    formation.FinalOrbitAstronomicalUnits,
+                    1.0,
+                    0.0,
+                    0.0);
+
+            return
+                DescribePlanet(
+                    formation,
+                    evolution,
+                    unchangedOrbit,
+                    generationSeed);
+        }
+
+        public static string DescribePlanet(
+            CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution,
+            CelestialPostMainSequencePlanetResult systemEvolution,
+            int generationSeed)
+        {
             var mass =
                 Format(
                     formation.TotalMassEarth);
             var radius =
                 Format(
                     formation.RadiusEarth);
-            var finalOrbit =
+            var presentOrbit =
                 Format(
-                    formation.FinalOrbitAstronomicalUnits);
+                    systemEvolution.PresentOrbitAstronomicalUnits);
             var classification =
                 DescribePlanetFormationClass(
                     formation.FormationClass);
@@ -110,13 +133,13 @@ namespace jcan.CelestialSystems
             var orbitSentence =
                 DescribePlanetOrbit(
                     formation,
-                    finalOrbit);
-            var hasMigration =
+                    systemEvolution);
+            var hasOrbitalHistory =
                 orbitSentence.Length > 0;
             var orbitIntroduction =
-                hasMigration
+                hasOrbitalHistory
                     ? $"This is a {classification} planet."
-                    : $"This {classification} planet orbits approximately {finalOrbit} astronomical units from its star.";
+                    : $"This {classification} planet orbits approximately {presentOrbit} astronomical units from its star.";
 
             switch (SelectVariant(
                 generationSeed,
@@ -142,9 +165,9 @@ namespace jcan.CelestialSystems
                 default:
                     return
                         JoinSentences(
-                            hasMigration
+                            hasOrbitalHistory
                                 ? $"This is a {classification} world."
-                                : $"This is a {classification} world located approximately {finalOrbit} astronomical units from its star.",
+                                : $"This is a {classification} world located approximately {presentOrbit} astronomical units from its star.",
                             evolutionSentence,
                             compositionSentence,
                             physicalSentence,
@@ -277,20 +300,44 @@ namespace jcan.CelestialSystems
 
         private static string DescribePlanetOrbit(
             CelestialPlanetFormationResult formation,
-            string finalOrbit)
+            CelestialPostMainSequencePlanetResult systemEvolution)
         {
-            if (formation.InwardMigrationFraction <
-                0.0005)
-            {
-                return string.Empty;
-            }
-
             var initialOrbit =
                 Format(
                     formation.InitialOrbitAstronomicalUnits);
+            var formationOrbit =
+                Format(
+                    formation.FinalOrbitAstronomicalUnits);
+            var presentOrbit =
+                Format(
+                    systemEvolution.PresentOrbitAstronomicalUnits);
+            var migrated =
+                formation.InwardMigrationFraction >=
+                    0.0005;
+            var expanded =
+                systemEvolution.Outcome ==
+                    CelestialPostMainSequencePlanetOutcome.ExpandedAfterMassLoss;
 
-            return
-                $"It formed near {initialOrbit} astronomical units before migrating inward to its present orbit near {finalOrbit} astronomical units.";
+            if (expanded)
+            {
+                var formationHistory =
+                    migrated
+                        ? $"It formed near {initialOrbit} astronomical units and migrated inward to approximately {formationOrbit} astronomical units while its star was young."
+                        : $"It formed near {formationOrbit} astronomical units.";
+
+                return
+                    JoinSentences(
+                        formationHistory,
+                        $"As its star shed mass and became a white dwarf, the planet's orbit expanded to its present distance of approximately {presentOrbit} astronomical units.");
+            }
+
+            if (migrated)
+            {
+                return
+                    $"It formed near {initialOrbit} astronomical units before migrating inward to its present orbit near {presentOrbit} astronomical units.";
+            }
+
+            return string.Empty;
         }
 
         private static int SelectVariant(

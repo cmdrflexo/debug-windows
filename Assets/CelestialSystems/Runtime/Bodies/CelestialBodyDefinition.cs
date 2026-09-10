@@ -89,6 +89,25 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double planetInwardMigrationFraction;
 
+        [Header("Generated Post-Main-Sequence Properties")]
+        [SerializeField]
+        private bool hasPostMainSequenceProperties;
+
+        [SerializeField]
+        private CelestialPostMainSequencePlanetOutcome postMainSequenceOutcome;
+
+        [SerializeField]
+        private double planetPresentOrbitAstronomicalUnits;
+
+        [SerializeField]
+        private double planetOrbitalExpansionFactor;
+
+        [SerializeField]
+        private double estimatedMaximumGiantRadiusAstronomicalUnits;
+
+        [SerializeField]
+        private double minimumSurvivalPeriapsisAstronomicalUnits;
+
         [Header("Generated Planetary Evolution Properties")]
         [SerializeField]
         private bool hasPlanetaryEvolutionProperties;
@@ -202,6 +221,24 @@ namespace jcan.CelestialSystems
         public double PlanetInwardMigrationFraction =>
             planetInwardMigrationFraction;
 
+        public bool HasPostMainSequenceProperties =>
+            hasPostMainSequenceProperties;
+
+        public CelestialPostMainSequencePlanetOutcome PostMainSequenceOutcome =>
+            postMainSequenceOutcome;
+
+        public double PlanetPresentOrbitAstronomicalUnits =>
+            planetPresentOrbitAstronomicalUnits;
+
+        public double PlanetOrbitalExpansionFactor =>
+            planetOrbitalExpansionFactor;
+
+        public double EstimatedMaximumGiantRadiusAstronomicalUnits =>
+            estimatedMaximumGiantRadiusAstronomicalUnits;
+
+        public double MinimumSurvivalPeriapsisAstronomicalUnits =>
+            minimumSurvivalPeriapsisAstronomicalUnits;
+
         public bool HasPlanetaryEvolutionProperties =>
             hasPlanetaryEvolutionProperties;
 
@@ -293,6 +330,13 @@ namespace jcan.CelestialSystems
             planetVolatileMassFraction = 0.0;
             planetHydrogenHeliumEnvelopeFraction = 0.0;
             planetInwardMigrationFraction = 0.0;
+            hasPostMainSequenceProperties = false;
+            postMainSequenceOutcome =
+                CelestialPostMainSequencePlanetOutcome.Unchanged;
+            planetPresentOrbitAstronomicalUnits = 0.0;
+            planetOrbitalExpansionFactor = 0.0;
+            estimatedMaximumGiantRadiusAstronomicalUnits = 0.0;
+            minimumSurvivalPeriapsisAstronomicalUnits = 0.0;
             hasPlanetaryEvolutionProperties = false;
             planetAssumedBondAlbedo = 0.0;
             planetEquilibriumTemperatureKelvin = 0.0;
@@ -346,6 +390,22 @@ namespace jcan.CelestialSystems
                 properties.HydrogenHeliumEnvelopeFraction;
             planetInwardMigrationFraction =
                 properties.InwardMigrationFraction;
+        }
+
+        internal void ConfigureRuntimePostMainSequenceProperties(
+            CelestialPostMainSequencePlanetResult properties)
+        {
+            hasPostMainSequenceProperties = true;
+            postMainSequenceOutcome =
+                properties.Outcome;
+            planetPresentOrbitAstronomicalUnits =
+                properties.PresentOrbitAstronomicalUnits;
+            planetOrbitalExpansionFactor =
+                properties.OrbitalExpansionFactor;
+            estimatedMaximumGiantRadiusAstronomicalUnits =
+                properties.EstimatedMaximumGiantRadiusAstronomicalUnits;
+            minimumSurvivalPeriapsisAstronomicalUnits =
+                properties.MinimumSurvivalPeriapsisAstronomicalUnits;
         }
 
         internal void ConfigureRuntimePlanetaryEvolutionProperties(

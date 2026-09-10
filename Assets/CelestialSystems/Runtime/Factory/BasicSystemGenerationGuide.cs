@@ -121,6 +121,21 @@ namespace jcan.CelestialSystems
         [Range(0.0f, 1.0f)]
         private float moonRetrogradeChance;
 
+        private readonly struct SurvivingPlanet
+        {
+            public SurvivingPlanet(
+                CelestialPlanetFormationResult formation,
+                CelestialPostMainSequencePlanetResult systemEvolution)
+            {
+                Formation = formation;
+                SystemEvolution = systemEvolution;
+            }
+
+            public CelestialPlanetFormationResult Formation { get; }
+
+            public CelestialPostMainSequencePlanetResult SystemEvolution { get; }
+        }
+
         public override bool TryGenerate(
             CelestialStarSystemGenerationRequest request,
             out CelestialStarSystemPlan plan,
@@ -223,21 +238,47 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            Array.Sort(
-                planetFormation,
+            var survivingPlanets =
+                new List<SurvivingPlanet>(
+                    planetFormation.Length);
+
+            for (var index = 0;
+                index < planetFormation.Length;
+                index++)
+            {
+                if (!CelestialPostMainSequenceSystemEvolutionModel.TryEvaluatePlanet(
+                        stellarProperties,
+                        planetFormation[index].FinalOrbitAstronomicalUnits,
+                        maximumPlanetEccentricity,
+                        out var systemEvolution,
+                        out error))
+                {
+                    return false;
+                }
+
+                if (systemEvolution.Survived)
+                {
+                    survivingPlanets.Add(
+                        new SurvivingPlanet(
+                            planetFormation[index],
+                            systemEvolution));
+                }
+            }
+
+            survivingPlanets.Sort(
                 (left, right) =>
-                    left.FinalOrbitAstronomicalUnits.CompareTo(
-                        right.FinalOrbitAstronomicalUnits));
+                    left.SystemEvolution.PresentOrbitAstronomicalUnits.CompareTo(
+                        right.SystemEvolution.PresentOrbitAstronomicalUnits));
 
             var safePlanetEccentricityLimit =
                 CalculateNonCrossingPlanetEccentricityLimit(
-                    planetFormation);
+                    survivingPlanets);
             var bodySystems =
                 new List<CelestialStarSystemPlan.BodySystemPlan>(
-                    planetCount + 1);
+                    survivingPlanets.Count + 1);
             var ownedRuntimeObjects =
                 new List<UnityEngine.Object>(
-                    (planetCount + 1) *
+                    (survivingPlanets.Count + 1) *
                     2);
             var starDescription =
                 CelestialObjectDescriptionGenerator.DescribeStar(
@@ -265,13 +306,15 @@ namespace jcan.CelestialSystems
                     ownedRuntimeObjects));
 
             for (var index = 0;
-                index < planetCount;
+                index < survivingPlanets.Count;
                 index++)
             {
                 var formation =
-                    planetFormation[index];
+                    survivingPlanets[index].Formation;
+                var systemEvolution =
+                    survivingPlanets[index].SystemEvolution;
                 var orbitRadius =
-                    formation.FinalOrbitAstronomicalUnits *
+                    systemEvolution.PresentOrbitAstronomicalUnits *
                     AstronomicalUnitMeters;
                 var phaseRadians =
                     random.Next01() *
@@ -347,6 +390,7 @@ namespace jcan.CelestialSystems
                         formation,
                         stellarProperties,
                         request.Environment.SystemAgeGigayears,
+                        systemEvolution.PresentOrbitAstronomicalUnits,
                         out var planetaryEvolution,
                         out error))
                 {
@@ -361,6 +405,7 @@ namespace jcan.CelestialSystems
                         $"generated-{instanceId}",
                         planetSeed,
                         formation,
+                        systemEvolution,
                         planetaryEvolution);
                 ownedRuntimeObjects.Add(
                     planet);
@@ -621,6 +666,7 @@ namespace jcan.CelestialSystems
             string definitionId,
             int generationSeed,
             CelestialPlanetFormationResult formation,
+            CelestialPostMainSequencePlanetResult systemEvolution,
             CelestialPlanetaryEvolutionResult evolution)
         {
             var definition =
@@ -643,12 +689,15 @@ namespace jcan.CelestialSystems
                 prototype.OceanDefinition);
             definition.ConfigureRuntimePlanetFormationProperties(
                 formation);
+            definition.ConfigureRuntimePostMainSequenceProperties(
+                systemEvolution);
             definition.ConfigureRuntimePlanetaryEvolutionProperties(
                 evolution);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribePlanet(
                     formation,
                     evolution,
+                    systemEvolution,
                     generationSeed));
             return definition;
         }
@@ -947,7 +996,7 @@ namespace jcan.CelestialSystems
         }
 
         private double CalculateNonCrossingPlanetEccentricityLimit(
-            IReadOnlyList<CelestialPlanetFormationResult> planets)
+            IReadOnlyList<SurvivingPlanet> planets)
         {
             if (planets == null ||
                 planets.Count <= 1)
@@ -964,10 +1013,12 @@ namespace jcan.CelestialSystems
             {
                 var innerOrbit =
                     planets[index - 1]
-                        .FinalOrbitAstronomicalUnits;
+                        .SystemEvolution
+                        .PresentOrbitAstronomicalUnits;
                 var outerOrbit =
                     planets[index]
-                        .FinalOrbitAstronomicalUnits;
+                        .SystemEvolution
+                        .PresentOrbitAstronomicalUnits;
 
                 if (innerOrbit >= outerOrbit)
                 {
