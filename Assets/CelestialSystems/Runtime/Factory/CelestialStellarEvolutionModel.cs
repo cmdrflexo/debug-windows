@@ -55,6 +55,7 @@ namespace jcan.CelestialSystems
             out string error)
         {
             result = default;
+            error = string.Empty;
 
             if (environment == null ||
                 !environment.TryValidate(
