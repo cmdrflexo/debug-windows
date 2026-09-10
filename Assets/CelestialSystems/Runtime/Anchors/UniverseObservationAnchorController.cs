@@ -15,7 +15,7 @@ namespace jcan.CelestialSystems
     {
         [Header("References")]
         [SerializeField]
-        private SgtGravityOriginBridge anchorBridge;
+        private SgtUniverseOriginBridge anchorBridge;
 
         [SerializeField]
         private DebugWindowManager debugWindowManager;
@@ -621,12 +621,12 @@ namespace jcan.CelestialSystems
         {
             if (anchorBridge == null)
             {
-                anchorBridge = GetComponentInParent<SgtGravityOriginBridge>();
+                anchorBridge = GetComponentInParent<SgtUniverseOriginBridge>();
             }
 
             if (anchorBridge == null)
             {
-                anchorBridge = FindFirstObjectByType<SgtGravityOriginBridge>();
+                anchorBridge = FindFirstObjectByType<SgtUniverseOriginBridge>();
             }
 
             if (selectionController == null)

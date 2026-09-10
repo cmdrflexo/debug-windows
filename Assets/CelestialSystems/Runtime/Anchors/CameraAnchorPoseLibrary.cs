@@ -80,7 +80,7 @@ namespace jcan.CelestialSystems
 
         [Header("Anchor")]
         [SerializeField]
-        private SgtGravityOriginBridge anchorSource;
+        private SgtUniverseOriginBridge anchorSource;
 
         [Header("Persistence")]
         [SerializeField]
@@ -105,7 +105,7 @@ namespace jcan.CelestialSystems
         private void Awake()
         {
             if (anchorSource == null)
-                anchorSource = FindFirstObjectByType<SgtGravityOriginBridge>();
+                anchorSource = FindFirstObjectByType<SgtUniverseOriginBridge>();
 
             filePath = Path.Combine(
                 Application.persistentDataPath,
