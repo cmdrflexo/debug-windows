@@ -12,6 +12,9 @@ namespace jcan.CelestialSystems
     [RequireComponent(typeof(UniverseObservationGridRenderer))]
     public sealed class UniverseObservationBodyMarkerDecorator : MonoBehaviour
     {
+        private const string DecorationsContainerName =
+            "Generated Observation Decorations";
+
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField] private CelestialBodyRuntimeContext targetContext;
@@ -283,6 +286,26 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private Transform GetOrCreateDecorationsContainer()
+        {
+            var containerParent = transform.parent;
+            var existing =
+                containerParent != null
+                    ? containerParent.Find(DecorationsContainerName)
+                    : null;
+
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var containerObject = new GameObject(
+                DecorationsContainerName);
+            var container = containerObject.transform;
+            container.SetParent(containerParent, false);
+            return container;
+        }
+
         private void EnsureGeneratedVisuals()
         {
             if (generatedAnchor != null)
@@ -293,6 +316,9 @@ namespace jcan.CelestialSystems
             var anchorObject = new GameObject(
                 $"Generated Body Grid Marker {GetInstanceID()}");
             generatedAnchor = anchorObject.transform;
+            generatedAnchor.SetParent(
+                GetOrCreateDecorationsContainer(),
+                false);
             floatingObject = anchorObject.AddComponent<SgtFloatingObject>();
 
             var markerObject = new GameObject("Marker");
