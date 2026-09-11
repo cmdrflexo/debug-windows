@@ -51,6 +51,7 @@ namespace jcan.CelestialSystems
         private Mesh elevationLineMesh;
         private Material elevationLineMaterial;
         private MaterialPropertyBlock markerPropertyBlock;
+        private Camera observationCamera;
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedTarget => hasResolvedTarget;
@@ -193,6 +194,7 @@ namespace jcan.CelestialSystems
                 Vector3.up * (float)(worldSize * planeOffsetFraction);
 
             UpdateElevationLine(elevation);
+            UpdatePersistentRendererBounds();
             SetRenderersVisible(true);
         }
 
@@ -288,21 +290,21 @@ namespace jcan.CelestialSystems
 
         private Transform GetOrCreateDecorationsContainer()
         {
-            var containerParent = transform.parent;
-            var existing =
-                containerParent != null
-                    ? containerParent.Find(DecorationsContainerName)
-                    : null;
+            var containerObject = GameObject.Find(
+                DecorationsContainerName);
 
-            if (existing != null)
+            if (containerObject == null)
             {
-                return existing;
+                containerObject = new GameObject(
+                    DecorationsContainerName);
             }
 
-            var containerObject = new GameObject(
-                DecorationsContainerName);
             var container = containerObject.transform;
-            container.SetParent(containerParent, false);
+            container.SetParent(null, false);
+            container.SetPositionAndRotation(
+                Vector3.zero,
+                Quaternion.identity);
+            container.localScale = Vector3.one;
             return container;
         }
 
@@ -326,6 +328,7 @@ namespace jcan.CelestialSystems
             markerVisual.SetParent(generatedAnchor, false);
             var markerFilter = markerObject.AddComponent<MeshFilter>();
             markerRenderer = markerObject.AddComponent<MeshRenderer>();
+            markerRenderer.allowOcclusionWhenDynamic = false;
             markerMesh = CreatePlaneMesh();
             markerFilter.sharedMesh = markerMesh;
 
@@ -333,6 +336,7 @@ namespace jcan.CelestialSystems
             lineObject.transform.SetParent(generatedAnchor, false);
             var lineFilter = lineObject.AddComponent<MeshFilter>();
             elevationLineRenderer = lineObject.AddComponent<MeshRenderer>();
+            elevationLineRenderer.allowOcclusionWhenDynamic = false;
             elevationLineMesh = new Mesh
             {
                 name = "Observation Body Elevation Line"
@@ -398,6 +402,40 @@ namespace jcan.CelestialSystems
                 0,
                 false);
             elevationLineMesh.RecalculateBounds();
+        }
+
+        private void UpdatePersistentRendererBounds()
+        {
+            if (observationCamera == null)
+            {
+                observationCamera = Camera.main;
+            }
+
+            if (observationCamera == null)
+            {
+                return;
+            }
+
+            IncludeCameraInRendererBounds(markerRenderer);
+            IncludeCameraInRendererBounds(elevationLineRenderer);
+        }
+
+        private void IncludeCameraInRendererBounds(MeshRenderer renderer)
+        {
+            if (renderer == null)
+            {
+                return;
+            }
+
+            var bounds = renderer.localBounds;
+            var cameraLocalPosition =
+                renderer.transform.InverseTransformPoint(
+                    observationCamera.transform.position);
+            bounds.Encapsulate(cameraLocalPosition);
+            bounds.Expand(Mathf.Max(
+                1.0f,
+                bounds.size.magnitude * 0.01f));
+            renderer.localBounds = bounds;
         }
 
         private void SetRenderersVisible(bool value)
