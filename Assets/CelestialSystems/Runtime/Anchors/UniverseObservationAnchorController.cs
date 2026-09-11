@@ -167,6 +167,38 @@ namespace jcan.CelestialSystems
 
         public string LastError => lastError;
 
+        public bool TryGetObservationPlane(
+            out UniversePosition pivotPosition,
+            out Vector3 planeRight,
+            out Vector3 planeForward,
+            out Vector3 planeUp)
+        {
+            if (target == null ||
+                !target.TryGetMotionState(out var targetMotion))
+            {
+                pivotPosition = default;
+                planeRight = default;
+                planeForward = default;
+                planeUp = default;
+                return false;
+            }
+
+            GetReferencePlaneAxes(
+                out planeRight,
+                out planeForward,
+                out planeUp);
+
+            var pivotOffset =
+                ToDoubleVector(planeRight) * plateOffsetRightMeters +
+                ToDoubleVector(planeForward) * plateOffsetForwardMeters;
+            pivotPosition = targetMotion.Position;
+            pivotPosition.AddLocalMeters(
+                pivotOffset.x,
+                pivotOffset.y,
+                pivotOffset.z);
+            return true;
+        }
+
         private void Awake()
         {
             ResolveReferences();
