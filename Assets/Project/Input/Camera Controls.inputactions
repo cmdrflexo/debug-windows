@@ -122,6 +122,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Trails",
+                    "type": "Button",
+                    "id": "1c629245-83ab-4cc8-a1a3-07a8d4961f49",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Orbits",
+                    "type": "Button",
+                    "id": "3f8749df-e70e-4d47-a94e-8c593657252c",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -342,6 +360,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "Plane Elevation Modifier",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c2551fd8-d243-4bde-a2cc-b62508c96cd1",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Trails",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a33cb7e4-ee6c-4311-aa2f-b220060bd337",
+                    "path": "<Keyboard>/o",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Toggle Orbits",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
