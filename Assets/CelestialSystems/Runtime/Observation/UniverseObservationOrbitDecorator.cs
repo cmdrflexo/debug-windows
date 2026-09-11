@@ -5,6 +5,7 @@
 using System;
 using SpaceGraphicsToolkit;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace jcan.CelestialSystems
 {
@@ -15,10 +16,15 @@ namespace jcan.CelestialSystems
         private const string DecorationsContainerName =
             "Generated Observation Decorations";
 
+        public static bool GlobalVisibility { get; private set; } = true;
+
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField] private UniverseObservationSelectionController selectionController;
         [SerializeField] private CelestialBodyRuntimeContext targetContext;
+        [SerializeField]
+        [Tooltip("Assign only on the authored template. Runtime siblings share its visibility.")]
+        private InputActionReference toggleVisibilityAction;
 
         [Header("Appearance")]
         [SerializeField] private Material orbitMaterial;
@@ -56,6 +62,7 @@ namespace jcan.CelestialSystems
         private Color[] orbitColors;
         private Bounds orbitGeometryBounds;
         private Camera observationCamera;
+        private bool enabledToggleVisibilityAction;
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedOrbit => hasResolvedOrbit;
@@ -92,6 +99,13 @@ namespace jcan.CelestialSystems
             }
         }
 
+        [RuntimeInitializeOnLoadMethod(
+            RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetGlobalVisibility()
+        {
+            GlobalVisibility = true;
+        }
+
         private void Awake()
         {
             ResolveReferences();
@@ -102,6 +116,30 @@ namespace jcan.CelestialSystems
         {
             ResolveReferences();
             EnsureGeneratedVisual();
+            enabledToggleVisibilityAction =
+                EnableAction(toggleVisibilityAction);
+
+            if (toggleVisibilityAction != null &&
+                toggleVisibilityAction.action != null)
+            {
+                toggleVisibilityAction.action.performed +=
+                    OnToggleVisibilityPerformed;
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (toggleVisibilityAction != null &&
+                toggleVisibilityAction.action != null)
+            {
+                toggleVisibilityAction.action.performed -=
+                    OnToggleVisibilityPerformed;
+            }
+
+            DisableAction(
+                toggleVisibilityAction,
+                enabledToggleVisibilityAction);
+            enabledToggleVisibilityAction = false;
         }
 
         private void OnDestroy()
@@ -138,7 +176,7 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisual();
 
-            if (!visible)
+            if (!visible || !GlobalVisibility)
             {
                 SetRendererVisible(false);
                 return;
@@ -578,6 +616,41 @@ namespace jcan.CelestialSystems
                 (float)value.y,
                 (float)value.z);
             return true;
+        }
+
+        private void OnToggleVisibilityPerformed(
+            InputAction.CallbackContext context)
+        {
+            GlobalVisibility = !GlobalVisibility;
+        }
+
+        private static bool EnableAction(
+            InputActionReference actionReference)
+        {
+            var action =
+                actionReference != null
+                    ? actionReference.action
+                    : null;
+
+            if (action == null || action.enabled)
+            {
+                return false;
+            }
+
+            action.Enable();
+            return true;
+        }
+
+        private static void DisableAction(
+            InputActionReference actionReference,
+            bool enabledByThisComponent)
+        {
+            if (enabledByThisComponent &&
+                actionReference != null &&
+                actionReference.action != null)
+            {
+                actionReference.action.Disable();
+            }
         }
 
         private static bool IsFloatRepresentable(double value)
