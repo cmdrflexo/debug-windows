@@ -363,21 +363,21 @@ namespace jcan.CelestialSystems
 
         private Transform GetOrCreateDecorationsContainer()
         {
-            var containerParent = transform.parent;
-            var existing =
-                containerParent != null
-                    ? containerParent.Find(DecorationsContainerName)
-                    : null;
+            var containerObject = GameObject.Find(
+                DecorationsContainerName);
 
-            if (existing != null)
+            if (containerObject == null)
             {
-                return existing;
+                containerObject = new GameObject(
+                    DecorationsContainerName);
             }
 
-            var containerObject = new GameObject(
-                DecorationsContainerName);
             var container = containerObject.transform;
-            container.SetParent(containerParent, false);
+            container.SetParent(null, false);
+            container.SetPositionAndRotation(
+                Vector3.zero,
+                Quaternion.identity);
+            container.localScale = Vector3.one;
             return container;
         }
 
