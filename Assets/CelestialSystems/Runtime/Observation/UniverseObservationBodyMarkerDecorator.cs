@@ -427,7 +427,11 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            var bounds = renderer.localBounds;
+            var meshFilter = renderer.GetComponent<MeshFilter>();
+            var bounds =
+                meshFilter != null && meshFilter.sharedMesh != null
+                    ? meshFilter.sharedMesh.bounds
+                    : renderer.localBounds;
             var cameraLocalPosition =
                 renderer.transform.InverseTransformPoint(
                     observationCamera.transform.position);
