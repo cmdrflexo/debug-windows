@@ -130,6 +130,41 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CelestialPlanetVolatileState planetVolatileState;
 
+        [Header("Generated Moon Formation Properties")]
+        [SerializeField]
+        private bool hasMoonFormationProperties;
+
+        [SerializeField]
+        private CelestialMoonFormationOrigin moonFormationOrigin;
+
+        [SerializeField]
+        private double moonVolatileMassFraction;
+
+        [SerializeField]
+        private double moonOrbitalRadiusMeters;
+
+        [SerializeField]
+        private double moonOrbitalEccentricity;
+
+        [SerializeField]
+        private double moonOrbitalInclinationDegrees;
+
+        [SerializeField]
+        private CelestialOrbitDirection moonOrbitDirection =
+            CelestialOrbitDirection.Prograde;
+
+        [SerializeField]
+        private double moonRocheLimitMeters;
+
+        [SerializeField]
+        private double moonStableOuterLimitMeters;
+
+        [SerializeField]
+        private double moonHillRadiusMeters;
+
+        [SerializeField]
+        private double moonSystemMassBudgetEarth;
+
         [SerializeField]
         [TextArea(3, 8)]
         private string description;
@@ -260,6 +295,39 @@ namespace jcan.CelestialSystems
         public CelestialPlanetVolatileState PlanetVolatileState =>
             planetVolatileState;
 
+        public bool HasMoonFormationProperties =>
+            hasMoonFormationProperties;
+
+        public CelestialMoonFormationOrigin MoonFormationOrigin =>
+            moonFormationOrigin;
+
+        public double MoonVolatileMassFraction =>
+            moonVolatileMassFraction;
+
+        public double MoonOrbitalRadiusMeters =>
+            moonOrbitalRadiusMeters;
+
+        public double MoonOrbitalEccentricity =>
+            moonOrbitalEccentricity;
+
+        public double MoonOrbitalInclinationDegrees =>
+            moonOrbitalInclinationDegrees;
+
+        public CelestialOrbitDirection MoonOrbitDirection =>
+            moonOrbitDirection;
+
+        public double MoonRocheLimitMeters =>
+            moonRocheLimitMeters;
+
+        public double MoonStableOuterLimitMeters =>
+            moonStableOuterLimitMeters;
+
+        public double MoonHillRadiusMeters =>
+            moonHillRadiusMeters;
+
+        public double MoonSystemMassBudgetEarth =>
+            moonSystemMassBudgetEarth;
+
         public string Description =>
             description ?? string.Empty;
 
@@ -347,6 +415,19 @@ namespace jcan.CelestialSystems
                 CelestialPlanetDifferentiation.Undifferentiated;
             planetVolatileState =
                 CelestialPlanetVolatileState.Depleted;
+            hasMoonFormationProperties = false;
+            moonFormationOrigin =
+                CelestialMoonFormationOrigin.RegularDisk;
+            moonVolatileMassFraction = 0.0;
+            moonOrbitalRadiusMeters = 0.0;
+            moonOrbitalEccentricity = 0.0;
+            moonOrbitalInclinationDegrees = 0.0;
+            moonOrbitDirection =
+                CelestialOrbitDirection.Prograde;
+            moonRocheLimitMeters = 0.0;
+            moonStableOuterLimitMeters = 0.0;
+            moonHillRadiusMeters = 0.0;
+            moonSystemMassBudgetEarth = 0.0;
             description = string.Empty;
         }
 
@@ -424,6 +505,33 @@ namespace jcan.CelestialSystems
                 properties.Differentiation;
             planetVolatileState =
                 properties.VolatileState;
+        }
+
+        internal void ConfigureRuntimeMoonFormationProperties(
+            CelestialMoonFormationResult moon,
+            CelestialMoonSystemFormationResult system)
+        {
+            hasMoonFormationProperties = true;
+            moonFormationOrigin =
+                moon.Origin;
+            moonVolatileMassFraction =
+                moon.VolatileMassFraction;
+            moonOrbitalRadiusMeters =
+                moon.OrbitalRadiusMeters;
+            moonOrbitalEccentricity =
+                moon.Eccentricity;
+            moonOrbitalInclinationDegrees =
+                moon.InclinationDegrees;
+            moonOrbitDirection =
+                moon.Direction;
+            moonRocheLimitMeters =
+                moon.RocheLimitMeters;
+            moonStableOuterLimitMeters =
+                moon.StableOuterLimitMeters;
+            moonHillRadiusMeters =
+                system.HillRadiusMeters;
+            moonSystemMassBudgetEarth =
+                system.SatelliteMassBudgetEarth;
         }
 
         private static bool IsFinite(

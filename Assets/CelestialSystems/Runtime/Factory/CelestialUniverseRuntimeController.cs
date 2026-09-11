@@ -697,6 +697,8 @@ namespace jcan.CelestialSystems
             CelestialBodyDefinition star = null;
             var planets =
                 new List<CelestialBodyDefinition>();
+            var moons =
+                new List<CelestialBodyDefinition>();
 
             foreach (var bodySystem in
                 starSystem.BodySystems.Values)
@@ -728,6 +730,11 @@ namespace jcan.CelestialSystems
                         planets.Add(
                             definition);
                     }
+                    else if (definition.HasMoonFormationProperties)
+                    {
+                        moons.Add(
+                            definition);
+                    }
                 }
             }
 
@@ -735,6 +742,10 @@ namespace jcan.CelestialSystems
                 (left, right) =>
                     ResolvePresentOrbit(left).CompareTo(
                         ResolvePresentOrbit(right)));
+            moons.Sort(
+                (left, right) =>
+                    left.MoonOrbitalRadiusMeters.CompareTo(
+                        right.MoonOrbitalRadiusMeters));
 
             var builder =
                 new StringBuilder();
@@ -780,6 +791,26 @@ namespace jcan.CelestialSystems
                         EarthMassKilograms,
                     "Earth masses",
                     planet.ReferenceRadiusMeters /
+                        EarthRadiusMeters,
+                    "Earth radii");
+            }
+
+            for (var index = 0;
+                index < moons.Count;
+                index++)
+            {
+                var moon =
+                    moons[index];
+
+                AppendSummaryLine(
+                    builder,
+                    $"moon {index + 1}",
+                    DescribeMoonClassification(
+                        moon.MoonFormationOrigin),
+                    moon.MassKilograms /
+                        EarthMassKilograms,
+                    "Earth masses",
+                    moon.ReferenceRadiusMeters /
                         EarthRadiusMeters,
                     "Earth radii");
             }
@@ -878,6 +909,22 @@ namespace jcan.CelestialSystems
                     return "giant planet";
                 default:
                     return "unclassified planet";
+            }
+        }
+
+        private static string DescribeMoonClassification(
+            CelestialMoonFormationOrigin origin)
+        {
+            switch (origin)
+            {
+                case CelestialMoonFormationOrigin.RegularDisk:
+                    return "regular moon";
+                case CelestialMoonFormationOrigin.GiantImpact:
+                    return "impact-formed moon";
+                case CelestialMoonFormationOrigin.Captured:
+                    return "captured moon";
+                default:
+                    return "unclassified moon";
             }
         }
 

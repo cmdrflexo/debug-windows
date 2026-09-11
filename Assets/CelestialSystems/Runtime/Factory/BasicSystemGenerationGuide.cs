@@ -56,27 +56,6 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicSurfaceQualityProfile moonQualityProfile;
 
-        [Header("Body Variation")]
-        [SerializeField]
-        [Min(0.01f)]
-        private float minimumPlanetRadiusScale =
-            0.5f;
-
-        [SerializeField]
-        [Min(0.01f)]
-        private float maximumPlanetRadiusScale =
-            1.5f;
-
-        [SerializeField]
-        [Min(0.01f)]
-        private float minimumMoonRadiusScale =
-            0.5f;
-
-        [SerializeField]
-        [Min(0.01f)]
-        private float maximumMoonRadiusScale =
-            1.5f;
-
         [Header("Prototype Orbits")]
         [SerializeField]
         [Range(0.0f, 45.0f)]
@@ -92,34 +71,29 @@ namespace jcan.CelestialSystems
         [Range(0.0f, 1.0f)]
         private float retrogradeChance;
 
-        [Header("Prototype Moons")]
-        [SerializeField]
-        [Range(0.0f, 1.0f)]
-        private float moonChance;
+        private readonly struct GeneratedMoon
+        {
+            public GeneratedMoon(
+                CelestialBodyDefinition definition,
+                CelestialMoonFormationResult formation,
+                double phaseRadians,
+                double argumentOfPeriapsisRadians)
+            {
+                Definition = definition;
+                Formation = formation;
+                PhaseRadians = phaseRadians;
+                ArgumentOfPeriapsisRadians =
+                    argumentOfPeriapsisRadians;
+            }
 
-        [SerializeField]
-        [Min(1.01f)]
-        private float minimumMoonOrbitPlanetRadii =
-            3.0f;
+            public CelestialBodyDefinition Definition { get; }
 
-        [SerializeField]
-        [Min(1.01f)]
-        private float maximumMoonOrbitPlanetRadii =
-            30.0f;
+            public CelestialMoonFormationResult Formation { get; }
 
-        [SerializeField]
-        [Range(0.0f, 90.0f)]
-        private float maximumMoonInclinationDegrees =
-            15.0f;
+            public double PhaseRadians { get; }
 
-        [SerializeField]
-        [Range(0.0f, 0.5f)]
-        private float maximumMoonEccentricity =
-            0.08f;
-
-        [SerializeField]
-        [Range(0.0f, 1.0f)]
-        private float moonRetrogradeChance;
+            public double ArgumentOfPeriapsisRadians { get; }
+        }
 
         private readonly struct SurvivingPlanet
         {
@@ -410,89 +384,62 @@ namespace jcan.CelestialSystems
                 ownedRuntimeObjects.Add(
                     planet);
 
-                CelestialBodyDefinition moon = null;
-                var moonOrbitRadius =
-                    0.0;
-                var moonPhaseRadians =
-                    0.0;
-                var moonInclinationRadians =
-                    0.0;
-                var moonDirection =
-                    1.0;
-                var moonEccentricity =
-                    0.0;
-                var moonArgumentOfPeriapsisRadians =
-                    0.0;
-
-                if (moonChance > 0.0f &&
-                    random.Next01() < moonChance)
+                if (!CelestialMoonFormationModel.TryGenerate(
+                        planetSeed,
+                        formation,
+                        formation.FinalOrbitAstronomicalUnits,
+                        stellarProperties.InitialMassSolar,
+                        out var moonSystem,
+                        out error))
                 {
-                    var minimumMoonOrbitRadius =
-                        planet.ReferenceRadiusMeters *
-                        minimumMoonOrbitPlanetRadii;
-                    var configuredMaximumMoonOrbitRadius =
-                        planet.ReferenceRadiusMeters *
-                        maximumMoonOrbitPlanetRadii;
-                    var hillRadius =
-                        orbitRadius *
-                        Math.Pow(
-                            planet.MassKilograms /
-                            (3.0 *
-                                star.MassKilograms),
-                            1.0 /
-                            3.0);
-                    var stableMaximumMoonOrbitRadius =
-                        hillRadius *
-                        0.35;
-                    moonEccentricity =
-                        random.NextRange(
-                            0.0,
-                            maximumMoonEccentricity);
-                    moonArgumentOfPeriapsisRadians =
-                        random.Next01() *
-                        Math.PI *
-                        2.0;
-                    var maximumStablePeriapsis =
-                        stableMaximumMoonOrbitRadius *
-                        (1.0 - moonEccentricity) /
-                        (1.0 + moonEccentricity);
-                    var maximumMoonOrbitRadius =
-                        Math.Min(
-                            configuredMaximumMoonOrbitRadius,
-                            maximumStablePeriapsis);
+                    ReleaseOwnedRuntimeObjects(
+                        ownedRuntimeObjects);
+                    return false;
+                }
 
-                    if (maximumMoonOrbitRadius >=
-                        minimumMoonOrbitRadius)
+                var generatedMoons =
+                    new List<GeneratedMoon>(
+                        moonSystem.Moons.Length);
+
+                for (var moonIndex = 0;
+                    moonIndex < moonSystem.Moons.Length;
+                    moonIndex++)
+                {
+                    var moonFormation =
+                        moonSystem.Moons[moonIndex];
+                    var moonDiameterMeters =
+                        moonFormation.RadiusEarth *
+                        EarthRadiusMeters *
+                        2.0;
+
+                    if (moonDiameterMeters <
+                        CelestialBodyDefinition.DefaultRoundBodyMinimumDiameterMeters)
                     {
-                        moon =
-                            CreateVariedDefinition(
-                                moonDefinition,
-                                $"generated-{instanceId}-moon-1",
-                                random.NextInt(),
-                                random.NextRange(
-                                    minimumMoonRadiusScale,
-                                    maximumMoonRadiusScale));
-                        ownedRuntimeObjects.Add(
-                            moon);
-                        moonOrbitRadius =
-                            random.NextRange(
-                                minimumMoonOrbitRadius,
-                                maximumMoonOrbitRadius);
-                        moonPhaseRadians =
-                            random.Next01() *
-                            Math.PI *
-                            2.0;
-                        moonInclinationRadians =
-                            (random.Next01() * 2.0 - 1.0) *
-                            maximumMoonInclinationDegrees *
-                            Math.PI /
-                            180.0;
-                        moonDirection =
-                            random.Next01() <
-                                moonRetrogradeChance
-                                    ? -1.0
-                                    : 1.0;
+                        continue;
                     }
+
+                    var moonSeed =
+                        random.NextInt();
+                    var moon =
+                        CreateMoonDefinition(
+                            moonDefinition,
+                            $"generated-{instanceId}-moon-{generatedMoons.Count + 1}",
+                            moonSeed,
+                            moonFormation,
+                            moonSystem,
+                            formation);
+                    ownedRuntimeObjects.Add(
+                        moon);
+                    generatedMoons.Add(
+                        new GeneratedMoon(
+                            moon,
+                            moonFormation,
+                            random.Next01() *
+                                Math.PI *
+                                2.0,
+                            random.Next01() *
+                                Math.PI *
+                                2.0));
                 }
 
                 bodySystems.Add(
@@ -500,7 +447,7 @@ namespace jcan.CelestialSystems
                         instanceId,
                         planet,
                         planetQualityProfile,
-                        moon,
+                        generatedMoons,
                         moonQualityProfile,
                         position,
                         velocity,
@@ -510,12 +457,6 @@ namespace jcan.CelestialSystems
                         direction,
                         eccentricity,
                         argumentOfPeriapsisRadians,
-                        moonOrbitRadius,
-                        moonPhaseRadians,
-                        moonInclinationRadians,
-                        moonDirection,
-                        moonEccentricity,
-                        moonArgumentOfPeriapsisRadians,
                         ownedRuntimeObjects));
             }
 
@@ -564,47 +505,21 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            if (moonChance > 0.0f &&
-                !IsUsablePrototype(
+            if (!IsUsablePrototype(
                     moonDefinition))
             {
                 error =
-                    "The basic system generation guide requires a valid, spawnable moon body definition when moon chance is greater than zero.";
-                return false;
-            }
-
-            if (!IsValidScaleRange(
-                    minimumPlanetRadiusScale,
-                    maximumPlanetRadiusScale) ||
-                !IsValidScaleRange(
-                    minimumMoonRadiusScale,
-                    maximumMoonRadiusScale))
-            {
-                error =
-                    "The basic system generation guide has an invalid body radius-scale range.";
-                return false;
-            }
-
-            if (minimumMoonOrbitPlanetRadii <= 1.0f ||
-                maximumMoonOrbitPlanetRadii <
-                    minimumMoonOrbitPlanetRadii)
-            {
-                error =
-                    "The basic system generation guide has an invalid moon orbital-radius range.";
+                    "The basic system generation guide requires a valid, spawnable moon body definition.";
                 return false;
             }
 
             if (!IsFinite(
                     maximumPlanetEccentricity) ||
                 maximumPlanetEccentricity < 0.0 ||
-                maximumPlanetEccentricity >= 1.0 ||
-                !IsFinite(
-                    maximumMoonEccentricity) ||
-                maximumMoonEccentricity < 0.0 ||
-                maximumMoonEccentricity >= 1.0)
+                maximumPlanetEccentricity >= 1.0)
             {
                 error =
-                    "The basic system generation guide requires eccentricity limits from zero up to, but not including, one.";
+                    "The basic system generation guide requires a planet eccentricity limit from zero up to, but not including, one.";
                 return false;
             }
 
@@ -702,11 +617,13 @@ namespace jcan.CelestialSystems
             return definition;
         }
 
-        private static CelestialBodyDefinition CreateVariedDefinition(
+        private static CelestialBodyDefinition CreateMoonDefinition(
             CelestialBodyDefinition prototype,
             string definitionId,
             int generationSeed,
-            double radiusScale)
+            CelestialMoonFormationResult formation,
+            CelestialMoonSystemFormationResult system,
+            CelestialPlanetFormationResult planet)
         {
             var definition =
                 CreateInstance<CelestialBodyDefinition>();
@@ -716,18 +633,24 @@ namespace jcan.CelestialSystems
                 HideFlags.DontSave;
             definition.ConfigureRuntime(
                 definitionId,
-                prototype.MassKilograms *
-                    radiusScale *
-                    radiusScale *
-                    radiusScale,
-                prototype.ReferenceRadiusMeters *
-                    radiusScale,
+                formation.MassEarth *
+                    EarthMassKilograms,
+                formation.RadiusEarth *
+                    EarthRadiusMeters,
                 generationSeed,
                 prototype.NorthAxis,
                 prototype.PoleReferenceAxis,
                 prototype.SurfaceSystem,
                 prototype.RoundMapMagicSurface,
                 prototype.OceanDefinition);
+            definition.ConfigureRuntimeMoonFormationProperties(
+                formation,
+                system);
+            definition.ConfigureRuntimeDescription(
+                CelestialObjectDescriptionGenerator.DescribeMoon(
+                    formation,
+                    planet,
+                    generationSeed));
             return definition;
         }
 
@@ -777,7 +700,7 @@ namespace jcan.CelestialSystems
             string systemInstanceId,
             CelestialBodyDefinition planet,
             RoundMapMagicSurfaceQualityProfile planetQualityProfile,
-            CelestialBodyDefinition moon,
+            IReadOnlyList<GeneratedMoon> moons,
             RoundMapMagicSurfaceQualityProfile moonQualityProfile,
             DoubleVector3 position,
             DoubleVector3 velocity,
@@ -787,12 +710,6 @@ namespace jcan.CelestialSystems
             double planetDirection,
             double planetEccentricity,
             double planetArgumentOfPeriapsisRadians,
-            double moonOrbitRadius,
-            double moonPhaseRadians,
-            double moonInclinationRadians,
-            double moonDirection,
-            double moonEccentricity,
-            double moonArgumentOfPeriapsisRadians,
             ICollection<UnityEngine.Object> ownedRuntimeObjects)
         {
             var planetPosition =
@@ -801,32 +718,58 @@ namespace jcan.CelestialSystems
                 new DoubleVector3();
             var entries =
                 new List<CelestialBodySystemDefinition.BodyEntry>(
-                    moon == null
-                        ? 1
-                        : 2);
+                    moons.Count + 1);
+            var totalMass =
+                planet.MassKilograms;
 
-            if (moon != null)
+            for (var index = 0;
+                index < moons.Count;
+                index++)
             {
-                var totalMass =
-                    planet.MassKilograms +
-                    moon.MassKilograms;
+                totalMass +=
+                    moons[index].Definition.MassKilograms;
+            }
+
+            var relativePositions =
+                new DoubleVector3[moons.Count];
+            var relativeVelocities =
+                new DoubleVector3[moons.Count];
+
+            for (var index = 0;
+                index < moons.Count;
+                index++)
+            {
+                var moon =
+                    moons[index];
+                var orbitRadius =
+                    moon.Formation.OrbitalRadiusMeters;
+                var inclinationRadians =
+                    moon.Formation.InclinationDegrees *
+                    Math.PI /
+                    180.0;
+                var direction =
+                    moon.Formation.Direction ==
+                        CelestialOrbitDirection.Retrograde
+                            ? -1.0
+                            : 1.0;
                 var relativeSpeed =
                     Math.Sqrt(
                         GravitationalConstant *
-                        totalMass /
-                        moonOrbitRadius);
+                        (planet.MassKilograms +
+                            moon.Definition.MassKilograms) /
+                        orbitRadius);
                 var cosinePhase =
                     Math.Cos(
-                        moonPhaseRadians);
+                        moon.PhaseRadians);
                 var sinePhase =
                     Math.Sin(
-                        moonPhaseRadians);
+                        moon.PhaseRadians);
                 var cosineInclination =
                     Math.Cos(
-                        moonInclinationRadians);
+                        inclinationRadians);
                 var sineInclination =
                     Math.Sin(
-                        moonInclinationRadians);
+                        inclinationRadians);
                 var radialDirection =
                     new DoubleVector3(
                         cosinePhase,
@@ -841,57 +784,29 @@ namespace jcan.CelestialSystems
                             sineInclination,
                         cosinePhase *
                             cosineInclination);
-                var planetDistance =
-                    moonOrbitRadius *
-                    moon.MassKilograms /
-                    totalMass;
-                var moonDistance =
-                    moonOrbitRadius *
-                    planet.MassKilograms /
-                    totalMass;
-                var planetSpeed =
-                    relativeSpeed *
-                    moon.MassKilograms /
-                    totalMass;
-                var moonSpeed =
-                    relativeSpeed *
-                    planet.MassKilograms /
-                    totalMass;
-
-                planetPosition =
+                var relativePosition =
                     radialDirection *
-                    -planetDistance;
-                planetVelocity =
+                    orbitRadius;
+                var relativeVelocity =
                     tangentDirection *
-                    (-planetSpeed *
-                        moonDirection);
+                    (relativeSpeed *
+                        direction);
 
-                entries.Add(
-                    new CelestialBodySystemDefinition.BodyEntry(
-                        "moon-1",
-                        moon,
-                        moonQualityProfile,
-                        "planet",
-                        CelestialBodySpawnMode.PrescribedTrajectory,
-                        radialDirection *
-                            moonDistance,
-                        tangentDirection *
-                            (moonSpeed *
-                                moonDirection),
-                        Vector3.zero,
-                        new DoubleVector3(),
-                        CreateConicTrajectory(
-                            "planet",
-                            moonOrbitRadius,
-                            moonEccentricity,
-                            moonPhaseRadians,
-                            moonInclinationRadians,
-                            moonArgumentOfPeriapsisRadians,
-                            moonDirection)));
+                relativePositions[index] =
+                    relativePosition;
+                relativeVelocities[index] =
+                    relativeVelocity;
+                planetPosition -=
+                    relativePosition *
+                    (moon.Definition.MassKilograms /
+                        totalMass);
+                planetVelocity -=
+                    relativeVelocity *
+                    (moon.Definition.MassKilograms /
+                        totalMass);
             }
 
-            entries.Insert(
-                0,
+            entries.Add(
                 new CelestialBodySystemDefinition.BodyEntry(
                     "planet",
                     planet,
@@ -902,6 +817,47 @@ namespace jcan.CelestialSystems
                     planetVelocity,
                     Vector3.zero,
                     new DoubleVector3()));
+
+            for (var index = 0;
+                index < moons.Count;
+                index++)
+            {
+                var moon =
+                    moons[index];
+                var moonInstanceId =
+                    $"moon-{index + 1}";
+                var direction =
+                    moon.Formation.Direction ==
+                        CelestialOrbitDirection.Retrograde
+                            ? -1.0
+                            : 1.0;
+
+                entries.Add(
+                    new CelestialBodySystemDefinition.BodyEntry(
+                        moonInstanceId,
+                        moon.Definition,
+                        moonQualityProfile,
+                        "planet",
+                        CelestialBodySpawnMode.PrescribedTrajectory,
+                        planetPosition +
+                            relativePositions[index],
+                        planetVelocity +
+                            relativeVelocities[index],
+                        Vector3.zero,
+                        new DoubleVector3(),
+                        CreateConicTrajectory(
+                            "planet",
+                            moon.Formation.OrbitalRadiusMeters *
+                                (1.0 -
+                                    moon.Formation.Eccentricity),
+                            moon.Formation.Eccentricity,
+                            moon.PhaseRadians,
+                            moon.Formation.InclinationDegrees *
+                                Math.PI /
+                                180.0,
+                            moon.ArgumentOfPeriapsisRadians,
+                            direction)));
+            }
 
             var definitionId =
                 $"{systemInstanceId}-body-system";

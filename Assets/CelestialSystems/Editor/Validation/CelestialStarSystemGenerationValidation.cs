@@ -122,7 +122,7 @@ namespace jcan.CelestialSystems.Editor
 
             Debug.Log(
                 $"Star-system generation PASS. {SampleCount} complete deterministic plans; physical values, formation histories, descriptions, references, trajectories, and non-crossing planetary orbits passed. " +
-                $"Generated {totalPlanets} planets and {totalMoons} prototype moons; {planetlessSystems} planetless systems; {remnantSystems} remnant-star systems; planet range {minimumPlanets}-{maximumPlanets}.");
+                $"Generated {totalPlanets} planets and {totalMoons} modeled major moons; {planetlessSystems} planetless systems; {remnantSystems} remnant-star systems; planet range {minimumPlanets}-{maximumPlanets}.");
         }
 
         private static bool TryValidatePlan(
@@ -208,6 +208,11 @@ namespace jcan.CelestialSystems.Editor
                     return false;
                 }
 
+                var moonOrbits =
+                    new List<OrbitRange>();
+                var moonMassEarth = 0.0;
+                var moonMassBudgetEarth = 0.0;
+
                 foreach (var entry in system.Definition.Bodies)
                 {
                     var body =
@@ -218,7 +223,8 @@ namespace jcan.CelestialSystems.Editor
                         string.IsNullOrWhiteSpace(
                             body.Description) &&
                         (body.HasStellarProperties ||
-                            body.HasPlanetFormationProperties))
+                            body.HasPlanetFormationProperties ||
+                            body.HasMoonFormationProperties))
                     {
                         error =
                             $"Body '{entry.InstanceId}' has invalid physical data or a missing generated description.";
@@ -267,10 +273,59 @@ namespace jcan.CelestialSystems.Editor
                         formedSolidMassEarth +=
                             body.PlanetSolidCoreMassEarth;
                     }
-                    else if (!body.HasStellarProperties)
+                    else if (body.HasMoonFormationProperties)
                     {
+                        if (!TryValidateMoon(
+                                body,
+                                entry,
+                                out var moonOrbit,
+                                out error))
+                        {
+                            return false;
+                        }
+
                         moonCount++;
+                        moonMassEarth +=
+                            body.MassKilograms /
+                            5.9722e24;
+                        moonMassBudgetEarth =
+                            body.MoonSystemMassBudgetEarth;
+                        moonOrbits.Add(
+                            moonOrbit);
                     }
+                    else
+                    {
+                        error =
+                            $"Body '{body.DefinitionId}' has no generated stellar, planetary, or moon identity.";
+                        return false;
+                    }
+                }
+
+                moonOrbits.Sort(
+                    (left, right) =>
+                        left.PeriapsisMeters.CompareTo(
+                            right.PeriapsisMeters));
+
+                for (var moonIndex = 1;
+                    moonIndex < moonOrbits.Count;
+                    moonIndex++)
+                {
+                    if (moonOrbits[moonIndex - 1].ApoapsisMeters >=
+                        moonOrbits[moonIndex].PeriapsisMeters)
+                    {
+                        error =
+                            $"Moon trajectories overlap in body system '{system.InstanceId}'.";
+                        return false;
+                    }
+                }
+
+                if (moonMassEarth >
+                    moonMassBudgetEarth +
+                        1.0e-9)
+                {
+                    error =
+                        $"Moons in body system '{system.InstanceId}' exceed their generated satellite mass budget.";
+                    return false;
                 }
             }
 
@@ -379,6 +434,88 @@ namespace jcan.CelestialSystems.Editor
                 return false;
             }
 
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateMoon(
+            CelestialBodyDefinition body,
+            CelestialBodySystemDefinition.BodyEntry entry,
+            out OrbitRange orbit,
+            out string error)
+        {
+            orbit = default;
+
+            if (!PositiveFinite(
+                    body.MassKilograms) ||
+                !PositiveFinite(
+                    body.ReferenceRadiusMeters) ||
+                !Fraction(
+                    body.MoonVolatileMassFraction) ||
+                !PositiveFinite(
+                    body.MoonOrbitalRadiusMeters) ||
+                !NonNegativeFinite(
+                    body.MoonOrbitalEccentricity) ||
+                body.MoonOrbitalEccentricity >= 1.0 ||
+                !NonNegativeFinite(
+                    body.MoonOrbitalInclinationDegrees) ||
+                body.MoonOrbitalInclinationDegrees > 180.0 ||
+                !PositiveFinite(
+                    body.MoonRocheLimitMeters) ||
+                !PositiveFinite(
+                    body.MoonStableOuterLimitMeters) ||
+                !PositiveFinite(
+                    body.MoonHillRadiusMeters) ||
+                !PositiveFinite(
+                    body.MoonSystemMassBudgetEarth) ||
+                entry.Trajectory == null ||
+                entry.Trajectory.Kind !=
+                    CelestialTrajectoryKind.KeplerianConic ||
+                entry.Trajectory.Conic == null)
+            {
+                error =
+                    $"Moon '{body.DefinitionId}' contains invalid formation or trajectory data.";
+                return false;
+            }
+
+            var conic =
+                entry.Trajectory.Conic;
+            var expectedPeriapsis =
+                body.MoonOrbitalRadiusMeters *
+                (1.0 -
+                    body.MoonOrbitalEccentricity);
+            var apoapsis =
+                body.MoonOrbitalRadiusMeters *
+                (1.0 +
+                    body.MoonOrbitalEccentricity);
+            var tolerance =
+                Math.Max(
+                    1.0e-6,
+                    expectedPeriapsis *
+                        1.0e-12);
+
+            if (Math.Abs(
+                    conic.PeriapsisDistanceMeters -
+                        expectedPeriapsis) >
+                    tolerance ||
+                conic.Eccentricity !=
+                    body.MoonOrbitalEccentricity ||
+                conic.Direction !=
+                    body.MoonOrbitDirection ||
+                expectedPeriapsis <=
+                    body.MoonRocheLimitMeters ||
+                apoapsis >=
+                    body.MoonStableOuterLimitMeters)
+            {
+                error =
+                    $"Moon '{body.DefinitionId}' contradicts its modeled orbit or stable boundaries.";
+                return false;
+            }
+
+            orbit =
+                new OrbitRange(
+                    expectedPeriapsis,
+                    apoapsis);
             error = string.Empty;
             return true;
         }

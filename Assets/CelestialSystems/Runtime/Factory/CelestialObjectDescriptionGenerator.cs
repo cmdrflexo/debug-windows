@@ -11,6 +11,9 @@ namespace jcan.CelestialSystems
     {
         public const int ModelVersion = 1;
 
+        private const double EarthRadiusMeters =
+            6371000.0;
+
         public static string DescribeStar(
             CelestialStellarPopulationSample population,
             CelestialStellarEvolutionResult evolution,
@@ -173,6 +176,110 @@ namespace jcan.CelestialSystems
                             physicalSentence,
                             orbitSentence);
             }
+        }
+
+        public static string DescribeMoon(
+            CelestialMoonFormationResult moon,
+            CelestialPlanetFormationResult planet,
+            int generationSeed)
+        {
+            var mass =
+                Format(
+                    moon.MassEarth);
+            var radius =
+                Format(
+                    moon.RadiusEarth);
+            var planetRadii =
+                Format(
+                    moon.OrbitalRadiusMeters /
+                    (planet.RadiusEarth *
+                        EarthRadiusMeters));
+            var eccentricity =
+                Format(
+                    moon.Eccentricity);
+            var inclination =
+                Format(
+                    moon.InclinationDegrees);
+            var direction =
+                moon.Direction ==
+                    CelestialOrbitDirection.Retrograde
+                        ? "retrograde"
+                        : "prograde";
+            var originSentence =
+                DescribeMoonOrigin(
+                    moon.Origin);
+            var physicalSentence =
+                $"Its modeled mass is {mass} Earth masses and its radius is {radius} Earth radii.";
+            var orbitSentence =
+                $"It follows a {direction} orbit at approximately {planetRadii} planetary radii, with an eccentricity of {eccentricity} and an inclination of {inclination} degrees.";
+            var compositionSentence =
+                DescribeMoonComposition(
+                    moon.VolatileMassFraction);
+
+            switch (SelectVariant(
+                generationSeed,
+                3))
+            {
+                case 0:
+                    return
+                        JoinSentences(
+                            originSentence,
+                            physicalSentence,
+                            compositionSentence,
+                            orbitSentence);
+
+                case 1:
+                    return
+                        JoinSentences(
+                            $"This natural satellite has a modeled mass of {mass} Earth masses and a radius of {radius} Earth radii.",
+                            originSentence,
+                            orbitSentence,
+                            compositionSentence);
+
+                default:
+                    return
+                        JoinSentences(
+                            originSentence,
+                            orbitSentence,
+                            compositionSentence,
+                            physicalSentence);
+            }
+        }
+
+        private static string DescribeMoonOrigin(
+            CelestialMoonFormationOrigin origin)
+        {
+            switch (origin)
+            {
+                case CelestialMoonFormationOrigin.RegularDisk:
+                    return
+                        "This moon formed within a disk of material surrounding its young planet.";
+                case CelestialMoonFormationOrigin.GiantImpact:
+                    return
+                        "This moon assembled from debris placed into orbit by a major impact on its planet.";
+                case CelestialMoonFormationOrigin.Captured:
+                    return
+                        "This moon formed independently and was later captured by its planet.";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string DescribeMoonComposition(
+            double volatileMassFraction)
+        {
+            var volatilePercent =
+                volatileMassFraction *
+                100.0;
+
+            if (volatilePercent < 0.05)
+            {
+                return
+                    "The formation model assigns it predominantly rocky material.";
+            }
+
+            return
+                $"The formation model assigns approximately {Format(volatilePercent)} percent of its mass to volatile material.";
         }
 
         private static string DescribePlanetComposition(
