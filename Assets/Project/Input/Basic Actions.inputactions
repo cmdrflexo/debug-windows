@@ -382,7 +382,6 @@
             ]
         },
         {
-<<<<<<< HEAD
             "name": "Universe Observation Camera",
             "id": "21c52832-10a0-4ef5-ac78-edc330f02a78",
             "actions": [
@@ -417,20 +416,10 @@
                     "name": "Zoom",
                     "type": "Value",
                     "id": "aa41adcc-f4aa-4ef6-b7b2-b32ee6f59adb",
-=======
-            "name": "Celestial Time",
-            "id": "6f68d152-fdd7-45d4-a9dd-bbb869b20acd",
-            "actions": [
-                {
-                    "name": "Time Scale Step",
-                    "type": "Value",
-                    "id": "796f71dc-684f-40fe-ab78-13fc9c2b4393",
->>>>>>> main
                     "expectedControlType": "Axis",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
-<<<<<<< HEAD
                 },
                 {
                     "name": "Recenter",
@@ -440,13 +429,10 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-=======
->>>>>>> main
                 }
             ],
             "bindings": [
                 {
-<<<<<<< HEAD
                     "name": "",
                     "id": "13acb979-ab89-49b9-a74f-4dd95d2daae8",
                     "path": "<Pointer>/delta",
@@ -500,7 +486,25 @@
                     "action": "Recenter",
                     "isComposite": false,
                     "isPartOfComposite": false
-=======
+                }
+            ]
+        },
+        {
+            "name": "Celestial Time",
+            "id": "6f68d152-fdd7-45d4-a9dd-bbb869b20acd",
+            "actions": [
+                {
+                    "name": "Time Scale Step",
+                    "type": "Value",
+                    "id": "796f71dc-684f-40fe-ab78-13fc9c2b4393",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
                     "name": "Keyboard",
                     "id": "5e963aca-5746-47cb-94aa-c33d4902d15a",
                     "path": "1DAxis",
@@ -532,7 +536,6 @@
                     "action": "Time Scale Step",
                     "isComposite": false,
                     "isPartOfComposite": true
->>>>>>> main
                 }
             ]
         }
