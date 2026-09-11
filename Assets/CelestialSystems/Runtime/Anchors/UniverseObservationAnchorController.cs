@@ -1001,8 +1001,12 @@ namespace jcan.CelestialSystems
 
         private void UpdateTargetTransition(float deltaTime)
         {
-            if (targetTransitionResponse <= Mathf.Epsilon ||
-                deltaTime <= Mathf.Epsilon)
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            if (targetTransitionResponse <= Mathf.Epsilon)
             {
                 ClearTargetTransition();
                 return;
