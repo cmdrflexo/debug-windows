@@ -73,8 +73,8 @@
             "bindings": [
                 {
                     "name": "",
-                    "id": "8c20a7b0-71cf-49c1-be11-8506b0c57655",
-                    "path": "<Mouse>/rightButton",
+                    "id": "be3dfc5b-0dd1-40d1-a8ac-475fc7c64d71",
+                    "path": "<Mouse>/leftButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -85,7 +85,7 @@
                 {
                     "name": "",
                     "id": "c78b823e-26b1-4717-ac6f-5b80d67f504f",
-                    "path": "<Mouse>/leftButton",
+                    "path": "<Mouse>/rightButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -129,7 +129,7 @@
                 {
                     "name": "",
                     "id": "bfb8b4db-8938-48ea-a129-bf2d1c89db18",
-                    "path": "<Keyboard>/pageUp",
+                    "path": "<Keyboard>/pageDown",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -140,7 +140,7 @@
                 {
                     "name": "",
                     "id": "53c681b1-ab45-4774-9c64-fd667bdecfff",
-                    "path": "<Keyboard>/pageDown",
+                    "path": "<Keyboard>/pageUp",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
