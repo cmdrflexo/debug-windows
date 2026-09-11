@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
@@ -70,11 +71,13 @@ namespace jcan.CelestialSystems
         private UniverseObservationPivotMarker observationPivotMarker;
 
         [SerializeField]
-        [Tooltip("Optional scene marker whose appearance is used for generated planet markers.")]
-        private UniverseObservationBodyMarkerDecorator planetMarkerTemplate;
+        [FormerlySerializedAs("planetMarkerTemplate")]
+        [Tooltip("Optional scene marker whose appearance is used for every generated body marker.")]
+        private UniverseObservationBodyMarkerDecorator bodyMarkerTemplate;
 
         [SerializeField]
-        private bool generatePlanetMarkers = true;
+        [FormerlySerializedAs("generatePlanetMarkers")]
+        private bool generateBodyMarkers = true;
 
         [Header("Lifecycle")]
         [SerializeField]
@@ -130,7 +133,7 @@ namespace jcan.CelestialSystems
         private CelestialUniverseFactory.GeneratedUniverse generatedUniverse;
 
         private readonly List<UniverseObservationBodyMarkerDecorator>
-            generatedPlanetMarkers =
+            generatedBodyMarkers =
                 new List<UniverseObservationBodyMarkerDecorator>();
 
         public CelestialBodyFactory BodyFactory =>
@@ -309,7 +312,7 @@ namespace jcan.CelestialSystems
 
                 SetObservationMarkerToBarycenter(
                     starSystem);
-                ConfigureObservationPlanetMarkers(
+                ConfigureObservationBodyMarkers(
                     starSystem);
 
                 if (logGeneratedStarSystemSummary)
@@ -343,27 +346,27 @@ namespace jcan.CelestialSystems
             return true;
         }
 
-        private void ConfigureObservationPlanetMarkers(
+        private void ConfigureObservationBodyMarkers(
             CelestialStarSystemFactory.GeneratedSystem starSystem)
         {
-            ClearObservationPlanetMarkers();
+            ClearObservationBodyMarkers();
 
-            if (!generatePlanetMarkers)
+            if (!generateBodyMarkers)
             {
                 return;
             }
 
-            planetMarkerTemplate ??=
+            bodyMarkerTemplate ??=
                 FindFirstObjectByType<UniverseObservationBodyMarkerDecorator>();
 
-            if (planetMarkerTemplate == null)
+            if (bodyMarkerTemplate == null)
             {
                 return;
             }
 
-            planetMarkerTemplate.ClearTarget();
+            bodyMarkerTemplate.ClearTarget();
 
-            var planets =
+            var bodies =
                 new List<CelestialBodyRuntimeContext>();
 
             foreach (var bodySystem in
@@ -378,64 +381,120 @@ namespace jcan.CelestialSystems
                     bodySystem.Bodies.Values)
                 {
                     if (body != null &&
-                        body.Definition != null &&
-                        body.Definition.HasPlanetFormationProperties)
+                        body.Definition != null)
                     {
-                        planets.Add(
+                        bodies.Add(
                             body);
                     }
                 }
             }
 
-            planets.Sort(
-                (left, right) =>
-                    ResolvePresentOrbit(
-                        left.Definition).CompareTo(
-                            ResolvePresentOrbit(
-                                right.Definition)));
+            bodies.Sort(
+                CompareBodyMarkerTargets);
 
             for (var index = 0;
-                index < planets.Count;
+                index < bodies.Count;
                 index++)
             {
                 if (index == 0)
                 {
-                    planetMarkerTemplate.SetTarget(
-                        planets[index]);
+                    bodyMarkerTemplate.SetTarget(
+                        bodies[index]);
                     continue;
                 }
 
                 var generatedMarker =
-                    planetMarkerTemplate.CreateRuntimeSibling(
-                        planets[index]);
+                    bodyMarkerTemplate.CreateRuntimeSibling(
+                        bodies[index]);
 
                 if (generatedMarker != null)
                 {
-                    generatedPlanetMarkers.Add(
+                    generatedBodyMarkers.Add(
                         generatedMarker);
                 }
             }
         }
 
-        private void ClearObservationPlanetMarkers()
+        private static int CompareBodyMarkerTargets(
+            CelestialBodyRuntimeContext left,
+            CelestialBodyRuntimeContext right)
         {
-            if (planetMarkerTemplate != null)
+            var leftRank =
+                ResolveBodyMarkerRank(
+                    left?.Definition);
+            var rightRank =
+                ResolveBodyMarkerRank(
+                    right?.Definition);
+            var rankComparison =
+                leftRank.CompareTo(
+                    rightRank);
+
+            if (rankComparison != 0)
             {
-                planetMarkerTemplate.ClearTarget();
+                return rankComparison;
             }
 
-            for (var index = 0;
-                index < generatedPlanetMarkers.Count;
-                index++)
+            if (leftRank == 1)
             {
-                if (generatedPlanetMarkers[index] != null)
+                var orbitComparison =
+                    ResolvePresentOrbit(
+                        left.Definition).CompareTo(
+                            ResolvePresentOrbit(
+                                right.Definition));
+
+                if (orbitComparison != 0)
                 {
-                    Destroy(
-                        generatedPlanetMarkers[index]);
+                    return orbitComparison;
                 }
             }
 
-            generatedPlanetMarkers.Clear();
+            return
+                string.Compare(
+                    left?.InstanceId,
+                    right?.InstanceId,
+                    StringComparison.Ordinal);
+        }
+
+        private static int ResolveBodyMarkerRank(
+            CelestialBodyDefinition definition)
+        {
+            if (definition == null)
+            {
+                return 3;
+            }
+
+            if (definition.HasStellarProperties)
+            {
+                return 0;
+            }
+
+            if (definition.HasPlanetFormationProperties)
+            {
+                return 1;
+            }
+
+            return 2;
+        }
+
+        private void ClearObservationBodyMarkers()
+        {
+            if (bodyMarkerTemplate != null)
+            {
+                bodyMarkerTemplate.ClearTarget();
+            }
+
+            for (var index = 0;
+                index < generatedBodyMarkers.Count;
+                index++)
+            {
+                if (generatedBodyMarkers[index] != null)
+                {
+                    Destroy(
+                        generatedBodyMarkers[index]);
+                }
+            }
+
+            generatedBodyMarkers.Clear();
         }
 
         private void LogStarSystemSummary(
@@ -820,7 +879,7 @@ namespace jcan.CelestialSystems
 
             hasGeneratedStarSystemBarycenter = false;
             generatedStarSystemBarycenter = default;
-            ClearObservationPlanetMarkers();
+            ClearObservationBodyMarkers();
             lastError = string.Empty;
         }
 
