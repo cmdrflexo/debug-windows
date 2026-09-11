@@ -140,6 +140,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Lock To Origin",
+                    "type": "Button",
+                    "id": "f06c1a81-1bae-445c-a11a-a74d6a690bbd",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -382,6 +391,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Toggle Orbits",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ec6aefaa-ab1d-46f2-a4f0-3c1483adb695",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Lock To Origin",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
