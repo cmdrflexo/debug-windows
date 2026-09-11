@@ -24,6 +24,16 @@ namespace jcan.CelestialSystems
         [Tooltip("Shared owner of the currently selected observation target.")]
         private UniverseObservationSelectionController selectionController;
 
+        [SerializeField]
+        private UniverseObservationGridRenderer observationGrid;
+
+        [SerializeField]
+        [Min(1.0f)]
+        private double initialOriginDistanceMeters = 1.0e11;
+
+        private bool originLocked = true;
+        public bool IsOriginLocked => originLocked;
+
         [Header("Target")]
         [SerializeField]
         private CelestialBodyRuntimeContext target;
@@ -101,6 +111,11 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private bool invertPitch;
+
+        [SerializeField]
+        private InputActionReference lockToOriginAction;
+
+        private bool enabledLockToOriginAction;
 
         [SerializeField]
         [Tooltip("Degrees of orbit rotation per mouse pixel.")]
@@ -263,8 +278,7 @@ namespace jcan.CelestialSystems
             out Vector3 planeForward,
             out Vector3 planeUp)
         {
-            if (target == null ||
-                !target.TryGetMotionState(out var targetMotion))
+            if (!TryGetPivotMotion(out var targetMotion))
             {
                 pivotPosition = default;
                 planeRight = default;
@@ -312,6 +326,7 @@ namespace jcan.CelestialSystems
             enabledPlaneElevationModifierAction =
                 EnableAction(planeElevationModifierAction);
             enabledRecenterAction = EnableAction(recenterAction);
+            enabledLockToOriginAction = EnableAction(lockToOriginAction);
             SubscribeToDebugMenu();
         }
 
@@ -336,6 +351,8 @@ namespace jcan.CelestialSystems
                 planeElevationModifierAction,
                 enabledPlaneElevationModifierAction);
             DisableAction(recenterAction, enabledRecenterAction);
+            DisableAction(lockToOriginAction, enabledLockToOriginAction);
+            enabledLockToOriginAction = false;
             enabledPointerDeltaAction = false;
             enabledOrbitAction = false;
             enabledOrbitLeftStepAction = false;
@@ -357,6 +374,7 @@ namespace jcan.CelestialSystems
             initialDistanceInTargetRadii = Mathf.Max(1.01f, initialDistanceInTargetRadii);
             minimumDistanceInTargetRadii = Mathf.Max(1.001f, minimumDistanceInTargetRadii);
             maximumDistanceMeters = Math.Max(1.0, maximumDistanceMeters);
+            initialOriginDistanceMeters = Math.Max(1.0, initialOriginDistanceMeters);
             orbitDegreesPerPixel = Mathf.Max(0.0f, orbitDegreesPerPixel);
             orbitVelocityResponse = Mathf.Max(0.0f, orbitVelocityResponse);
             orbitDamping = Mathf.Max(0.0f, orbitDamping);
@@ -388,12 +406,12 @@ namespace jcan.CelestialSystems
         {
             ResolveSelectionTarget();
 
-            if (selectionController == null)
+            if (selectionController == null && !originLocked)
             {
                 ResolveTarget();
             }
 
-            if (!listen || debugMenuVisible || target == null)
+            if (!listen || debugMenuVisible || (!originLocked && target == null))
             {
                 return;
             }
@@ -403,13 +421,13 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
-            if (target == null || anchorBridge == null)
+            if ((!originLocked && target == null) || anchorBridge == null)
             {
                 hasTargetMotion = false;
                 return;
             }
 
-            if (!target.TryGetMotionState(out var targetMotion))
+            if (!TryGetPivotMotion(out var targetMotion))
             {
                 hasTargetMotion = false;
                 lastError = "The selected target has no available motion state.";
@@ -424,7 +442,7 @@ namespace jcan.CelestialSystems
             }
 
             var radiusMeters = GetTargetRadiusMeters();
-            var minimumDistanceMeters = radiusMeters * minimumDistanceInTargetRadii;
+            var minimumDistanceMeters = originLocked ? 1.0 : radiusMeters * minimumDistanceInTargetRadii;
 
             targetDistanceMeters = Math.Max(
                 minimumDistanceMeters,
@@ -519,13 +537,12 @@ namespace jcan.CelestialSystems
 
         public void SelectTarget(CelestialBodyRuntimeContext newTarget)
         {
-            if (target == newTarget)
+            if (target == newTarget && !originLocked)
             {
                 return;
             }
 
             var preserveDistance =
-                target != null &&
                 newTarget != null &&
                 viewInitialized;
             var currentPivotPosition = default(UniversePosition);
@@ -554,6 +571,7 @@ namespace jcan.CelestialSystems
                     planeUp);
             }
 
+            originLocked = newTarget == null;
             target = newTarget;
             targetInstanceId =
                 newTarget != null
@@ -679,9 +697,18 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (selectionController.IsOriginLocked)
+            {
+                if (!originLocked)
+                {
+                    LockToOrigin();
+                }
+                return;
+            }
+
             var selectedTarget = selectionController.SelectedTarget;
 
-            if (target != selectedTarget)
+            if (originLocked || target != selectedTarget)
             {
                 SelectTarget(selectedTarget);
             }
@@ -690,7 +717,7 @@ namespace jcan.CelestialSystems
         private void InitializeView()
         {
             distanceMeters = Math.Max(
-                GetTargetRadiusMeters() * initialDistanceInTargetRadii,
+                (originLocked ? initialOriginDistanceMeters : GetTargetRadiusMeters() * initialDistanceInTargetRadii),
                 1.0);
             targetDistanceMeters = distanceMeters;
             planeElevationMeters = 0.0;
@@ -705,6 +732,12 @@ namespace jcan.CelestialSystems
 
         private void ReadControls(float deltaTime)
         {
+            if (WasPressedThisFrame(lockToOriginAction))
+            {
+                LockToOrigin();
+                return;
+            }
+
             var pointerDelta = ReadVector2(pointerDeltaAction);
 
             ApplyOrbitInput(pointerDelta, deltaTime);
@@ -778,7 +811,7 @@ namespace jcan.CelestialSystems
             if (recenterZoomArmed)
             {
                 targetDistanceMeters = Math.Max(
-                    GetTargetRadiusMeters() * initialDistanceInTargetRadii,
+                    (originLocked ? initialOriginDistanceMeters : GetTargetRadiusMeters() * initialDistanceInTargetRadii),
                     1.0);
                 recenterZoomArmed = false;
                 return;
@@ -1111,8 +1144,47 @@ namespace jcan.CelestialSystems
             return Math.Max(1.0, target.ConfiguredReferenceRadiusMeters);
         }
 
+        private bool TryGetPivotMotion(out UniverseMotionState motion)
+        {
+            if (originLocked)
+            {
+                var origin = observationGrid != null && observationGrid.HasGridOrigin
+                    ? observationGrid.GridOrigin
+                    : default(UniversePosition);
+                motion = new UniverseMotionState(origin, Quaternion.identity);
+                return true;
+            }
+
+            motion = default;
+            return target != null && target.TryGetMotionState(out motion);
+        }
+
+        [ContextMenu("Lock To Origin")]
+        public void LockToOrigin()
+        {
+            var hasPivot = TryGetObservationPlane(
+                out var previousPivot, out _, out _, out _);
+            originLocked = true;
+            selectionController?.LockToOrigin();
+            RecenterOnTarget();
+            ClearOrbitVelocity();
+            if (hasPivot && TryGetPivotMotion(out var originMotion) &&
+                previousPivot.TryGetOffsetMetersFrom(originMotion.Position, out var offset))
+            {
+                targetTransitionOffsetXMeters = offset.x;
+                targetTransitionOffsetYMeters = offset.y;
+                targetTransitionOffsetZMeters = offset.z;
+            }
+            recenterZoomArmed = false;
+        }
+
         private void ResolveReferences()
         {
+            if (observationGrid == null)
+            {
+                observationGrid = FindFirstObjectByType<UniverseObservationGridRenderer>();
+            }
+
             if (anchorBridge == null)
             {
                 anchorBridge = GetComponentInParent<SgtUniverseOriginBridge>();
