@@ -79,6 +79,13 @@ namespace jcan.CelestialSystems
         [FormerlySerializedAs("generatePlanetMarkers")]
         private bool generateBodyMarkers = true;
 
+        [SerializeField]
+        [Tooltip("Optional scene orbit decorator whose appearance is used for generated orbit paths.")]
+        private UniverseObservationOrbitDecorator orbitDecoratorTemplate;
+
+        [SerializeField]
+        private bool generateOrbitPaths = true;
+
         [Header("Lifecycle")]
         [SerializeField]
         private Transform generatedParentOverride;
@@ -135,6 +142,10 @@ namespace jcan.CelestialSystems
         private readonly List<UniverseObservationBodyMarkerDecorator>
             generatedBodyMarkers =
                 new List<UniverseObservationBodyMarkerDecorator>();
+
+        private readonly List<UniverseObservationOrbitDecorator>
+            generatedOrbitDecorators =
+                new List<UniverseObservationOrbitDecorator>();
 
         public CelestialBodyFactory BodyFactory =>
             bodyFactory;
@@ -314,6 +325,8 @@ namespace jcan.CelestialSystems
                     starSystem);
                 ConfigureObservationBodyMarkers(
                     starSystem);
+                ConfigureObservationOrbitDecorators(
+                    starSystem);
 
                 if (logGeneratedStarSystemSummary)
                 {
@@ -344,6 +357,97 @@ namespace jcan.CelestialSystems
             generatedUniverse = null;
             ResetRuntimeSummary();
             return true;
+        }
+
+        private void ConfigureObservationOrbitDecorators(
+            CelestialStarSystemFactory.GeneratedSystem starSystem)
+        {
+            ClearObservationOrbitDecorators();
+
+            if (!generateOrbitPaths)
+            {
+                return;
+            }
+
+            orbitDecoratorTemplate ??=
+                FindFirstObjectByType<UniverseObservationOrbitDecorator>();
+
+            if (orbitDecoratorTemplate == null)
+            {
+                return;
+            }
+
+            orbitDecoratorTemplate.ClearTarget();
+
+            var orbitingBodies =
+                new List<CelestialBodyRuntimeContext>();
+
+            foreach (var bodySystem in
+                starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in
+                    bodySystem.Bodies.Values)
+                {
+                    if (body != null &&
+                        body.MotionProviderSource is
+                            TrajectoryCelestialBodyMotionProvider)
+                    {
+                        orbitingBodies.Add(
+                            body);
+                    }
+                }
+            }
+
+            orbitingBodies.Sort(
+                CompareBodyMarkerTargets);
+
+            for (var index = 0;
+                index < orbitingBodies.Count;
+                index++)
+            {
+                if (index == 0)
+                {
+                    orbitDecoratorTemplate.SetTarget(
+                        orbitingBodies[index]);
+                    continue;
+                }
+
+                var generatedDecorator =
+                    orbitDecoratorTemplate.CreateRuntimeSibling(
+                        orbitingBodies[index]);
+
+                if (generatedDecorator != null)
+                {
+                    generatedOrbitDecorators.Add(
+                        generatedDecorator);
+                }
+            }
+        }
+
+        private void ClearObservationOrbitDecorators()
+        {
+            if (orbitDecoratorTemplate != null)
+            {
+                orbitDecoratorTemplate.ClearTarget();
+            }
+
+            for (var index = 0;
+                index < generatedOrbitDecorators.Count;
+                index++)
+            {
+                if (generatedOrbitDecorators[index] != null)
+                {
+                    Destroy(
+                        generatedOrbitDecorators[index]);
+                }
+            }
+
+            generatedOrbitDecorators.Clear();
         }
 
         private void ConfigureObservationBodyMarkers(
@@ -880,6 +984,7 @@ namespace jcan.CelestialSystems
             hasGeneratedStarSystemBarycenter = false;
             generatedStarSystemBarycenter = default;
             ClearObservationBodyMarkers();
+            ClearObservationOrbitDecorators();
             lastError = string.Empty;
         }
 
