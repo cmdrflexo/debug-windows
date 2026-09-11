@@ -55,7 +55,7 @@ namespace jcan.CelestialSystems
         public UniversePosition ProjectedGridPosition => projectedGridPosition;
         public double ElevationMeters => elevationMeters;
 
-        public Color Color
+        public Color MarkerColor
         {
             get => color;
             set
@@ -95,6 +95,11 @@ namespace jcan.CelestialSystems
 
         private void OnDestroy()
         {
+            if (generatedAnchor != null)
+            {
+                Destroy(generatedAnchor.gameObject);
+            }
+
             if (markerMesh != null)
             {
                 Destroy(markerMesh);
@@ -255,7 +260,6 @@ namespace jcan.CelestialSystems
             var anchorObject = new GameObject(
                 $"Generated Body Grid Marker {GetInstanceID()}");
             generatedAnchor = anchorObject.transform;
-            generatedAnchor.SetParent(transform, false);
             floatingObject = anchorObject.AddComponent<SgtFloatingObject>();
 
             var markerObject = new GameObject("Marker");
