@@ -165,6 +165,40 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double moonSystemMassBudgetEarth;
 
+        [Header("Generated Moon Evolution Properties")]
+        [SerializeField]
+        private bool hasMoonEvolutionProperties;
+
+        [SerializeField]
+        private double moonAssumedBondAlbedo;
+
+        [SerializeField]
+        private double moonEquilibriumTemperatureKelvin;
+
+        [SerializeField]
+        private double moonEscapeVelocityMetersPerSecond;
+
+        [SerializeField]
+        private CelestialAtmosphereRetention moonAtmosphereRetention;
+
+        [SerializeField]
+        private CelestialPlanetDifferentiation moonDifferentiation;
+
+        [SerializeField]
+        private CelestialPlanetVolatileState moonVolatileState;
+
+        [SerializeField]
+        private bool moonLikelyTidallyLocked;
+
+        [SerializeField]
+        private double moonRelativeTidalHeatingIndex;
+
+        [SerializeField]
+        private CelestialMoonTidalHeating moonTidalHeating;
+
+        [SerializeField]
+        private CelestialMoonTidalMigrationSensitivity moonTidalMigrationSensitivity;
+
         [SerializeField]
         [TextArea(3, 8)]
         private string description;
@@ -328,6 +362,39 @@ namespace jcan.CelestialSystems
         public double MoonSystemMassBudgetEarth =>
             moonSystemMassBudgetEarth;
 
+        public bool HasMoonEvolutionProperties =>
+            hasMoonEvolutionProperties;
+
+        public double MoonAssumedBondAlbedo =>
+            moonAssumedBondAlbedo;
+
+        public double MoonEquilibriumTemperatureKelvin =>
+            moonEquilibriumTemperatureKelvin;
+
+        public double MoonEscapeVelocityMetersPerSecond =>
+            moonEscapeVelocityMetersPerSecond;
+
+        public CelestialAtmosphereRetention MoonAtmosphereRetention =>
+            moonAtmosphereRetention;
+
+        public CelestialPlanetDifferentiation MoonDifferentiation =>
+            moonDifferentiation;
+
+        public CelestialPlanetVolatileState MoonVolatileState =>
+            moonVolatileState;
+
+        public bool MoonLikelyTidallyLocked =>
+            moonLikelyTidallyLocked;
+
+        public double MoonRelativeTidalHeatingIndex =>
+            moonRelativeTidalHeatingIndex;
+
+        public CelestialMoonTidalHeating MoonTidalHeating =>
+            moonTidalHeating;
+
+        public CelestialMoonTidalMigrationSensitivity MoonTidalMigrationSensitivity =>
+            moonTidalMigrationSensitivity;
+
         public string Description =>
             description ?? string.Empty;
 
@@ -428,6 +495,22 @@ namespace jcan.CelestialSystems
             moonStableOuterLimitMeters = 0.0;
             moonHillRadiusMeters = 0.0;
             moonSystemMassBudgetEarth = 0.0;
+            hasMoonEvolutionProperties = false;
+            moonAssumedBondAlbedo = 0.0;
+            moonEquilibriumTemperatureKelvin = 0.0;
+            moonEscapeVelocityMetersPerSecond = 0.0;
+            moonAtmosphereRetention =
+                CelestialAtmosphereRetention.None;
+            moonDifferentiation =
+                CelestialPlanetDifferentiation.Undifferentiated;
+            moonVolatileState =
+                CelestialPlanetVolatileState.Depleted;
+            moonLikelyTidallyLocked = false;
+            moonRelativeTidalHeatingIndex = 0.0;
+            moonTidalHeating =
+                CelestialMoonTidalHeating.Negligible;
+            moonTidalMigrationSensitivity =
+                CelestialMoonTidalMigrationSensitivity.Low;
             description = string.Empty;
         }
 
@@ -532,6 +615,32 @@ namespace jcan.CelestialSystems
                 system.HillRadiusMeters;
             moonSystemMassBudgetEarth =
                 system.SatelliteMassBudgetEarth;
+        }
+
+        internal void ConfigureRuntimeMoonEvolutionProperties(
+            CelestialMoonEvolutionResult properties)
+        {
+            hasMoonEvolutionProperties = true;
+            moonAssumedBondAlbedo =
+                properties.AssumedBondAlbedo;
+            moonEquilibriumTemperatureKelvin =
+                properties.EquilibriumTemperatureKelvin;
+            moonEscapeVelocityMetersPerSecond =
+                properties.EscapeVelocityMetersPerSecond;
+            moonAtmosphereRetention =
+                properties.AtmosphereRetention;
+            moonDifferentiation =
+                properties.Differentiation;
+            moonVolatileState =
+                properties.VolatileState;
+            moonLikelyTidallyLocked =
+                properties.LikelyTidallyLocked;
+            moonRelativeTidalHeatingIndex =
+                properties.RelativeTidalHeatingIndex;
+            moonTidalHeating =
+                properties.TidalHeating;
+            moonTidalMigrationSensitivity =
+                properties.MigrationSensitivity;
         }
 
         private static bool IsFinite(

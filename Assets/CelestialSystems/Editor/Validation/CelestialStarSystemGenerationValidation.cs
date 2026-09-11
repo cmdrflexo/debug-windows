@@ -446,7 +446,8 @@ namespace jcan.CelestialSystems.Editor
         {
             orbit = default;
 
-            if (!PositiveFinite(
+            if (!body.HasMoonEvolutionProperties ||
+                !PositiveFinite(
                     body.MassKilograms) ||
                 !PositiveFinite(
                     body.ReferenceRadiusMeters) ||
@@ -468,6 +469,14 @@ namespace jcan.CelestialSystems.Editor
                     body.MoonHillRadiusMeters) ||
                 !PositiveFinite(
                     body.MoonSystemMassBudgetEarth) ||
+                !Fraction(
+                    body.MoonAssumedBondAlbedo) ||
+                !PositiveFinite(
+                    body.MoonEquilibriumTemperatureKelvin) ||
+                !PositiveFinite(
+                    body.MoonEscapeVelocityMetersPerSecond) ||
+                !NonNegativeFinite(
+                    body.MoonRelativeTidalHeatingIndex) ||
                 entry.Trajectory == null ||
                 entry.Trajectory.Kind !=
                     CelestialTrajectoryKind.KeplerianConic ||
@@ -588,6 +597,18 @@ namespace jcan.CelestialSystems.Editor
                         .Append(':').Append(body.MassKilograms.ToString("R"))
                         .Append(':').Append(body.ReferenceRadiusMeters.ToString("R"))
                         .Append(':').Append(body.Description);
+
+                    if (body.HasMoonEvolutionProperties)
+                    {
+                        result.Append(':').Append(body.MoonAssumedBondAlbedo.ToString("R"))
+                            .Append(':').Append(body.MoonEquilibriumTemperatureKelvin.ToString("R"))
+                            .Append(':').Append(body.MoonEscapeVelocityMetersPerSecond.ToString("R"))
+                            .Append(':').Append(body.MoonRelativeTidalHeatingIndex.ToString("R"))
+                            .Append(':').Append(body.MoonLikelyTidallyLocked)
+                            .Append(':').Append(body.MoonTidalHeating)
+                            .Append(':').Append(body.MoonTidalMigrationSensitivity);
+                    }
+
                     AppendTrajectory(result, entry.Trajectory);
                 }
             }

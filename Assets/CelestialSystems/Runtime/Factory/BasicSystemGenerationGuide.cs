@@ -420,6 +420,22 @@ namespace jcan.CelestialSystems
 
                     var moonSeed =
                         random.NextInt();
+
+                    if (!CelestialMoonEvolutionModel.TryEvaluate(
+                            moonSeed,
+                            moonFormation,
+                            formation,
+                            stellarProperties,
+                            request.Environment.SystemAgeGigayears,
+                            systemEvolution.PresentOrbitAstronomicalUnits,
+                            out var moonEvolution,
+                            out error))
+                    {
+                        ReleaseOwnedRuntimeObjects(
+                            ownedRuntimeObjects);
+                        return false;
+                    }
+
                     var moon =
                         CreateMoonDefinition(
                             moonDefinition,
@@ -427,6 +443,7 @@ namespace jcan.CelestialSystems
                             moonSeed,
                             moonFormation,
                             moonSystem,
+                            moonEvolution,
                             formation);
                     ownedRuntimeObjects.Add(
                         moon);
@@ -633,6 +650,7 @@ namespace jcan.CelestialSystems
             int generationSeed,
             CelestialMoonFormationResult formation,
             CelestialMoonSystemFormationResult system,
+            CelestialMoonEvolutionResult evolution,
             CelestialPlanetFormationResult planet)
         {
             var definition =
@@ -656,9 +674,12 @@ namespace jcan.CelestialSystems
             definition.ConfigureRuntimeMoonFormationProperties(
                 formation,
                 system);
+            definition.ConfigureRuntimeMoonEvolutionProperties(
+                evolution);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribeMoon(
                     formation,
+                    evolution,
                     planet,
                     generationSeed));
             return definition;

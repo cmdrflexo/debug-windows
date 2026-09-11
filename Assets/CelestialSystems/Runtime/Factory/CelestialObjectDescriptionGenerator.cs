@@ -180,6 +180,7 @@ namespace jcan.CelestialSystems
 
         public static string DescribeMoon(
             CelestialMoonFormationResult moon,
+            CelestialMoonEvolutionResult evolution,
             CelestialPlanetFormationResult planet,
             int generationSeed)
         {
@@ -200,6 +201,12 @@ namespace jcan.CelestialSystems
             var inclination =
                 Format(
                     moon.InclinationDegrees);
+            var temperature =
+                Math.Round(
+                    evolution.EquilibriumTemperatureKelvin)
+                    .ToString(
+                        "0",
+                        CultureInfo.InvariantCulture);
             var direction =
                 moon.Direction ==
                     CelestialOrbitDirection.Retrograde
@@ -215,6 +222,18 @@ namespace jcan.CelestialSystems
             var compositionSentence =
                 DescribeMoonComposition(
                     moon.VolatileMassFraction);
+            var environmentSentence =
+                JoinSentences(
+                    $"Its modeled stellar equilibrium temperature is approximately {temperature} kelvin.",
+                    DescribeAtmosphereRetention(
+                        evolution.AtmosphereRetention),
+                    DescribeVolatileState(
+                        evolution.VolatileState),
+                    DescribeDifferentiation(
+                        evolution.Differentiation));
+            var tidalSentence =
+                DescribeMoonTides(
+                    evolution);
 
             switch (SelectVariant(
                 generationSeed,
@@ -226,7 +245,9 @@ namespace jcan.CelestialSystems
                             originSentence,
                             physicalSentence,
                             compositionSentence,
-                            orbitSentence);
+                            orbitSentence,
+                            environmentSentence,
+                            tidalSentence);
 
                 case 1:
                     return
@@ -234,14 +255,18 @@ namespace jcan.CelestialSystems
                             $"This natural satellite has a modeled mass of {mass} Earth masses and a radius of {radius} Earth radii.",
                             originSentence,
                             orbitSentence,
-                            compositionSentence);
+                            tidalSentence,
+                            compositionSentence,
+                            environmentSentence);
 
                 default:
                     return
                         JoinSentences(
                             originSentence,
                             orbitSentence,
+                            environmentSentence,
                             compositionSentence,
+                            tidalSentence,
                             physicalSentence);
             }
         }
@@ -280,6 +305,71 @@ namespace jcan.CelestialSystems
 
             return
                 $"The formation model assigns approximately {Format(volatilePercent)} percent of its mass to volatile material.";
+        }
+
+        private static string DescribeMoonTides(
+            CelestialMoonEvolutionResult evolution)
+        {
+            string locking;
+
+            if (evolution.LikelyTidallyLocked)
+            {
+                locking =
+                    "It is likely tidally locked, keeping the same hemisphere generally facing its planet.";
+            }
+            else
+            {
+                locking =
+                    "The model does not classify it as tidally locked at the system's present age.";
+            }
+
+            string heating;
+
+            switch (evolution.TidalHeating)
+            {
+                case CelestialMoonTidalHeating.Negligible:
+                    heating =
+                        "Modeled internal heating from tides is negligible.";
+                    break;
+                case CelestialMoonTidalHeating.Mild:
+                    heating =
+                        "Modeled tidal heating is mild.";
+                    break;
+                case CelestialMoonTidalHeating.Significant:
+                    heating =
+                        "Modeled tidal heating is significant and may sustain internal geological activity.";
+                    break;
+                case CelestialMoonTidalHeating.Extreme:
+                    heating =
+                        "Modeled tidal heating is extreme and is expected to dominate its internal activity.";
+                    break;
+                default:
+                    heating = string.Empty;
+                    break;
+            }
+
+            string migration;
+
+            switch (evolution.MigrationSensitivity)
+            {
+                case CelestialMoonTidalMigrationSensitivity.Moderate:
+                    migration =
+                        "Its orbit has moderate sensitivity to long-term tidal migration.";
+                    break;
+                case CelestialMoonTidalMigrationSensitivity.High:
+                    migration =
+                        "Its orbit is highly sensitive to long-term tidal migration, though the current model does not assign a migration direction.";
+                    break;
+                default:
+                    migration = string.Empty;
+                    break;
+            }
+
+            return
+                JoinSentences(
+                    locking,
+                    heating,
+                    migration);
         }
 
         private static string DescribePlanetComposition(
