@@ -56,13 +56,24 @@ namespace jcan.CelestialSystems
         [Tooltip("Used only when Kind is Keplerian Conic. Its reference ID is authoritative.")]
         private KeplerianConicTrajectory conic;
 
-        public CelestialTrajectoryDefinition(KeplerianConicTrajectory conic)
+        [SerializeField]
+        [Tooltip("Optional total gravitating mass for barycentric component trajectories. Zero uses reference plus orbiting mass.")]
+        private double gravitatingMassKilogramsOverride;
+
+        public CelestialTrajectoryDefinition(
+            KeplerianConicTrajectory conic,
+            double gravitatingMassKilogramsOverride = 0.0)
         {
             kind = CelestialTrajectoryKind.KeplerianConic;
             this.conic = conic;
+            this.gravitatingMassKilogramsOverride =
+                gravitatingMassKilogramsOverride;
         }
 
         public KeplerianConicTrajectory Conic => conic;
+
+        public double GravitatingMassKilogramsOverride =>
+            gravitatingMassKilogramsOverride;
 
         public CelestialTrajectoryDefinition(
             string referenceInstanceId,
