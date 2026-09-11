@@ -72,10 +72,25 @@ namespace jcan.CelestialSystems
         private InputActionReference orbitAction;
 
         [SerializeField]
+        private InputActionReference orbitLeftStepAction;
+
+        [SerializeField]
+        private InputActionReference orbitRightStepAction;
+
+        [SerializeField]
         private InputActionReference panAction;
 
         [SerializeField]
+        private InputActionReference panDirectionAction;
+
+        [SerializeField]
         private InputActionReference zoomAction;
+
+        [SerializeField]
+        private InputActionReference zoomInAction;
+
+        [SerializeField]
+        private InputActionReference zoomOutAction;
 
         [SerializeField]
         private InputActionReference recenterAction;
@@ -99,6 +114,11 @@ namespace jcan.CelestialSystems
         private float orbitDamping = 20.0f;
 
         [SerializeField]
+        [Tooltip("Horizontal orbit angle applied by each step action.")]
+        [Min(0.0f)]
+        private float orbitStepDegrees = 45.0f;
+
+        [SerializeField]
         [Tooltip("Plate movement per mouse pixel, as a fraction of camera distance.")]
         [Min(0.0f)]
         private float panDistanceFractionPerPixel = 0.0015f;
@@ -114,6 +134,11 @@ namespace jcan.CelestialSystems
         private float panDamping = 4.0f;
 
         [SerializeField]
+        [Tooltip("Keyboard pan speed as a fraction of camera distance per second.")]
+        [Min(0.0f)]
+        private float keyboardPanDistanceFractionPerSecond = 0.75f;
+
+        [SerializeField]
         [Tooltip("Base-2 logarithmic zoom applied per mouse-wheel unit.")]
         [Min(0.0f)]
         private float zoomExponentPerWheelUnit = 0.002f;
@@ -122,6 +147,11 @@ namespace jcan.CelestialSystems
         [Tooltip("How quickly the camera settles on the selected zoom distance.")]
         [Min(0.0f)]
         private float zoomResponse = 12.0f;
+
+        [SerializeField]
+        [Tooltip("Distance multiplier applied by each zoom-key press.")]
+        [Min(1.01f)]
+        private float keyboardZoomStepMultiplier = 2.0f;
 
         [SerializeField]
         private bool listen = true;
@@ -156,8 +186,13 @@ namespace jcan.CelestialSystems
         private bool viewInitialized;
         private bool enabledPointerDeltaAction;
         private bool enabledOrbitAction;
+        private bool enabledOrbitLeftStepAction;
+        private bool enabledOrbitRightStepAction;
         private bool enabledPanAction;
+        private bool enabledPanDirectionAction;
         private bool enabledZoomAction;
+        private bool enabledZoomInAction;
+        private bool enabledZoomOutAction;
         private bool enabledRecenterAction;
         private bool recenterZoomArmed;
         private double yawVelocityDegreesPerSecond;
@@ -220,8 +255,13 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             enabledPointerDeltaAction = EnableAction(pointerDeltaAction);
             enabledOrbitAction = EnableAction(orbitAction);
+            enabledOrbitLeftStepAction = EnableAction(orbitLeftStepAction);
+            enabledOrbitRightStepAction = EnableAction(orbitRightStepAction);
             enabledPanAction = EnableAction(panAction);
+            enabledPanDirectionAction = EnableAction(panDirectionAction);
             enabledZoomAction = EnableAction(zoomAction);
+            enabledZoomInAction = EnableAction(zoomInAction);
+            enabledZoomOutAction = EnableAction(zoomOutAction);
             enabledRecenterAction = EnableAction(recenterAction);
             SubscribeToDebugMenu();
         }
@@ -236,13 +276,23 @@ namespace jcan.CelestialSystems
             UnsubscribeFromDebugMenu();
             DisableAction(pointerDeltaAction, enabledPointerDeltaAction);
             DisableAction(orbitAction, enabledOrbitAction);
+            DisableAction(orbitLeftStepAction, enabledOrbitLeftStepAction);
+            DisableAction(orbitRightStepAction, enabledOrbitRightStepAction);
             DisableAction(panAction, enabledPanAction);
+            DisableAction(panDirectionAction, enabledPanDirectionAction);
             DisableAction(zoomAction, enabledZoomAction);
+            DisableAction(zoomInAction, enabledZoomInAction);
+            DisableAction(zoomOutAction, enabledZoomOutAction);
             DisableAction(recenterAction, enabledRecenterAction);
             enabledPointerDeltaAction = false;
             enabledOrbitAction = false;
+            enabledOrbitLeftStepAction = false;
+            enabledOrbitRightStepAction = false;
             enabledPanAction = false;
+            enabledPanDirectionAction = false;
             enabledZoomAction = false;
+            enabledZoomInAction = false;
+            enabledZoomOutAction = false;
             enabledRecenterAction = false;
             ClearPanVelocity();
             ClearOrbitVelocity();
@@ -257,11 +307,18 @@ namespace jcan.CelestialSystems
             orbitDegreesPerPixel = Mathf.Max(0.0f, orbitDegreesPerPixel);
             orbitVelocityResponse = Mathf.Max(0.0f, orbitVelocityResponse);
             orbitDamping = Mathf.Max(0.0f, orbitDamping);
+            orbitStepDegrees = Mathf.Max(0.0f, orbitStepDegrees);
             panDistanceFractionPerPixel = Mathf.Max(0.0f, panDistanceFractionPerPixel);
             panVelocityResponse = Mathf.Max(0.0f, panVelocityResponse);
             panDamping = Mathf.Max(0.0f, panDamping);
+            keyboardPanDistanceFractionPerSecond = Mathf.Max(
+                0.0f,
+                keyboardPanDistanceFractionPerSecond);
             zoomExponentPerWheelUnit = Mathf.Max(0.0f, zoomExponentPerWheelUnit);
             zoomResponse = Mathf.Max(0.0f, zoomResponse);
+            keyboardZoomStepMultiplier = Mathf.Max(
+                1.01f,
+                keyboardZoomStepMultiplier);
             NormalizeReferencePlane();
         }
 
@@ -507,6 +564,9 @@ namespace jcan.CelestialSystems
             var pointerDelta = ReadVector2(pointerDeltaAction);
 
             ApplyOrbitInput(pointerDelta, deltaTime);
+            ApplyOrbitStepInput();
+
+            var panDirection = ReadVector2(panDirectionAction);
 
             if (IsPressed(panAction))
             {
@@ -516,6 +576,11 @@ namespace jcan.CelestialSystems
                 }
 
                 ApplyPanDrag(pointerDelta, deltaTime);
+            }
+            else if (panDirection.sqrMagnitude > Mathf.Epsilon)
+            {
+                recenterZoomArmed = false;
+                ApplyPanDirection(panDirection, deltaTime);
             }
             else
             {
@@ -535,6 +600,16 @@ namespace jcan.CelestialSystems
                 targetDistanceMeters *= Math.Pow(
                     2.0,
                     -zoomInput * zoomExponentPerWheelUnit);
+            }
+
+            if (WasPressedThisFrame(zoomInAction))
+            {
+                ApplyKeyboardZoomStep(1.0 / keyboardZoomStepMultiplier);
+            }
+
+            if (WasPressedThisFrame(zoomOutAction))
+            {
+                ApplyKeyboardZoomStep(keyboardZoomStepMultiplier);
             }
 
             if (WasPressedThisFrame(recenterAction))
@@ -619,6 +694,86 @@ namespace jcan.CelestialSystems
             {
                 pitchVelocityDegreesPerSecond = 0.0;
             }
+        }
+
+        private void ApplyOrbitStepInput()
+        {
+            var step = 0.0f;
+
+            if (WasPressedThisFrame(orbitLeftStepAction))
+            {
+                step -= orbitStepDegrees;
+            }
+
+            if (WasPressedThisFrame(orbitRightStepAction))
+            {
+                step += orbitStepDegrees;
+            }
+
+            if (Mathf.Approximately(step, 0.0f))
+            {
+                return;
+            }
+
+            ClearOrbitVelocity();
+            yawDegrees += step;
+            recenterZoomArmed = false;
+        }
+
+        private void ApplyKeyboardZoomStep(double multiplier)
+        {
+            targetDistanceMeters = Math.Max(
+                1.0,
+                targetDistanceMeters > 0.0
+                    ? targetDistanceMeters
+                    : distanceMeters);
+            targetDistanceMeters *= multiplier;
+            recenterZoomArmed = false;
+        }
+
+        private void ApplyPanDirection(Vector2 direction, float deltaTime)
+        {
+            if (deltaTime <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            if (direction.sqrMagnitude > 1.0f)
+            {
+                direction.Normalize();
+            }
+
+            GetReferencePlaneAxes(
+                out var planeRight,
+                out var planeForward,
+                out var planeUp);
+
+            var yawRotation = Quaternion.AngleAxis(yawDegrees, planeUp);
+            var cameraRightOnPlane = yawRotation * planeRight;
+            var cameraForwardOnPlane = yawRotation * planeForward;
+            var metersPerSecond =
+                distanceMeters * keyboardPanDistanceFractionPerSecond;
+            var desiredMovement =
+                ToDoubleVector(cameraRightOnPlane) *
+                    (direction.x * metersPerSecond) +
+                ToDoubleVector(cameraForwardOnPlane) *
+                    (direction.y * metersPerSecond);
+            var desiredRightVelocity = Dot(desiredMovement, planeRight);
+            var desiredForwardVelocity = Dot(desiredMovement, planeForward);
+            var response = 1.0 - Math.Exp(-panVelocityResponse * deltaTime);
+
+            panVelocityRightMetersPerSecond = Lerp(
+                panVelocityRightMetersPerSecond,
+                desiredRightVelocity,
+                response);
+            panVelocityForwardMetersPerSecond = Lerp(
+                panVelocityForwardMetersPerSecond,
+                desiredForwardVelocity,
+                response);
+            plateOffsetRightMeters +=
+                panVelocityRightMetersPerSecond * deltaTime;
+            plateOffsetForwardMeters +=
+                panVelocityForwardMetersPerSecond * deltaTime;
         }
 
         private void ApplyPanDrag(Vector2 pointerDelta, float deltaTime)
