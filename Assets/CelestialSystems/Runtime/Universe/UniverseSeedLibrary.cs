@@ -84,7 +84,8 @@ namespace jcan.CelestialSystems
             if (saved == null)
                 saved = FindBySeed(seed);
 
-            if (saved == null)
+            var created = saved == null;
+            if (created)
             {
                 saved = new SavedUniverseSeed
                 {
@@ -93,9 +94,23 @@ namespace jcan.CelestialSystems
                 entries.Add(saved);
             }
 
+            var previousSeed = saved.seed;
+            var previousName = saved.displayName;
             saved.seed = seed;
             saved.displayName = displayName?.Trim() ?? string.Empty;
-            return SaveChanges(saved);
+            if (SaveChanges())
+                return true;
+
+            if (created)
+                entries.Remove(saved);
+            else
+            {
+                saved.seed = previousSeed;
+                saved.displayName = previousName;
+            }
+
+            saved = null;
+            return false;
         }
 
         public bool Delete(string uniqueId)
@@ -107,8 +122,13 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            entries.Remove(entry);
-            return SaveChanges(null);
+            var index = entries.IndexOf(entry);
+            entries.RemoveAt(index);
+            if (SaveChanges())
+                return true;
+
+            entries.Insert(index, entry);
+            return false;
         }
 
         public SavedUniverseSeed Find(string uniqueId)
@@ -169,7 +189,7 @@ namespace jcan.CelestialSystems
             }
         }
 
-        private bool SaveChanges(SavedUniverseSeed saved)
+        private bool SaveChanges()
         {
             try
             {
@@ -192,13 +212,6 @@ namespace jcan.CelestialSystems
                 Debug.LogWarning(
                     $"Could not save universe seeds: {exception.Message}",
                     this);
-
-                if (saved != null &&
-                    entries.Contains(saved) &&
-                    string.IsNullOrWhiteSpace(saved.uniqueId))
-                {
-                    entries.Remove(saved);
-                }
 
                 return false;
             }
