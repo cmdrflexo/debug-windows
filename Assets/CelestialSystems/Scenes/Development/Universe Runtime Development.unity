@@ -151,7 +151,7 @@ MonoBehaviour:
   bodyFactory: {fileID: 316926649}
   starSystemGuide: {fileID: 11400000, guid: e4ca6e4a9245841408f006d1c0618152, type: 2}
   galacticEnvironment: {fileID: 11400000, guid: ee8f8e60ea254a65b102ad92a42e2907, type: 2}
-  seed: 512
+  seed: 4090
   universeInstanceId: universe-runtime
   galaxyInstanceId: prototype-galaxy
   starSystemInstanceId: prototype-star-system
@@ -164,8 +164,10 @@ MonoBehaviour:
     y: 0
     z: 0
   rotationEulerDegrees: {x: 0, y: 0, z: 0}
+  observationPivotMarker: {fileID: 0}
   generatedParentOverride: {fileID: 0}
   generateOnStart: 1
+  logGeneratedStarSystemSummary: 1
   waitingForFactory: 0
   generationAttempted: 0
   generationSucceeded: 0
@@ -174,6 +176,14 @@ MonoBehaviour:
   generatedStarSystemCount: 0
   generatedBodySystemCount: 0
   generatedBodyCount: 0
+  hasGeneratedStarSystemBarycenter: 0
+  generatedStarSystemBarycenter:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
   lastError: 
 --- !u!4 &140983662
 Transform:
@@ -368,19 +378,29 @@ MonoBehaviour:
   maximumDistanceMeters: 1e+18
   pointerDeltaAction: {fileID: 8468614314426882343, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   orbitAction: {fileID: 5128496647766509628, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  orbitLeftStepAction: {fileID: -2600626709649160825, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  orbitRightStepAction: {fileID: 8197260936193591258, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   panAction: {fileID: -7838522926709464524, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  panDirectionAction: {fileID: 4496249241302110386, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   zoomAction: {fileID: 4369740539164405390, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  zoomInAction: {fileID: -1028233289949196988, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  zoomOutAction: {fileID: 2530486801309968657, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   recenterAction: {fileID: -1466553362185345752, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   invertPitch: 1
   orbitDegreesPerPixel: 0.2
   orbitVelocityResponse: 25
   orbitDamping: 20
+  orbitStepDegrees: 45
   panDistanceFractionPerPixel: 0.0025
   panVelocityResponse: 20
   panDamping: 4
+  keyboardPanDistanceFractionPerSecond: 0.75
   zoomExponentPerWheelUnit: 0.2
+  zoomResponse: 12
+  keyboardZoomStepMultiplier: 2
   listen: 1
   distanceMeters: 0
+  targetDistanceMeters: 0
   plateOffsetRightMeters: 0
   plateOffsetForwardMeters: 0
   panVelocityRightMetersPerSecond: 0
@@ -1540,10 +1560,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1714501034}
-  - component: {fileID: 1714501038}
-  - component: {fileID: 1714501037}
   - component: {fileID: 1714501036}
   - component: {fileID: 1714501035}
+  - component: {fileID: 1714501037}
+  - component: {fileID: 1714501038}
+  - component: {fileID: 1714501039}
   m_Layer: 0
   m_Name: Universe Observation Grid
   m_TagString: Untagged
@@ -1659,8 +1680,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseObservationGridRenderer
   observationController: {fileID: 288112568}
-  xLineCount: 100
-  yLineCount: 100
+  lineCount: 100
   cellsPerCameraDistance: 6
   minimumCellSizeMeters: 6
   fadeMode: 1
@@ -1674,6 +1694,49 @@ MonoBehaviour:
   visible: 1
   currentCellSizeMeters: 0
   scaleTransition: 0
+--- !u!114 &1714501039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1714501033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d68d41a10e0245cb8f02738bb61713b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseObservationPivotMarker
+  observationController: {fileID: 0}
+  directionReferenceContext: {fileID: 0}
+  useObservationTargetWhenUnset: 1
+  hasDirectionReferencePosition: 0
+  directionReferencePosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
+  markerMaterial: {fileID: 2100000, guid: 50292b1468c5c3343b61279615325b03, type: 2}
+  relativeSize: 0.25
+  planeOffsetFraction: 0.001
+  visible: 1
+  hasPivotPosition: 0
+  pivotPosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
+  hasResolvedDirectionReference: 0
+  resolvedDirectionReferencePosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
 --- !u!1 &1757395887
 GameObject:
   m_ObjectHideFlags: 0
