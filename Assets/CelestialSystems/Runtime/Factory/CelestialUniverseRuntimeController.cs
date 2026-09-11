@@ -2,6 +2,7 @@
  * Provides the scene-facing entry point for the universe-to-body runtime factory chain.
  */
 
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -47,6 +48,11 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Vector3 rotationEulerDegrees;
 
+        [Header("Observation")]
+        [SerializeField]
+        [Tooltip("Optional grid pivot marker that will point toward the generated star system's barycenter.")]
+        private UniverseObservationPivotMarker observationPivotMarker;
+
         [Header("Lifecycle")]
         [SerializeField]
         private Transform generatedParentOverride;
@@ -78,6 +84,12 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int generatedBodyCount;
+
+        [SerializeField]
+        private bool hasGeneratedStarSystemBarycenter;
+
+        [SerializeField]
+        private UniversePosition generatedStarSystemBarycenter;
 
         [SerializeField]
         private string lastError;
@@ -121,6 +133,12 @@ namespace jcan.CelestialSystems
 
         public int GeneratedBodyCount =>
             generatedBodyCount;
+
+        public bool HasGeneratedStarSystemBarycenter =>
+            hasGeneratedStarSystemBarycenter;
+
+        public UniversePosition GeneratedStarSystemBarycenter =>
+            generatedStarSystemBarycenter;
 
         public string LastError =>
             lastError;
@@ -246,6 +264,9 @@ namespace jcan.CelestialSystems
                             bodySystem.Bodies.Count;
                     }
                 }
+
+                SetObservationMarkerToBarycenter(
+                    starSystem);
             }
 
             return true;
@@ -272,6 +293,145 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        private void SetObservationMarkerToBarycenter(
+            CelestialStarSystemFactory.GeneratedSystem starSystem)
+        {
+            observationPivotMarker ??=
+                FindFirstObjectByType<UniverseObservationPivotMarker>();
+
+            if (observationPivotMarker == null ||
+                !TryCalculateBarycenter(
+                    starSystem,
+                    out generatedStarSystemBarycenter))
+            {
+                hasGeneratedStarSystemBarycenter = false;
+                return;
+            }
+
+            hasGeneratedStarSystemBarycenter = true;
+            observationPivotMarker.SetDirectionReference(
+                generatedStarSystemBarycenter);
+        }
+
+        private static bool TryCalculateBarycenter(
+            CelestialStarSystemFactory.GeneratedSystem starSystem,
+            out UniversePosition barycenter)
+        {
+            barycenter = default;
+
+            if (starSystem == null)
+            {
+                return false;
+            }
+
+            var hasOrigin = false;
+            var origin = default(UniversePosition);
+            var weightedX = 0.0;
+            var weightedY = 0.0;
+            var weightedZ = 0.0;
+            var totalMass = 0.0;
+
+            foreach (var bodySystem in
+                starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in
+                    bodySystem.Bodies.Values)
+                {
+                    if (body == null ||
+                        body.Definition == null ||
+                        !IsFinitePositive(
+                            body.Definition.MassKilograms) ||
+                        !body.TryGetMotionState(
+                            out var motionState))
+                    {
+                        continue;
+                    }
+
+                    if (!hasOrigin)
+                    {
+                        origin = motionState.Position;
+                        hasOrigin = true;
+                    }
+
+                    if (!motionState.Position.TryGetOffsetMetersFrom(
+                            origin,
+                            out var offset))
+                    {
+                        continue;
+                    }
+
+                    var mass =
+                        body.Definition.MassKilograms;
+                    weightedX +=
+                        offset.x *
+                        mass;
+                    weightedY +=
+                        offset.y *
+                        mass;
+                    weightedZ +=
+                        offset.z *
+                        mass;
+                    totalMass +=
+                        mass;
+                }
+            }
+
+            if (!hasOrigin ||
+                !IsFinitePositive(
+                    totalMass))
+            {
+                return false;
+            }
+
+            var offsetX =
+                weightedX /
+                totalMass;
+            var offsetY =
+                weightedY /
+                totalMass;
+            var offsetZ =
+                weightedZ /
+                totalMass;
+
+            if (!IsFinite(
+                    offsetX) ||
+                !IsFinite(
+                    offsetY) ||
+                !IsFinite(
+                    offsetZ))
+            {
+                return false;
+            }
+
+            barycenter = origin;
+            barycenter.AddLocalMeters(
+                offsetX,
+                offsetY,
+                offsetZ);
+            return true;
+        }
+
+        private static bool IsFinitePositive(
+            double value)
+        {
+            return
+                IsFinite(value) &&
+                value > 0.0;
+        }
+
+        private static bool IsFinite(
+            double value)
+        {
+            return
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value);
+        }
+
         private void ResetRuntimeSummary()
         {
             generationSucceeded = false;
@@ -280,6 +440,15 @@ namespace jcan.CelestialSystems
             generatedStarSystemCount = 0;
             generatedBodySystemCount = 0;
             generatedBodyCount = 0;
+
+            if (hasGeneratedStarSystemBarycenter &&
+                observationPivotMarker != null)
+            {
+                observationPivotMarker.ClearDirectionReference();
+            }
+
+            hasGeneratedStarSystemBarycenter = false;
+            generatedStarSystemBarycenter = default;
             lastError = string.Empty;
         }
 
