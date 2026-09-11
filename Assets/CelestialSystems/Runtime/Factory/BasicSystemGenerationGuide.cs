@@ -566,9 +566,19 @@ namespace jcan.CelestialSystems
                 index < ownedRuntimeObjects.Count;
                 index++)
             {
-                if (ownedRuntimeObjects[index] != null)
+                if (ownedRuntimeObjects[index] == null)
+                {
+                    continue;
+                }
+
+                if (Application.isPlaying)
                 {
                     Destroy(
+                        ownedRuntimeObjects[index]);
+                }
+                else
+                {
+                    DestroyImmediate(
                         ownedRuntimeObjects[index]);
                 }
             }

@@ -344,6 +344,21 @@ namespace jcan.CelestialSystems
                                 0.7);
                 }
 
+                var boundaryEccentricityLimit =
+                    Math.Min(
+                        1.0 -
+                            rocheLimitMeters /
+                            orbitalRadii[index],
+                        stableOuterLimitMeters /
+                            orbitalRadii[index] -
+                            1.0);
+                eccentricityLimit =
+                    Math.Min(
+                        eccentricityLimit,
+                        Math.Max(
+                            0.0,
+                            boundaryEccentricityLimit *
+                                0.9));
                 var eccentricity =
                     random.NextRange(
                         0.0,
