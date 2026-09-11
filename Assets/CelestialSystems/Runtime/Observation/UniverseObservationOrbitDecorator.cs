@@ -26,6 +26,10 @@ namespace jcan.CelestialSystems
         private Color targetedColor =
             new Color(1.0f, 0.55f, 0.1f, 1.0f);
         [SerializeField]
+        [Tooltip("How quickly orbit color settles between normal and targeted.")]
+        [Min(0.0f)]
+        private float colorTransitionResponse = 8.0f;
+        [SerializeField]
         [Range(16, 512)]
         private int pathSegments = 128;
         [SerializeField] private bool visible = true;
@@ -33,6 +37,9 @@ namespace jcan.CelestialSystems
         [Header("Runtime")]
         [SerializeField] private bool hasResolvedOrbit;
         [SerializeField] private bool isTargeted;
+        [SerializeField]
+        [Range(0.0f, 1.0f)]
+        private float targetedColorBlend;
         [SerializeField] private string lastError;
 
         private Transform generatedAnchor;
@@ -43,7 +50,7 @@ namespace jcan.CelestialSystems
         private TrajectoryCelestialBodyMotionProvider trajectoryProvider;
         private CelestialTrajectoryDefinition builtTrajectory;
         private int builtPathSegments;
-        private bool builtTargeted;
+        private Color[] orbitColors;
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedOrbit => hasResolvedOrbit;
@@ -113,6 +120,9 @@ namespace jcan.CelestialSystems
         private void OnValidate()
         {
             pathSegments = Mathf.Clamp(pathSegments, 16, 512);
+            colorTransitionResponse = Mathf.Max(
+                0.0f,
+                colorTransitionResponse);
             builtTrajectory = null;
             ApplyMaterial();
             ApplyOrbitColor();
@@ -159,10 +169,7 @@ namespace jcan.CelestialSystems
                 }
             }
 
-            if (builtTargeted != isTargeted)
-            {
-                ApplyOrbitColor();
-            }
+            UpdateOrbitColor(Time.unscaledDeltaTime);
 
             floatingObject.SetPosition(floatingPosition);
             floatingObject.ApplyPosition();
@@ -183,6 +190,7 @@ namespace jcan.CelestialSystems
             orbit.orbitMaterial = orbitMaterial;
             orbit.normalColor = normalColor;
             orbit.targetedColor = targetedColor;
+            orbit.colorTransitionResponse = colorTransitionResponse;
             orbit.pathSegments = pathSegments;
             orbit.visible = visible;
             orbit.ApplyMaterial();
@@ -195,6 +203,7 @@ namespace jcan.CelestialSystems
             targetContext = context;
             trajectoryProvider = null;
             builtTrajectory = null;
+            targetedColorBlend = 0.0f;
             hasResolvedOrbit = false;
             lastError = string.Empty;
         }
@@ -309,10 +318,11 @@ namespace jcan.CelestialSystems
                 0,
                 false);
             orbitMesh.RecalculateBounds();
+            ExpandOrbitBounds(vertices);
 
             builtTrajectory = provider.Trajectory;
             builtPathSegments = segmentCount;
-            builtTargeted = !isTargeted;
+            orbitColors = new Color[vertices.Length];
             ApplyOrbitColor();
             return true;
         }
@@ -407,6 +417,33 @@ namespace jcan.CelestialSystems
             orbitRenderer.sharedMaterial = generatedMaterial;
         }
 
+        private void UpdateOrbitColor(float deltaTime)
+        {
+            var targetBlend = isTargeted ? 1.0f : 0.0f;
+
+            if (colorTransitionResponse <= Mathf.Epsilon)
+            {
+                targetedColorBlend = targetBlend;
+            }
+            else if (deltaTime > Mathf.Epsilon)
+            {
+                var blend =
+                    1.0f -
+                    Mathf.Exp(-colorTransitionResponse * deltaTime);
+                targetedColorBlend = Mathf.Lerp(
+                    targetedColorBlend,
+                    targetBlend,
+                    blend);
+
+                if (Mathf.Abs(targetedColorBlend - targetBlend) <= 0.001f)
+                {
+                    targetedColorBlend = targetBlend;
+                }
+            }
+
+            ApplyOrbitColor();
+        }
+
         private void ApplyOrbitColor()
         {
             if (orbitMesh == null || orbitMesh.vertexCount == 0)
@@ -414,19 +451,45 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            var appliedColor =
-                isTargeted
-                    ? targetedColor
-                    : normalColor;
-            var colors = new Color[orbitMesh.vertexCount];
-
-            for (var index = 0; index < colors.Length; index++)
+            if (orbitColors == null ||
+                orbitColors.Length != orbitMesh.vertexCount)
             {
-                colors[index] = appliedColor;
+                orbitColors = new Color[orbitMesh.vertexCount];
             }
 
-            orbitMesh.colors = colors;
-            builtTargeted = isTargeted;
+            var appliedColor = Color.Lerp(
+                normalColor,
+                targetedColor,
+                targetedColorBlend);
+
+            for (var index = 0; index < orbitColors.Length; index++)
+            {
+                orbitColors[index] = appliedColor;
+            }
+
+            orbitMesh.colors = orbitColors;
+        }
+
+        private void ExpandOrbitBounds(Vector3[] vertices)
+        {
+            var extent = 1.0f;
+
+            for (var index = 0; index < vertices.Length; index++)
+            {
+                var vertex = vertices[index];
+                extent = Mathf.Max(
+                    extent,
+                    Mathf.Abs(vertex.x),
+                    Mathf.Abs(vertex.y),
+                    Mathf.Abs(vertex.z));
+            }
+
+            // A closed orbit can have almost zero thickness along one axis.
+            // A conservative cube prevents unstable edge-on frustum culling.
+            extent *= 1.1f;
+            orbitMesh.bounds = new Bounds(
+                Vector3.zero,
+                Vector3.one * (extent * 2.0f));
         }
 
         private void SetRendererVisible(bool value)
