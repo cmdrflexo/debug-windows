@@ -59,15 +59,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "Timescale",
-                    "type": "Value",
-                    "id": "4865e8b5-ed6a-4047-bb2f-43a1f2c6e2d8",
-                    "expectedControlType": "Axis",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -136,39 +127,6 @@
                     "action": "Toggle Debug",
                     "isComposite": false,
                     "isPartOfComposite": false
-                },
-                {
-                    "name": "1D Axis",
-                    "id": "bc877b25-14a7-46b4-927b-b2bbb98d0098",
-                    "path": "1DAxis",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Timescale",
-                    "isComposite": true,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "negative",
-                    "id": "75432948-614d-470a-b9b6-82894708d028",
-                    "path": "<Keyboard>/comma",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Timescale",
-                    "isComposite": false,
-                    "isPartOfComposite": true
-                },
-                {
-                    "name": "positive",
-                    "id": "8991cfb5-0737-4dd0-92a6-5aa2ac026ce0",
-                    "path": "<Keyboard>/period",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Timescale",
-                    "isComposite": false,
-                    "isPartOfComposite": true
                 }
             ]
         },
@@ -518,7 +476,7 @@
                 {
                     "name": "negative",
                     "id": "dcce1997-8968-4ee0-bfe7-7fc3fe8739e6",
-                    "path": "<Keyboard>/leftBracket",
+                    "path": "<Keyboard>/comma",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -529,7 +487,7 @@
                 {
                     "name": "positive",
                     "id": "3a6a5d52-625b-4971-80d9-f7d4009a22b2",
-                    "path": "<Keyboard>/rightBracket",
+                    "path": "<Keyboard>/period",
                     "interactions": "",
                     "processors": "",
                     "groups": "",

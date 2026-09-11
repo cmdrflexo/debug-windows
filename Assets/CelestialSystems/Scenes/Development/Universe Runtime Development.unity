@@ -151,7 +151,7 @@ MonoBehaviour:
   bodyFactory: {fileID: 316926649}
   starSystemGuide: {fileID: 11400000, guid: e4ca6e4a9245841408f006d1c0618152, type: 2}
   galacticEnvironment: {fileID: 11400000, guid: ee8f8e60ea254a65b102ad92a42e2907, type: 2}
-  seed: 0
+  seed: -386584318
   universeInstanceId: universe-runtime
   galaxyInstanceId: prototype-galaxy
   starSystemInstanceId: prototype-star-system
@@ -257,6 +257,10 @@ MonoBehaviour:
   initialUniversalTimeSeconds: 0
   timeScale: 1
   runOnStart: 1
+  timeScaleStepAction: {fileID: 673318411273150769, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
+  timeScaleStepMultiplier: 10
+  minimumTimeScaleMagnitude: 0.001
+  maximumTimeScaleMagnitude: 1000000000000
   universalTimeSeconds: 0
   isRunning: 0
 --- !u!1 &266950182
