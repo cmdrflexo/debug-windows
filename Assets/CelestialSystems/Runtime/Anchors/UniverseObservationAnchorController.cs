@@ -119,11 +119,19 @@ namespace jcan.CelestialSystems
         private float zoomExponentPerWheelUnit = 0.002f;
 
         [SerializeField]
+        [Tooltip("How quickly the camera settles on the selected zoom distance.")]
+        [Min(0.0f)]
+        private float zoomResponse = 12.0f;
+
+        [SerializeField]
         private bool listen = true;
 
         [Header("Runtime")]
         [SerializeField]
         private double distanceMeters;
+
+        [SerializeField]
+        private double targetDistanceMeters;
 
         [SerializeField]
         private double plateOffsetRightMeters;
@@ -158,6 +166,8 @@ namespace jcan.CelestialSystems
         public CelestialBodyRuntimeContext Target => target;
 
         public double DistanceMeters => distanceMeters;
+
+        public double TargetDistanceMeters => targetDistanceMeters;
 
         public double PlateOffsetRightMeters => plateOffsetRightMeters;
 
@@ -251,6 +261,7 @@ namespace jcan.CelestialSystems
             panVelocityResponse = Mathf.Max(0.0f, panVelocityResponse);
             panDamping = Mathf.Max(0.0f, panDamping);
             zoomExponentPerWheelUnit = Mathf.Max(0.0f, zoomExponentPerWheelUnit);
+            zoomResponse = Mathf.Max(0.0f, zoomResponse);
             NormalizeReferencePlane();
         }
 
@@ -295,6 +306,24 @@ namespace jcan.CelestialSystems
 
             var radiusMeters = GetTargetRadiusMeters();
             var minimumDistanceMeters = radiusMeters * minimumDistanceInTargetRadii;
+
+            targetDistanceMeters = Math.Max(
+                minimumDistanceMeters,
+                Math.Min(maximumDistanceMeters, targetDistanceMeters));
+            var zoomBlend = zoomResponse <= Mathf.Epsilon
+                ? 1.0
+                : 1.0 - Math.Exp(
+                    -zoomResponse * Time.unscaledDeltaTime);
+            distanceMeters = Lerp(
+                distanceMeters,
+                targetDistanceMeters,
+                zoomBlend);
+
+            if (Math.Abs(distanceMeters - targetDistanceMeters) <=
+                Math.Max(0.001, targetDistanceMeters * 1.0e-9))
+            {
+                distanceMeters = targetDistanceMeters;
+            }
 
             distanceMeters = Math.Max(
                 minimumDistanceMeters,
@@ -421,6 +450,7 @@ namespace jcan.CelestialSystems
             pitchDegrees = 35.0f;
             yawDegrees = 0.0f;
             ClearOrbitVelocity();
+            targetDistanceMeters = 0.0;
             viewInitialized = false;
             recenterZoomArmed = false;
         }
@@ -464,6 +494,7 @@ namespace jcan.CelestialSystems
             distanceMeters = Math.Max(
                 GetTargetRadiusMeters() * initialDistanceInTargetRadii,
                 1.0);
+            targetDistanceMeters = distanceMeters;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
             ClearPanVelocity();
@@ -496,7 +527,12 @@ namespace jcan.CelestialSystems
             if (!Mathf.Approximately(zoomInput, 0.0f))
             {
                 recenterZoomArmed = false;
-                distanceMeters *= Math.Pow(
+                targetDistanceMeters = Math.Max(
+                    1.0,
+                    targetDistanceMeters > 0.0
+                        ? targetDistanceMeters
+                        : distanceMeters);
+                targetDistanceMeters *= Math.Pow(
                     2.0,
                     -zoomInput * zoomExponentPerWheelUnit);
             }
@@ -511,7 +547,7 @@ namespace jcan.CelestialSystems
         {
             if (recenterZoomArmed)
             {
-                distanceMeters = Math.Max(
+                targetDistanceMeters = Math.Max(
                     GetTargetRadiusMeters() * initialDistanceInTargetRadii,
                     1.0);
                 recenterZoomArmed = false;
