@@ -168,6 +168,11 @@ namespace jcan.CelestialSystems
         private float planeElevationResponse = 12.0f;
 
         [SerializeField]
+        [Tooltip("How quickly the observation pivot settles onto a newly selected target.")]
+        [Min(0.0f)]
+        private float targetTransitionResponse = 4.0f;
+
+        [SerializeField]
         private bool listen = true;
 
         [Header("Runtime")]
@@ -188,6 +193,15 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private double plateOffsetForwardMeters;
+
+        [SerializeField]
+        private double targetTransitionOffsetXMeters;
+
+        [SerializeField]
+        private double targetTransitionOffsetYMeters;
+
+        [SerializeField]
+        private double targetTransitionOffsetZMeters;
 
         [SerializeField]
         private double panVelocityRightMetersPerSecond;
@@ -267,7 +281,8 @@ namespace jcan.CelestialSystems
             var pivotOffset =
                 ToDoubleVector(planeRight) * plateOffsetRightMeters +
                 ToDoubleVector(planeForward) * plateOffsetForwardMeters +
-                ToDoubleVector(planeUp) * planeElevationMeters;
+                ToDoubleVector(planeUp) * planeElevationMeters +
+                GetTargetTransitionOffset();
             pivotPosition = targetMotion.Position;
             pivotPosition.AddLocalMeters(
                 pivotOffset.x,
@@ -363,6 +378,9 @@ namespace jcan.CelestialSystems
             planeElevationResponse = Mathf.Max(
                 0.0f,
                 planeElevationResponse);
+            targetTransitionResponse = Mathf.Max(
+                0.0f,
+                targetTransitionResponse);
             NormalizeReferencePlane();
         }
 
@@ -449,6 +467,8 @@ namespace jcan.CelestialSystems
                 planeElevationMeters = targetPlaneElevationMeters;
             }
 
+            UpdateTargetTransition(Time.unscaledDeltaTime);
+
             GetReferencePlaneAxes(
                 out var planeRight,
                 out var planeForward,
@@ -457,7 +477,8 @@ namespace jcan.CelestialSystems
             var pivotOffset =
                 ToDoubleVector(planeRight) * plateOffsetRightMeters +
                 ToDoubleVector(planeForward) * plateOffsetForwardMeters +
-                ToDoubleVector(planeUp) * planeElevationMeters;
+                ToDoubleVector(planeUp) * planeElevationMeters +
+                GetTargetTransitionOffset();
             var pivotPosition = targetMotion.Position;
             pivotPosition.AddLocalMeters(
                 pivotOffset.x,
@@ -507,15 +528,23 @@ namespace jcan.CelestialSystems
                 target != null &&
                 newTarget != null &&
                 viewInitialized;
+            var currentPivotPosition = default(UniversePosition);
+            var planeUp = referencePlaneNormal.normalized;
+            var newTargetMotion = default(UniverseMotionState);
+            var hasCurrentPivot =
+                preserveDistance &&
+                TryGetObservationPlane(
+                    out currentPivotPosition,
+                    out _,
+                    out _,
+                    out planeUp);
+            var hasNewTargetMotion =
+                newTarget != null &&
+                newTarget.TryGetMotionState(out newTargetMotion);
             var preservedPlaneElevationMeters = 0.0;
 
-            if (preserveDistance &&
-                TryGetObservationPlane(
-                    out var currentPivotPosition,
-                    out _,
-                    out _,
-                    out var planeUp) &&
-                newTarget.TryGetMotionState(out var newTargetMotion) &&
+            if (hasCurrentPivot &&
+                hasNewTargetMotion &&
                 currentPivotPosition.TryGetOffsetMetersFrom(
                     newTargetMotion.Position,
                     out var pivotOffsetFromNewTarget))
@@ -534,6 +563,29 @@ namespace jcan.CelestialSystems
             plateOffsetForwardMeters = 0.0;
             planeElevationMeters = preservedPlaneElevationMeters;
             targetPlaneElevationMeters = preservedPlaneElevationMeters;
+            ClearTargetTransition();
+
+            if (hasCurrentPivot && hasNewTargetMotion)
+            {
+                var destinationPivot = newTargetMotion.Position;
+                var elevationOffset =
+                    ToDoubleVector(planeUp) *
+                    preservedPlaneElevationMeters;
+                destinationPivot.AddLocalMeters(
+                    elevationOffset.x,
+                    elevationOffset.y,
+                    elevationOffset.z);
+
+                if (currentPivotPosition.TryGetOffsetMetersFrom(
+                        destinationPivot,
+                        out var transitionOffset))
+                {
+                    targetTransitionOffsetXMeters = transitionOffset.x;
+                    targetTransitionOffsetYMeters = transitionOffset.y;
+                    targetTransitionOffsetZMeters = transitionOffset.z;
+                }
+            }
+
             ClearPanVelocity();
             viewInitialized = preserveDistance;
             hasTargetMotion = false;
@@ -580,6 +632,7 @@ namespace jcan.CelestialSystems
             plateOffsetForwardMeters = 0.0;
             planeElevationMeters = 0.0;
             targetPlaneElevationMeters = 0.0;
+            ClearTargetTransition();
             ClearPanVelocity();
         }
 
@@ -595,6 +648,7 @@ namespace jcan.CelestialSystems
             targetDistanceMeters = 0.0;
             planeElevationMeters = 0.0;
             targetPlaneElevationMeters = 0.0;
+            ClearTargetTransition();
             viewInitialized = false;
             recenterZoomArmed = false;
         }
@@ -643,6 +697,7 @@ namespace jcan.CelestialSystems
             targetPlaneElevationMeters = 0.0;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            ClearTargetTransition();
             ClearPanVelocity();
             recenterZoomArmed = false;
             viewInitialized = true;
@@ -942,6 +997,47 @@ namespace jcan.CelestialSystems
             {
                 panVelocityForwardMetersPerSecond = 0.0;
             }
+        }
+
+        private void UpdateTargetTransition(float deltaTime)
+        {
+            if (targetTransitionResponse <= Mathf.Epsilon ||
+                deltaTime <= Mathf.Epsilon)
+            {
+                ClearTargetTransition();
+                return;
+            }
+
+            var dampingFactor = Math.Exp(
+                -targetTransitionResponse * deltaTime);
+            targetTransitionOffsetXMeters *= dampingFactor;
+            targetTransitionOffsetYMeters *= dampingFactor;
+            targetTransitionOffsetZMeters *= dampingFactor;
+            var snapDistance = Math.Max(
+                0.001,
+                distanceMeters * 1.0e-9);
+
+            if (Math.Abs(targetTransitionOffsetXMeters) <= snapDistance &&
+                Math.Abs(targetTransitionOffsetYMeters) <= snapDistance &&
+                Math.Abs(targetTransitionOffsetZMeters) <= snapDistance)
+            {
+                ClearTargetTransition();
+            }
+        }
+
+        private DoubleVector3 GetTargetTransitionOffset()
+        {
+            return new DoubleVector3(
+                targetTransitionOffsetXMeters,
+                targetTransitionOffsetYMeters,
+                targetTransitionOffsetZMeters);
+        }
+
+        private void ClearTargetTransition()
+        {
+            targetTransitionOffsetXMeters = 0.0;
+            targetTransitionOffsetYMeters = 0.0;
+            targetTransitionOffsetZMeters = 0.0;
         }
 
         private void ClearPanVelocity()
