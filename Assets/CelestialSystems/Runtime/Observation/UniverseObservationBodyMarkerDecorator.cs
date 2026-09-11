@@ -152,8 +152,17 @@ namespace jcan.CelestialSystems
                     0.0,
                     out var floatingPosition))
             {
+                var hadResolvedTarget = hasResolvedTarget;
                 hasResolvedTarget = false;
-                SetRenderersVisible(false);
+
+                // Keep the last valid decoration visible through transient
+                // motion/frame conversion failures. Visibility is only
+                // explicitly removed by SetVisible(false) or ClearTarget().
+                if (!hadResolvedTarget)
+                {
+                    SetRenderersVisible(false);
+                }
+
                 return;
             }
 
