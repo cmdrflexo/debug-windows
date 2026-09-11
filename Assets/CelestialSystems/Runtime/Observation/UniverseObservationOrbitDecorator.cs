@@ -12,6 +12,9 @@ namespace jcan.CelestialSystems
     [RequireComponent(typeof(UniverseObservationGridRenderer))]
     public sealed class UniverseObservationOrbitDecorator : MonoBehaviour
     {
+        private const string DecorationsContainerName =
+            "Generated Observation Decorations";
+
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField] private UniverseObservationSelectionController selectionController;
@@ -358,6 +361,26 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private Transform GetOrCreateDecorationsContainer()
+        {
+            var containerParent = transform.parent;
+            var existing =
+                containerParent != null
+                    ? containerParent.Find(DecorationsContainerName)
+                    : null;
+
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var containerObject = new GameObject(
+                DecorationsContainerName);
+            var container = containerObject.transform;
+            container.SetParent(containerParent, false);
+            return container;
+        }
+
         private void EnsureGeneratedVisual()
         {
             if (generatedAnchor != null)
@@ -368,6 +391,9 @@ namespace jcan.CelestialSystems
             var anchorObject = new GameObject(
                 $"Generated Observation Orbit {GetInstanceID()}");
             generatedAnchor = anchorObject.transform;
+            generatedAnchor.SetParent(
+                GetOrCreateDecorationsContainer(),
+                false);
             floatingObject = anchorObject.AddComponent<SgtFloatingObject>();
 
             var lineObject = new GameObject("Orbit Line");
