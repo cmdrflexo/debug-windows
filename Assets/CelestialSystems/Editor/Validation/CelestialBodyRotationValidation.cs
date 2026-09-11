@@ -20,6 +20,7 @@ namespace jcan.CelestialSystems.Editor
                     41,
                     distantPlanet,
                     1.0,
+                    1.0,
                     4.6,
                     out var distant,
                     out var error) ||
@@ -27,12 +28,14 @@ namespace jcan.CelestialSystems.Editor
                     41,
                     distantPlanet,
                     1.0,
+                    1.0,
                     4.6,
                     out var repeated,
                     out error) ||
                 !CelestialBodyRotationModel.TryEvaluatePlanet(
                     42,
                     closePlanet,
+                    0.02,
                     1.0,
                     4.6,
                     out var close,

@@ -51,6 +51,7 @@ namespace jcan.CelestialSystems
         public static bool TryEvaluatePlanet(
             int seed,
             CelestialPlanetFormationResult planet,
+            double presentOrbitAstronomicalUnits,
             double stellarMassSolar,
             double systemAgeGigayears,
             out CelestialBodyRotationResult result,
@@ -61,7 +62,7 @@ namespace jcan.CelestialSystems
 
             if (!IsFinitePositive(planet.TotalMassEarth) ||
                 !IsFinitePositive(planet.RadiusEarth) ||
-                !IsFinitePositive(planet.FinalOrbitAstronomicalUnits) ||
+                !IsFinitePositive(presentOrbitAstronomicalUnits) ||
                 !IsFinitePositive(stellarMassSolar) ||
                 !IsFiniteNonNegative(systemAgeGigayears))
             {
@@ -72,6 +73,7 @@ namespace jcan.CelestialSystems
             var random = new DeterministicRandom(seed);
             var synchronous = IsPlanetSynchronous(
                 planet,
+                presentOrbitAstronomicalUnits,
                 stellarMassSolar,
                 systemAgeGigayears);
             double periodHours;
@@ -81,7 +83,7 @@ namespace jcan.CelestialSystems
             if (synchronous)
             {
                 periodHours = CalculateOrbitalPeriodHours(
-                    planet.FinalOrbitAstronomicalUnits * AstronomicalUnitMeters,
+                    presentOrbitAstronomicalUnits * AstronomicalUnitMeters,
                     stellarMassSolar * SolarMassKilograms);
                 axialTilt = random.NextRange(0.0, 5.0);
                 direction = CelestialSpinDirection.Prograde;
@@ -168,6 +170,7 @@ namespace jcan.CelestialSystems
 
         private static bool IsPlanetSynchronous(
             CelestialPlanetFormationResult planet,
+            double presentOrbitAstronomicalUnits,
             double stellarMassSolar,
             double systemAgeGigayears)
         {
@@ -176,7 +179,7 @@ namespace jcan.CelestialSystems
                 Math.Pow(stellarMassSolar, 2.0) *
                 Math.Pow(planet.RadiusEarth, 3.0) /
                 planet.TotalMassEarth *
-                Math.Pow(0.05 / planet.FinalOrbitAstronomicalUnits, 6.0);
+                Math.Pow(0.05 / presentOrbitAstronomicalUnits, 6.0);
 
             return exposure >= 1.0;
         }

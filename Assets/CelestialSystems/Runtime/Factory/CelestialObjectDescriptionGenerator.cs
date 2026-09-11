@@ -103,6 +103,7 @@ namespace jcan.CelestialSystems
                     formation,
                     evolution,
                     unchangedOrbit,
+                    null,
                     generationSeed);
         }
 
@@ -110,6 +111,38 @@ namespace jcan.CelestialSystems
             CelestialPlanetFormationResult formation,
             CelestialPlanetaryEvolutionResult evolution,
             CelestialPostMainSequencePlanetResult systemEvolution,
+            int generationSeed)
+        {
+            return
+                DescribePlanet(
+                    formation,
+                    evolution,
+                    systemEvolution,
+                    null,
+                    generationSeed);
+        }
+
+        public static string DescribePlanet(
+            CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution,
+            CelestialPostMainSequencePlanetResult systemEvolution,
+            CelestialBodyRotationResult rotation,
+            int generationSeed)
+        {
+            return
+                DescribePlanet(
+                    formation,
+                    evolution,
+                    systemEvolution,
+                    (CelestialBodyRotationResult?)rotation,
+                    generationSeed);
+        }
+
+        private static string DescribePlanet(
+            CelestialPlanetFormationResult formation,
+            CelestialPlanetaryEvolutionResult evolution,
+            CelestialPostMainSequencePlanetResult systemEvolution,
+            CelestialBodyRotationResult? rotation,
             int generationSeed)
         {
             var mass =
@@ -137,6 +170,12 @@ namespace jcan.CelestialSystems
                 DescribePlanetOrbit(
                     formation,
                     systemEvolution);
+            var rotationSentence =
+                rotation.HasValue
+                    ? DescribeRotation(
+                        rotation.Value,
+                        false)
+                    : string.Empty;
             var hasOrbitalHistory =
                 orbitSentence.Length > 0;
             var orbitIntroduction =
@@ -155,6 +194,7 @@ namespace jcan.CelestialSystems
                             physicalSentence,
                             evolutionSentence,
                             compositionSentence,
+                            rotationSentence,
                             orbitSentence);
 
                 case 1:
@@ -163,6 +203,7 @@ namespace jcan.CelestialSystems
                             $"With an estimated mass of {mass} Earth masses and a radius of {radius} Earth radii, this world is classified as a {classification} planet.",
                             compositionSentence,
                             evolutionSentence,
+                            rotationSentence,
                             orbitSentence);
 
                 default:
@@ -174,6 +215,7 @@ namespace jcan.CelestialSystems
                             evolutionSentence,
                             compositionSentence,
                             physicalSentence,
+                            rotationSentence,
                             orbitSentence);
             }
         }
@@ -181,6 +223,38 @@ namespace jcan.CelestialSystems
         public static string DescribeMoon(
             CelestialMoonFormationResult moon,
             CelestialMoonEvolutionResult evolution,
+            CelestialPlanetFormationResult planet,
+            int generationSeed)
+        {
+            return
+                DescribeMoon(
+                    moon,
+                    evolution,
+                    null,
+                    planet,
+                    generationSeed);
+        }
+
+        public static string DescribeMoon(
+            CelestialMoonFormationResult moon,
+            CelestialMoonEvolutionResult evolution,
+            CelestialBodyRotationResult rotation,
+            CelestialPlanetFormationResult planet,
+            int generationSeed)
+        {
+            return
+                DescribeMoon(
+                    moon,
+                    evolution,
+                    (CelestialBodyRotationResult?)rotation,
+                    planet,
+                    generationSeed);
+        }
+
+        private static string DescribeMoon(
+            CelestialMoonFormationResult moon,
+            CelestialMoonEvolutionResult evolution,
+            CelestialBodyRotationResult? rotation,
             CelestialPlanetFormationResult planet,
             int generationSeed)
         {
@@ -233,7 +307,15 @@ namespace jcan.CelestialSystems
                         evolution.Differentiation));
             var tidalSentence =
                 DescribeMoonTides(
-                    evolution);
+                    evolution,
+                    rotation);
+            var rotationSentence =
+                rotation.HasValue &&
+                !rotation.Value.IsSynchronous
+                    ? DescribeRotation(
+                        rotation.Value,
+                        true)
+                    : string.Empty;
 
             switch (SelectVariant(
                 generationSeed,
@@ -247,7 +329,8 @@ namespace jcan.CelestialSystems
                             compositionSentence,
                             orbitSentence,
                             environmentSentence,
-                            tidalSentence);
+                            tidalSentence,
+                            rotationSentence);
 
                 case 1:
                     return
@@ -256,6 +339,7 @@ namespace jcan.CelestialSystems
                             originSentence,
                             orbitSentence,
                             tidalSentence,
+                            rotationSentence,
                             compositionSentence,
                             environmentSentence);
 
@@ -267,6 +351,7 @@ namespace jcan.CelestialSystems
                             environmentSentence,
                             compositionSentence,
                             tidalSentence,
+                            rotationSentence,
                             physicalSentence);
             }
         }
@@ -307,15 +392,46 @@ namespace jcan.CelestialSystems
                 $"The formation model assigns approximately {Format(volatilePercent)} percent of its mass to volatile material.";
         }
 
+        private static string DescribeRotation(
+            CelestialBodyRotationResult rotation,
+            bool isMoon)
+        {
+            var direction =
+                rotation.SpinDirection ==
+                    CelestialSpinDirection.Retrograde
+                        ? "retrograde"
+                        : "prograde";
+            var tilt =
+                Format(
+                    rotation.AxialTiltDegrees);
+            var period =
+                Format(
+                    rotation.RotationPeriodHours);
+
+            if (rotation.IsSynchronous)
+            {
+                return
+                    $"Its modeled rotation is synchronized with its orbit, with a period of {period} hours and an axial tilt of approximately {tilt} degrees.";
+            }
+
+            return
+                isMoon
+                    ? $"It rotates {direction} once every {period} hours, with a modeled axial tilt of approximately {tilt} degrees."
+                    : $"The model gives it a {direction} rotation period of {period} hours and an axial tilt of approximately {tilt} degrees.";
+        }
+
         private static string DescribeMoonTides(
-            CelestialMoonEvolutionResult evolution)
+            CelestialMoonEvolutionResult evolution,
+            CelestialBodyRotationResult? rotation)
         {
             string locking;
 
             if (evolution.LikelyTidallyLocked)
             {
                 locking =
-                    "It is likely tidally locked, keeping the same hemisphere generally facing its planet.";
+                    rotation.HasValue
+                        ? $"It is likely tidally locked, rotating once every {Format(rotation.Value.RotationPeriodHours)} hours and keeping the same hemisphere generally facing its planet."
+                        : "It is likely tidally locked, keeping the same hemisphere generally facing its planet.";
             }
             else
             {

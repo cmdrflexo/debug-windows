@@ -373,6 +373,20 @@ namespace jcan.CelestialSystems
                     return false;
                 }
 
+                if (!CelestialBodyRotationModel.TryEvaluatePlanet(
+                        planetSeed,
+                        formation,
+                        systemEvolution.PresentOrbitAstronomicalUnits,
+                        stellarProperties.CurrentMassSolar,
+                        request.Environment.SystemAgeGigayears,
+                        out var planetRotation,
+                        out error))
+                {
+                    ReleaseOwnedRuntimeObjects(
+                        ownedRuntimeObjects);
+                    return false;
+                }
+
                 var planet =
                     CreatePlanetDefinition(
                         planetDefinition,
@@ -380,7 +394,8 @@ namespace jcan.CelestialSystems
                         planetSeed,
                         formation,
                         systemEvolution,
-                        planetaryEvolution);
+                        planetaryEvolution,
+                        planetRotation);
                 ownedRuntimeObjects.Add(
                     planet);
 
@@ -436,6 +451,19 @@ namespace jcan.CelestialSystems
                         return false;
                     }
 
+                    if (!CelestialBodyRotationModel.TryEvaluateMoon(
+                            moonSeed,
+                            moonFormation,
+                            moonEvolution,
+                            formation.TotalMassEarth,
+                            out var moonRotation,
+                            out error))
+                    {
+                        ReleaseOwnedRuntimeObjects(
+                            ownedRuntimeObjects);
+                        return false;
+                    }
+
                     var moon =
                         CreateMoonDefinition(
                             moonDefinition,
@@ -444,6 +472,7 @@ namespace jcan.CelestialSystems
                             moonFormation,
                             moonSystem,
                             moonEvolution,
+                            moonRotation,
                             formation);
                     ownedRuntimeObjects.Add(
                         moon);
@@ -609,7 +638,8 @@ namespace jcan.CelestialSystems
             int generationSeed,
             CelestialPlanetFormationResult formation,
             CelestialPostMainSequencePlanetResult systemEvolution,
-            CelestialPlanetaryEvolutionResult evolution)
+            CelestialPlanetaryEvolutionResult evolution,
+            CelestialBodyRotationResult rotation)
         {
             var definition =
                 CreateInstance<CelestialBodyDefinition>();
@@ -635,11 +665,14 @@ namespace jcan.CelestialSystems
                 systemEvolution);
             definition.ConfigureRuntimePlanetaryEvolutionProperties(
                 evolution);
+            definition.ConfigureRuntimeRotationProperties(
+                rotation);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribePlanet(
                     formation,
                     evolution,
                     systemEvolution,
+                    rotation,
                     generationSeed));
             return definition;
         }
@@ -651,6 +684,7 @@ namespace jcan.CelestialSystems
             CelestialMoonFormationResult formation,
             CelestialMoonSystemFormationResult system,
             CelestialMoonEvolutionResult evolution,
+            CelestialBodyRotationResult rotation,
             CelestialPlanetFormationResult planet)
         {
             var definition =
@@ -676,10 +710,13 @@ namespace jcan.CelestialSystems
                 system);
             definition.ConfigureRuntimeMoonEvolutionProperties(
                 evolution);
+            definition.ConfigureRuntimeRotationProperties(
+                rotation);
             definition.ConfigureRuntimeDescription(
                 CelestialObjectDescriptionGenerator.DescribeMoon(
                     formation,
                     evolution,
+                    rotation,
                     planet,
                     generationSeed));
             return definition;

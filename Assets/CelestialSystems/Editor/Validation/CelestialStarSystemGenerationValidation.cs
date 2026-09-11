@@ -377,6 +377,12 @@ namespace jcan.CelestialSystems.Editor
 
             if (!body.HasPostMainSequenceProperties ||
                 !body.HasPlanetaryEvolutionProperties ||
+                !body.HasRotationProperties ||
+                !PositiveFinite(
+                    body.RotationPeriodHours) ||
+                !NonNegativeFinite(
+                    body.AxialTiltDegrees) ||
+                body.AxialTiltDegrees > 180.0 ||
                 !PositiveFinite(
                     body.PlanetInitialOrbitAstronomicalUnits) ||
                 !PositiveFinite(
@@ -447,6 +453,14 @@ namespace jcan.CelestialSystems.Editor
             orbit = default;
 
             if (!body.HasMoonEvolutionProperties ||
+                !body.HasRotationProperties ||
+                !PositiveFinite(
+                    body.RotationPeriodHours) ||
+                !NonNegativeFinite(
+                    body.AxialTiltDegrees) ||
+                body.AxialTiltDegrees > 180.0 ||
+                body.MoonLikelyTidallyLocked !=
+                    body.IsSpinOrbitSynchronous ||
                 !PositiveFinite(
                     body.MassKilograms) ||
                 !PositiveFinite(
@@ -597,6 +611,14 @@ namespace jcan.CelestialSystems.Editor
                         .Append(':').Append(body.MassKilograms.ToString("R"))
                         .Append(':').Append(body.ReferenceRadiusMeters.ToString("R"))
                         .Append(':').Append(body.Description);
+
+                    if (body.HasRotationProperties)
+                    {
+                        result.Append(':').Append(body.RotationPeriodHours.ToString("R"))
+                            .Append(':').Append(body.AxialTiltDegrees.ToString("R"))
+                            .Append(':').Append(body.SpinDirection)
+                            .Append(':').Append(body.SpinState);
+                    }
 
                     if (body.HasMoonEvolutionProperties)
                     {

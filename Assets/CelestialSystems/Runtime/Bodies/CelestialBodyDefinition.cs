@@ -199,6 +199,24 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CelestialMoonTidalMigrationSensitivity moonTidalMigrationSensitivity;
 
+        [Header("Generated Rotation Properties")]
+        [SerializeField]
+        private bool hasRotationProperties;
+
+        [SerializeField]
+        private double rotationPeriodHours;
+
+        [SerializeField]
+        private double axialTiltDegrees;
+
+        [SerializeField]
+        private CelestialSpinDirection spinDirection =
+            CelestialSpinDirection.Prograde;
+
+        [SerializeField]
+        private CelestialSpinState spinState =
+            CelestialSpinState.FreeRotating;
+
         [SerializeField]
         [TextArea(3, 8)]
         private string description;
@@ -395,6 +413,25 @@ namespace jcan.CelestialSystems
         public CelestialMoonTidalMigrationSensitivity MoonTidalMigrationSensitivity =>
             moonTidalMigrationSensitivity;
 
+        public bool HasRotationProperties =>
+            hasRotationProperties;
+
+        public double RotationPeriodHours =>
+            rotationPeriodHours;
+
+        public double AxialTiltDegrees =>
+            axialTiltDegrees;
+
+        public CelestialSpinDirection SpinDirection =>
+            spinDirection;
+
+        public CelestialSpinState SpinState =>
+            spinState;
+
+        public bool IsSpinOrbitSynchronous =>
+            spinState ==
+                CelestialSpinState.SpinOrbitSynchronous;
+
         public string Description =>
             description ?? string.Empty;
 
@@ -511,6 +548,13 @@ namespace jcan.CelestialSystems
                 CelestialMoonTidalHeating.Negligible;
             moonTidalMigrationSensitivity =
                 CelestialMoonTidalMigrationSensitivity.Low;
+            hasRotationProperties = false;
+            rotationPeriodHours = 0.0;
+            axialTiltDegrees = 0.0;
+            spinDirection =
+                CelestialSpinDirection.Prograde;
+            spinState =
+                CelestialSpinState.FreeRotating;
             description = string.Empty;
         }
 
@@ -641,6 +685,20 @@ namespace jcan.CelestialSystems
                 properties.TidalHeating;
             moonTidalMigrationSensitivity =
                 properties.MigrationSensitivity;
+        }
+
+        internal void ConfigureRuntimeRotationProperties(
+            CelestialBodyRotationResult properties)
+        {
+            hasRotationProperties = true;
+            rotationPeriodHours =
+                properties.RotationPeriodHours;
+            axialTiltDegrees =
+                properties.AxialTiltDegrees;
+            spinDirection =
+                properties.SpinDirection;
+            spinState =
+                properties.SpinState;
         }
 
         private static bool IsFinite(
