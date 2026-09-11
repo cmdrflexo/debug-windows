@@ -338,6 +338,56 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "Celestial Time",
+            "id": "6f68d152-fdd7-45d4-a9dd-bbb869b20acd",
+            "actions": [
+                {
+                    "name": "Time Scale Step",
+                    "type": "Value",
+                    "id": "796f71dc-684f-40fe-ab78-13fc9c2b4393",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "Keyboard",
+                    "id": "5e963aca-5746-47cb-94aa-c33d4902d15a",
+                    "path": "1DAxis",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Time Scale Step",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "negative",
+                    "id": "dcce1997-8968-4ee0-bfe7-7fc3fe8739e6",
+                    "path": "<Keyboard>/leftBracket",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Time Scale Step",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "positive",
+                    "id": "3a6a5d52-625b-4971-80d9-f7d4009a22b2",
+                    "path": "<Keyboard>/rightBracket",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Time Scale Step",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                }
+            ]
         }
     ],
     "controlSchemes": []
