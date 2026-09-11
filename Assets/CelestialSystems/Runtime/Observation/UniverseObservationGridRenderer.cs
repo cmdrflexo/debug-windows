@@ -30,7 +30,7 @@ namespace jcan.CelestialSystems
 
         [Header("Grid Size")]
         [SerializeField]
-        [FormerlySerializedAs("lineCount")]
+        [FormerlySerializedAs("xLineCount")]
         [Min(2)]
         private int lineCount = 100;
 
