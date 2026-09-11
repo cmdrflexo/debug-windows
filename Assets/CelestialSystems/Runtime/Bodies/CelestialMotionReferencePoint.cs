@@ -26,7 +26,7 @@ namespace jcan.CelestialSystems
         public double ConfiguredMassKilograms =>
             configuredMassKilograms;
 
-        internal bool Initialize(
+        public bool Initialize(
             string newInstanceId,
             double newMassKilograms,
             TrajectoryCelestialBodyMotionProvider newMotionProvider)
