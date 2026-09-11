@@ -51,6 +51,8 @@ namespace jcan.CelestialSystems
         private CelestialTrajectoryDefinition builtTrajectory;
         private int builtPathSegments;
         private Color[] orbitColors;
+        private Bounds orbitGeometryBounds;
+        private Camera observationCamera;
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedOrbit => hasResolvedOrbit;
@@ -175,6 +177,7 @@ namespace jcan.CelestialSystems
             floatingObject.ApplyPosition();
             generatedAnchor.rotation = Quaternion.identity;
             generatedAnchor.localScale = Vector3.one;
+            UpdatePersistentRendererBounds();
             hasResolvedOrbit = true;
             lastError = string.Empty;
             SetRendererVisible(true);
@@ -319,6 +322,7 @@ namespace jcan.CelestialSystems
                 false);
             orbitMesh.RecalculateBounds();
             ExpandOrbitBounds(vertices);
+            orbitGeometryBounds = orbitMesh.bounds;
 
             builtTrajectory = provider.Trajectory;
             builtPathSegments = segmentCount;
@@ -370,6 +374,7 @@ namespace jcan.CelestialSystems
             lineObject.transform.SetParent(generatedAnchor, false);
             var meshFilter = lineObject.AddComponent<MeshFilter>();
             orbitRenderer = lineObject.AddComponent<MeshRenderer>();
+            orbitRenderer.allowOcclusionWhenDynamic = false;
             orbitMesh = new Mesh
             {
                 name = "Observation Orbit Line"
@@ -490,6 +495,35 @@ namespace jcan.CelestialSystems
             orbitMesh.bounds = new Bounds(
                 Vector3.zero,
                 Vector3.one * (extent * 2.0f));
+        }
+
+        private void UpdatePersistentRendererBounds()
+        {
+            if (orbitRenderer == null || orbitMesh == null)
+            {
+                return;
+            }
+
+            if (observationCamera == null)
+            {
+                observationCamera = Camera.main;
+            }
+
+            var persistentBounds = orbitGeometryBounds;
+
+            if (observationCamera != null)
+            {
+                var cameraLocalPosition =
+                    orbitRenderer.transform.InverseTransformPoint(
+                        observationCamera.transform.position);
+                persistentBounds.Encapsulate(cameraLocalPosition);
+            }
+
+            var padding = Mathf.Max(
+                1.0f,
+                persistentBounds.size.magnitude * 0.01f);
+            persistentBounds.Expand(padding);
+            orbitRenderer.localBounds = persistentBounds;
         }
 
         private void SetRendererVisible(bool value)
