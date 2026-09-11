@@ -438,7 +438,8 @@ namespace jcan.CelestialSystems
                             request.InitialPositionMetersFromFrameOrigin,
                             request.InitialVelocityMetersPerSecond,
                             request.InitialRotation,
-                            request.InitialAngularVelocityRadiansPerSecond)
+                            request.InitialAngularVelocityRadiansPerSecond,
+                            request.Definition)
                         : trajectoryProvider.InitializeTrajectory(
                             universeFrame,
                             celestialTime,
@@ -447,7 +448,8 @@ namespace jcan.CelestialSystems
                             request.OrbitCenter,
                             massKilograms,
                             request.InitialRotation,
-                            request.InitialAngularVelocityRadiansPerSecond);
+                            request.InitialAngularVelocityRadiansPerSecond,
+                            request.Definition);
 
                 if (!providerInitialized)
                 {

@@ -2,6 +2,7 @@
  * Drives a celestial body from an independent clock using an inertial state or a prescribed trajectory.
  */
 
+using System;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -33,6 +34,7 @@ namespace jcan.CelestialSystems
         private Transform drivenTransform;
         private CelestialTrajectoryDefinition trajectory;
         private CelestialBodyRuntimeContext referenceBody;
+        private CelestialBodyDefinition bodyDefinition;
         private double referenceMassKilograms;
         private double orbitingMassKilograms;
         private UniversePosition inertialPositionAtEpoch;
@@ -177,6 +179,27 @@ namespace jcan.CelestialSystems
             Quaternion initialRotation,
             DoubleVector3 initialAngularVelocityRadiansPerSecond)
         {
+            return InitializeInertial(
+                newUniverseFrame,
+                newTimeSource,
+                newDrivenTransform,
+                positionMetersFromFrameOrigin,
+                velocityMetersPerSecond,
+                initialRotation,
+                initialAngularVelocityRadiansPerSecond,
+                null);
+        }
+
+        public bool InitializeInertial(
+            UniverseFrameController newUniverseFrame,
+            ICelestialTimeSource newTimeSource,
+            Transform newDrivenTransform,
+            DoubleVector3 positionMetersFromFrameOrigin,
+            DoubleVector3 velocityMetersPerSecond,
+            Quaternion initialRotation,
+            DoubleVector3 initialAngularVelocityRadiansPerSecond,
+            CelestialBodyDefinition newBodyDefinition)
+        {
             ResetState();
 
             if (!TryAssignSharedDependencies(
@@ -201,6 +224,8 @@ namespace jcan.CelestialSystems
                 initialRotation;
             angularVelocityRadiansPerSecond =
                 initialAngularVelocityRadiansPerSecond;
+            bodyDefinition =
+                newBodyDefinition;
             usesTrajectory = false;
             isReady = true;
             return TryRefreshMotionState() &&
@@ -216,6 +241,29 @@ namespace jcan.CelestialSystems
             double newOrbitingMassKilograms,
             Quaternion initialRotation,
             DoubleVector3 initialAngularVelocityRadiansPerSecond)
+        {
+            return InitializeTrajectory(
+                newUniverseFrame,
+                newTimeSource,
+                newDrivenTransform,
+                newTrajectory,
+                newReferenceBody,
+                newOrbitingMassKilograms,
+                initialRotation,
+                initialAngularVelocityRadiansPerSecond,
+                null);
+        }
+
+        public bool InitializeTrajectory(
+            UniverseFrameController newUniverseFrame,
+            ICelestialTimeSource newTimeSource,
+            Transform newDrivenTransform,
+            CelestialTrajectoryDefinition newTrajectory,
+            CelestialBodyRuntimeContext newReferenceBody,
+            double newOrbitingMassKilograms,
+            Quaternion initialRotation,
+            DoubleVector3 initialAngularVelocityRadiansPerSecond,
+            CelestialBodyDefinition newBodyDefinition)
         {
             ResetState();
 
@@ -268,6 +316,8 @@ namespace jcan.CelestialSystems
                 initialRotation;
             angularVelocityRadiansPerSecond =
                 initialAngularVelocityRadiansPerSecond;
+            bodyDefinition =
+                newBodyDefinition;
             usesTrajectory = true;
             isReady = true;
             return TryRefreshMotionState() &&
@@ -334,6 +384,10 @@ namespace jcan.CelestialSystems
                 timeSource.UniversalTimeSeconds;
             UniversePosition position;
             DoubleVector3 velocity;
+            var relativePosition =
+                new DoubleVector3();
+            var relativeVelocity =
+                new DoubleVector3();
 
             if (usesTrajectory)
             {
@@ -350,8 +404,8 @@ namespace jcan.CelestialSystems
                         referenceMassKilograms,
                         orbitingMassKilograms,
                         universalTimeSeconds,
-                        out var relativePosition,
-                        out var relativeVelocity,
+                        out relativePosition,
+                        out relativeVelocity,
                         out var trajectoryError))
                 {
                     return Fail(
@@ -387,6 +441,11 @@ namespace jcan.CelestialSystems
                     inertialVelocityMetersPerSecond;
             }
 
+            EvaluateGeneratedRotation(
+                universalTimeSeconds,
+                relativePosition,
+                relativeVelocity);
+
             motionState =
                 new UniverseMotionState(
                     position,
@@ -398,6 +457,249 @@ namespace jcan.CelestialSystems
             hasMotionState = true;
             lastError = string.Empty;
             return true;
+        }
+
+        private void EvaluateGeneratedRotation(
+            double universalTimeSeconds,
+            DoubleVector3 relativePosition,
+            DoubleVector3 relativeVelocity)
+        {
+            if (bodyDefinition == null ||
+                !bodyDefinition.HasRotationProperties)
+            {
+                return;
+            }
+
+            if (bodyDefinition.IsSpinOrbitSynchronous &&
+                usesTrajectory &&
+                TryNormalize(
+                    relativePosition *
+                        -1.0,
+                    out var towardPrimary) &&
+                TryNormalize(
+                    Cross(
+                        relativePosition,
+                        relativeVelocity),
+                    out var orbitNormal))
+            {
+                var tangent =
+                    Vector3.Cross(
+                        orbitNormal,
+                        towardPrimary).normalized;
+                var spinAxis =
+                    Quaternion.AngleAxis(
+                        (float)bodyDefinition.AxialTiltDegrees,
+                        tangent) *
+                    orbitNormal;
+                var primeDirection =
+                    Vector3.ProjectOnPlane(
+                        towardPrimary,
+                        spinAxis).normalized;
+
+                rotation =
+                    MapLocalAxes(
+                        bodyDefinition.NorthAxis,
+                        bodyDefinition.PoleReferenceAxis,
+                        spinAxis,
+                        primeDirection);
+                var radiusSquared =
+                    relativePosition.x * relativePosition.x +
+                    relativePosition.y * relativePosition.y +
+                    relativePosition.z * relativePosition.z;
+                var orbitalAngularVelocity =
+                    Cross(
+                        relativePosition,
+                        relativeVelocity) /
+                    radiusSquared;
+                angularVelocityRadiansPerSecond =
+                    orbitalAngularVelocity;
+                return;
+            }
+
+            var baseNorth =
+                Vector3.up;
+
+            if (usesTrajectory &&
+                TryNormalize(
+                    Cross(
+                        relativePosition,
+                        relativeVelocity),
+                    out var evaluatedOrbitNormal))
+            {
+                baseNorth =
+                    evaluatedOrbitNormal;
+            }
+
+            var seedAngle =
+                PositiveModulo(
+                    bodyDefinition.GenerationSeed *
+                        0.6180339887498949 *
+                        360.0,
+                    360.0);
+            var tiltAxis =
+                Quaternion.AngleAxis(
+                    (float)seedAngle,
+                    baseNorth) *
+                Vector3.forward;
+
+            if (Math.Abs(
+                    Vector3.Dot(
+                        tiltAxis.normalized,
+                        baseNorth)) >
+                0.99f)
+            {
+                tiltAxis =
+                    Vector3.right;
+            }
+
+            tiltAxis =
+                Vector3.ProjectOnPlane(
+                    tiltAxis,
+                    baseNorth).normalized;
+            var spinAxis =
+                Quaternion.AngleAxis(
+                    (float)bodyDefinition.AxialTiltDegrees,
+                    tiltAxis) *
+                baseNorth;
+            var referenceDirection =
+                Vector3.ProjectOnPlane(
+                    tiltAxis,
+                    spinAxis).normalized;
+            var baseRotation =
+                MapLocalAxes(
+                    bodyDefinition.NorthAxis,
+                    bodyDefinition.PoleReferenceAxis,
+                    spinAxis,
+                    referenceDirection);
+            var direction =
+                bodyDefinition.SpinDirection ==
+                    CelestialSpinDirection.Retrograde
+                        ? -1.0
+                        : 1.0;
+            var periodSeconds =
+                bodyDefinition.RotationPeriodHours *
+                3600.0;
+            var phaseDegrees =
+                PositiveModulo(
+                    seedAngle +
+                    direction *
+                    universalTimeSeconds /
+                    periodSeconds *
+                    360.0,
+                    360.0);
+
+            rotation =
+                Quaternion.AngleAxis(
+                    (float)phaseDegrees,
+                    spinAxis) *
+                baseRotation;
+            var angularSpeed =
+                direction *
+                2.0 *
+                Math.PI /
+                periodSeconds;
+            angularVelocityRadiansPerSecond =
+                new DoubleVector3(
+                    spinAxis.x * angularSpeed,
+                    spinAxis.y * angularSpeed,
+                    spinAxis.z * angularSpeed);
+        }
+
+        private static Quaternion MapLocalAxes(
+            Vector3 localNorth,
+            Vector3 localReference,
+            Vector3 worldNorth,
+            Vector3 worldReference)
+        {
+            var normalizedLocalNorth =
+                localNorth.normalized;
+            var normalizedWorldNorth =
+                worldNorth.normalized;
+            var localForward =
+                Vector3.ProjectOnPlane(
+                    localReference,
+                    normalizedLocalNorth).normalized;
+            var worldForward =
+                Vector3.ProjectOnPlane(
+                    worldReference,
+                    normalizedWorldNorth).normalized;
+
+            if (localForward.sqrMagnitude < 0.000001f)
+            {
+                localForward =
+                    Vector3.forward;
+            }
+
+            if (worldForward.sqrMagnitude < 0.000001f)
+            {
+                worldForward =
+                    Vector3.forward;
+            }
+
+            return
+                Quaternion.LookRotation(
+                    worldForward,
+                    normalizedWorldNorth) *
+                Quaternion.Inverse(
+                    Quaternion.LookRotation(
+                        localForward,
+                        normalizedLocalNorth));
+        }
+
+        private static DoubleVector3 Cross(
+            DoubleVector3 left,
+            DoubleVector3 right)
+        {
+            return
+                new DoubleVector3(
+                    left.y * right.z -
+                        left.z * right.y,
+                    left.z * right.x -
+                        left.x * right.z,
+                    left.x * right.y -
+                        left.y * right.x);
+        }
+
+        private static bool TryNormalize(
+            DoubleVector3 value,
+            out Vector3 normalized)
+        {
+            var maximum =
+                Math.Max(
+                    Math.Abs(value.x),
+                    Math.Max(
+                        Math.Abs(value.y),
+                        Math.Abs(value.z)));
+
+            if (!IsFinite(maximum) ||
+                maximum <= 0.0)
+            {
+                normalized = default;
+                return false;
+            }
+
+            var scaled =
+                new Vector3(
+                    (float)(value.x / maximum),
+                    (float)(value.y / maximum),
+                    (float)(value.z / maximum));
+            normalized =
+                scaled.normalized;
+            return normalized.sqrMagnitude >
+                0.999f;
+        }
+
+        private static double PositiveModulo(
+            double value,
+            double modulus)
+        {
+            var remainder =
+                value %
+                modulus;
+            return
+                remainder < 0.0
+                    ? remainder + modulus
+                    : remainder;
         }
 
         private bool ApplySceneTransform()
@@ -434,6 +736,7 @@ namespace jcan.CelestialSystems
             drivenTransform = null;
             trajectory = null;
             referenceBody = null;
+            bodyDefinition = null;
             referenceMassKilograms = 0.0;
             orbitingMassKilograms = 0.0;
             inertialPositionAtEpoch = default;
