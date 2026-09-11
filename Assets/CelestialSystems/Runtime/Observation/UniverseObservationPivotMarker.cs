@@ -29,6 +29,7 @@ namespace jcan.CelestialSystems
 
         [Header("Marker")]
         [SerializeField] private Material markerMaterial;
+        [SerializeField] private Color markerColor = Color.white;
         [SerializeField]
         [Tooltip("Marker width as a fraction of the camera's observation distance.")]
         [Min(0.000001f)]
@@ -48,6 +49,7 @@ namespace jcan.CelestialSystems
         private Transform markerVisual;
         private MeshRenderer markerRenderer;
         private Mesh generatedMesh;
+        private MaterialPropertyBlock markerPropertyBlock;
 
         public UniverseObservationAnchorController ObservationController => observationController;
         public CelestialBodyRuntimeContext DirectionReferenceContext => directionReferenceContext;
@@ -60,6 +62,16 @@ namespace jcan.CelestialSystems
         {
             get => relativeSize;
             set => relativeSize = Mathf.Max(0.000001f, value);
+        }
+
+        public Color MarkerColor
+        {
+            get => markerColor;
+            set
+            {
+                markerColor = value;
+                ApplyMarkerColor();
+            }
         }
 
         public Material MarkerMaterial
@@ -97,6 +109,7 @@ namespace jcan.CelestialSystems
             relativeSize = Mathf.Max(0.000001f, relativeSize);
             planeOffsetFraction = Mathf.Max(0.0f, planeOffsetFraction);
             ApplyMaterial();
+            ApplyMarkerColor();
         }
 
         private void LateUpdate()
@@ -264,7 +277,22 @@ namespace jcan.CelestialSystems
             if (markerRenderer != null)
             {
                 markerRenderer.sharedMaterial = markerMaterial;
+                ApplyMarkerColor();
             }
+        }
+
+        private void ApplyMarkerColor()
+        {
+            if (markerRenderer == null)
+            {
+                return;
+            }
+
+            markerPropertyBlock ??= new MaterialPropertyBlock();
+            markerRenderer.GetPropertyBlock(markerPropertyBlock);
+            markerPropertyBlock.SetColor("_BaseColor", markerColor);
+            markerPropertyBlock.SetColor("_Color", markerColor);
+            markerRenderer.SetPropertyBlock(markerPropertyBlock);
         }
 
         private void SetRendererVisible(bool value)
