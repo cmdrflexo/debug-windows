@@ -124,9 +124,18 @@ namespace jcan.CelestialSystems
                     out var planeForward,
                     out var planeUp))
             {
+                var hadPivotPosition = hasPivotPosition;
                 hasPivotPosition = false;
                 hasResolvedDirectionReference = false;
-                SetRendererVisible(false);
+
+                // Keep the last valid decoration visible through transient
+                // observation-frame failures. Visibility is only explicitly
+                // removed with SetVisible(false).
+                if (!hadPivotPosition)
+                {
+                    SetRendererVisible(false);
+                }
+
                 return;
             }
 
