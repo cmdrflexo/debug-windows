@@ -28,6 +28,31 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private UniverseObservationAnchorController observationController;
 
+        [Header("Alignment")]
+        [SerializeField]
+        private bool hasGridOrigin;
+
+        [SerializeField]
+        [Tooltip("Universal alignment origin supplied by generation (system barycenter).")]
+        private UniversePosition gridOrigin;
+
+        public bool HasGridOrigin => hasGridOrigin;
+        public UniversePosition GridOrigin => gridOrigin;
+
+        public void SetGridOrigin(UniversePosition position)
+        {
+            gridOrigin = position;
+            hasGridOrigin = true;
+            geometryDirty = true;
+        }
+
+        public void ClearGridOrigin()
+        {
+            gridOrigin = default;
+            hasGridOrigin = false;
+            geometryDirty = true;
+        }
+
         [Header("Grid Size")]
         [SerializeField]
         [FormerlySerializedAs("xLineCount")]
@@ -208,8 +233,25 @@ namespace jcan.CelestialSystems
             currentCellSizeMeters = baseSpacing;
             scaleTransition = transition;
 
-            var offsetRight = observationController.PlateOffsetRightMeters;
-            var offsetForward = observationController.PlateOffsetForwardMeters;
+            // Keep the mesh near the camera, but phase every scale against the
+            // same universal origin. Projection preserves the adjustable plane height.
+            var alignmentOrigin = hasGridOrigin ? gridOrigin : default(UniversePosition);
+            if (!pivotPosition.TryGetOffsetMetersFrom(
+                    alignmentOrigin,
+                    out var pivotOffset))
+            {
+                meshRenderer.enabled = false;
+                return;
+            }
+
+            var offsetRight =
+                pivotOffset.x * planeRight.x +
+                pivotOffset.y * planeRight.y +
+                pivotOffset.z * planeRight.z;
+            var offsetForward =
+                pivotOffset.x * planeForward.x +
+                pivotOffset.y * planeForward.y +
+                pivotOffset.z * planeForward.z;
             var offsetTolerance = Math.Max(baseSpacing * 0.000001, 0.000001);
 
             if (geometryDirty ||
