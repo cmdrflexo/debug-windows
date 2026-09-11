@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using SpaceGraphicsToolkit;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
@@ -29,12 +30,9 @@ namespace jcan.CelestialSystems
 
         [Header("Grid Size")]
         [SerializeField]
+        [FormerlySerializedAs("lineCount")]
         [Min(2)]
-        private int xLineCount = 100;
-
-        [SerializeField]
-        [Min(2)]
-        private int yLineCount = 100;
+        private int lineCount = 100;
 
         [SerializeField]
         [Tooltip("Approximate current-scale cells per camera distance.")]
@@ -145,8 +143,7 @@ namespace jcan.CelestialSystems
 
         private void OnValidate()
         {
-            xLineCount = Mathf.Max(2, xLineCount);
-            yLineCount = Mathf.Max(2, yLineCount);
+            lineCount = Mathf.Max(2, lineCount);
             cellsPerCameraDistance = Mathf.Max(1.0f, cellsPerCameraDistance);
             minimumCellSizeMeters = Math.Max(0.000001, minimumCellSizeMeters);
             fadeStartDistanceMeters = Math.Max(0.0, fadeStartDistanceMeters);
@@ -307,12 +304,12 @@ namespace jcan.CelestialSystems
             var nearestY = Math.Round(pivotOffsetForward / spacing);
             var phaseX = pivotOffsetRight - nearestX * spacing;
             var phaseY = pivotOffsetForward - nearestY * spacing;
-            var halfX = spacing * (xLineCount - 1) * 0.5;
-            var halfY = spacing * (yLineCount - 1) * 0.5;
-            var startX = -(xLineCount / 2);
-            var startY = -(yLineCount / 2);
+            var halfX = spacing * (lineCount - 1) * 0.5;
+            var halfY = spacing * (lineCount - 1) * 0.5;
+            var startX = -(lineCount / 2);
+            var startY = -(lineCount / 2);
 
-            for (var i = 0; i < xLineCount; i++)
+            for (var i = 0; i < lineCount; i++)
             {
                 var indexOffset = startX + i;
                 var gridIndex = nearestX + indexOffset;
@@ -335,7 +332,7 @@ namespace jcan.CelestialSystems
                     layerOpacity);
             }
 
-            for (var i = 0; i < yLineCount; i++)
+            for (var i = 0; i < lineCount; i++)
             {
                 var indexOffset = startY + i;
                 var gridIndex = nearestY + indexOffset;
