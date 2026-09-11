@@ -61,22 +61,13 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Timerate Increase",
-                    "type": "Button",
+                    "name": "Timescale",
+                    "type": "Value",
                     "id": "4865e8b5-ed6a-4047-bb2f-43a1f2c6e2d8",
-                    "expectedControlType": "",
+                    "expectedControlType": "Axis",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Timerate Decrease",
-                    "type": "Button",
-                    "id": "cd635364-352d-4b25-a867-03ce65ec8298",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -147,26 +138,37 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "",
-                    "id": "e9e8ae8c-c8e7-4cdc-94be-f4ef44348f36",
-                    "path": "<Keyboard>/period",
+                    "name": "1D Axis",
+                    "id": "bc877b25-14a7-46b4-927b-b2bbb98d0098",
+                    "path": "1DAxis",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Timerate Increase",
-                    "isComposite": false,
+                    "action": "Timescale",
+                    "isComposite": true,
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "",
-                    "id": "16d449e7-0262-4b15-b9d5-3c551f6ff258",
+                    "name": "negative",
+                    "id": "75432948-614d-470a-b9b6-82894708d028",
                     "path": "<Keyboard>/comma",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Timerate Decrease",
+                    "action": "Timescale",
                     "isComposite": false,
-                    "isPartOfComposite": false
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "positive",
+                    "id": "8991cfb5-0737-4dd0-92a6-5aa2ac026ce0",
+                    "path": "<Keyboard>/period",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Timescale",
+                    "isComposite": false,
+                    "isPartOfComposite": true
                 }
             ]
         },

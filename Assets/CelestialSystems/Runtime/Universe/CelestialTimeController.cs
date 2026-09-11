@@ -4,6 +4,7 @@
 
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace jcan.CelestialSystems
 {
@@ -22,12 +23,31 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool runOnStart = true;
 
+        [Header("Input")]
+        [SerializeField]
+        [Tooltip("Axis action where positive input increases time scale and negative input decreases it.")]
+        private InputActionReference timeScaleStepAction;
+
+        [SerializeField]
+        [Min(1.0001f)]
+        private double timeScaleStepMultiplier = 10.0;
+
+        [SerializeField]
+        [Min(0.000001f)]
+        private double minimumTimeScaleMagnitude = 0.001;
+
+        [SerializeField]
+        [Min(0.000001f)]
+        private double maximumTimeScaleMagnitude = 1000000000000.0;
+
         [Header("Runtime")]
         [SerializeField]
         private double universalTimeSeconds;
 
         [SerializeField]
         private bool isRunning;
+
+        private bool enabledTimeScaleStepAction;
 
         public static CelestialTimeController Instance { get; private set; }
 
@@ -74,6 +94,51 @@ namespace jcan.CelestialSystems
                     : 1.0;
             isRunning =
                 runOnStart;
+        }
+
+        private void OnEnable()
+        {
+            var action =
+                timeScaleStepAction != null
+                    ? timeScaleStepAction.action
+                    : null;
+
+            if (action == null)
+            {
+                return;
+            }
+
+            enabledTimeScaleStepAction =
+                !action.enabled;
+
+            if (enabledTimeScaleStepAction)
+            {
+                action.Enable();
+            }
+
+            action.performed +=
+                OnTimeScaleStepPerformed;
+        }
+
+        private void OnDisable()
+        {
+            var action =
+                timeScaleStepAction != null
+                    ? timeScaleStepAction.action
+                    : null;
+
+            if (action != null)
+            {
+                action.performed -=
+                    OnTimeScaleStepPerformed;
+
+                if (enabledTimeScaleStepAction)
+                {
+                    action.Disable();
+                }
+            }
+
+            enabledTimeScaleStepAction = false;
         }
 
         private void OnDestroy()
@@ -143,6 +208,107 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        public bool IncreaseTimeScale(
+            int stepCount = 1)
+        {
+            return StepTimeScale(
+                Math.Max(
+                    1,
+                    stepCount));
+        }
+
+        public bool DecreaseTimeScale(
+            int stepCount = 1)
+        {
+            return StepTimeScale(
+                -Math.Max(
+                    1,
+                    stepCount));
+        }
+
+        private bool StepTimeScale(
+            int signedStepCount)
+        {
+            if (signedStepCount == 0)
+            {
+                return true;
+            }
+
+            var stepFactor =
+                Math.Pow(
+                    timeScaleStepMultiplier,
+                    Math.Abs(
+                        signedStepCount));
+
+            if (!IsFinite(
+                    stepFactor) ||
+                stepFactor <= 0.0)
+            {
+                return false;
+            }
+
+            var sign =
+                timeScale < 0.0
+                    ? -1.0
+                    : 1.0;
+            var magnitude =
+                Math.Abs(
+                    timeScale);
+
+            if (magnitude == 0.0)
+            {
+                magnitude =
+                    minimumTimeScaleMagnitude;
+            }
+            else if (signedStepCount > 0)
+            {
+                magnitude *=
+                    stepFactor;
+            }
+            else
+            {
+                magnitude /=
+                    stepFactor;
+            }
+
+            magnitude =
+                Math.Max(
+                    minimumTimeScaleMagnitude,
+                    Math.Min(
+                        maximumTimeScaleMagnitude,
+                        magnitude));
+
+            return SetTimeScale(
+                sign *
+                    magnitude);
+        }
+
+        private void OnTimeScaleStepPerformed(
+            InputAction.CallbackContext context)
+        {
+            var input =
+                context.ReadValue<float>();
+
+            if (Mathf.Approximately(
+                    input,
+                    0.0f))
+            {
+                return;
+            }
+
+            var stepCount =
+                Math.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        Mathf.Abs(
+                            input)));
+
+            StepTimeScale(
+                input > 0.0f
+                    ? stepCount
+                    : -stepCount);
+        }
+
         public void SetRunning(
             bool shouldRun)
         {
@@ -170,6 +336,44 @@ namespace jcan.CelestialSystems
             {
                 timeScale =
                     1.0;
+            }
+
+            if (!IsFinite(
+                    timeScaleStepMultiplier) ||
+                timeScaleStepMultiplier <= 1.0)
+            {
+                timeScaleStepMultiplier =
+                    10.0;
+            }
+
+            if (!IsFinite(
+                    minimumTimeScaleMagnitude) ||
+                minimumTimeScaleMagnitude <= 0.0)
+            {
+                minimumTimeScaleMagnitude =
+                    0.001;
+            }
+
+            if (!IsFinite(
+                    maximumTimeScaleMagnitude) ||
+                maximumTimeScaleMagnitude <
+                    minimumTimeScaleMagnitude)
+            {
+                maximumTimeScaleMagnitude =
+                    minimumTimeScaleMagnitude;
+            }
+
+            if (timeScale != 0.0)
+            {
+                timeScale =
+                    Math.Sign(
+                        timeScale) *
+                    Math.Max(
+                        minimumTimeScaleMagnitude,
+                        Math.Min(
+                            maximumTimeScaleMagnitude,
+                            Math.Abs(
+                                timeScale)));
             }
         }
 
