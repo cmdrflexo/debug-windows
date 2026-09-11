@@ -39,6 +39,7 @@ namespace jcan.CelestialSystems
         private CelestialGalacticEnvironmentDefinition galacticEnvironment;
 
         [SerializeField]
+        [Tooltip("Deterministic generation seed. Set to zero to choose a new random nonzero seed for each generation.")]
         private int seed = 1;
 
         [SerializeField]
@@ -91,6 +92,9 @@ namespace jcan.CelestialSystems
         private bool generationSucceeded;
 
         [SerializeField]
+        private int resolvedSeed;
+
+        [SerializeField]
         private Transform generatedUniverseRoot;
 
         [SerializeField]
@@ -138,6 +142,9 @@ namespace jcan.CelestialSystems
 
         public bool GenerationSucceeded =>
             generationSucceeded;
+
+        public int ResolvedSeed =>
+            resolvedSeed;
 
         public Transform GeneratedUniverseRoot =>
             generatedUniverseRoot;
@@ -232,6 +239,10 @@ namespace jcan.CelestialSystems
                     "The universe runtime controller requires a galactic environment.");
             }
 
+            resolvedSeed =
+                ResolveGenerationSeed(
+                    seed);
+
             universeFactory ??=
                 new CelestialUniverseFactory(                    bodyFactory);
 
@@ -245,7 +256,7 @@ namespace jcan.CelestialSystems
                     universeInstanceId,
                     galaxyInstanceId,
                     starSystemInstanceId,
-                    seed,
+                    resolvedSeed,
                     starSystemGuide,
                     galacticEnvironment,
                     positionMetersFromFrameOrigin,
@@ -518,6 +529,23 @@ namespace jcan.CelestialSystems
                     : planet.PlanetFinalOrbitAstronomicalUnits;
         }
 
+        private static int ResolveGenerationSeed(
+            int configuredSeed)
+        {
+            if (configuredSeed != 0)
+            {
+                return configuredSeed;
+            }
+
+            var randomSeed =
+                Guid.NewGuid().GetHashCode();
+
+            return
+                randomSeed != 0
+                    ? randomSeed
+                    : 1;
+        }
+
         private static string FormatSummaryValue(
             double value)
         {
@@ -669,6 +697,7 @@ namespace jcan.CelestialSystems
         private void ResetRuntimeSummary()
         {
             generationSucceeded = false;
+            resolvedSeed = 0;
             generatedUniverseRoot = null;
             generatedGalaxyCount = 0;
             generatedStarSystemCount = 0;
