@@ -486,7 +486,7 @@ namespace jcan.CelestialSystems
                     Vector3.Cross(
                         orbitNormal,
                         towardPrimary).normalized;
-                var spinAxis =
+                var synchronousSpinAxis =
                     Quaternion.AngleAxis(
                         (float)bodyDefinition.AxialTiltDegrees,
                         tangent) *
@@ -494,13 +494,13 @@ namespace jcan.CelestialSystems
                 var primeDirection =
                     Vector3.ProjectOnPlane(
                         towardPrimary,
-                        spinAxis).normalized;
+                        synchronousSpinAxis).normalized;
 
                 rotation =
                     MapLocalAxes(
                         bodyDefinition.NorthAxis,
                         bodyDefinition.PoleReferenceAxis,
-                        spinAxis,
+                        synchronousSpinAxis,
                         primeDirection);
                 var radiusSquared =
                     relativePosition.x * relativePosition.x +
