@@ -69,6 +69,13 @@ namespace jcan.CelestialSystems
         [Tooltip("Optional grid pivot marker that will point toward the generated star system's barycenter.")]
         private UniverseObservationPivotMarker observationPivotMarker;
 
+        [SerializeField]
+        [Tooltip("Optional scene marker whose appearance is used for generated planet markers.")]
+        private UniverseObservationBodyMarkerDecorator planetMarkerTemplate;
+
+        [SerializeField]
+        private bool generatePlanetMarkers = true;
+
         [Header("Lifecycle")]
         [SerializeField]
         private Transform generatedParentOverride;
@@ -121,6 +128,10 @@ namespace jcan.CelestialSystems
         private CelestialUniverseFactory universeFactory;
 
         private CelestialUniverseFactory.GeneratedUniverse generatedUniverse;
+
+        private readonly List<UniverseObservationBodyMarkerDecorator>
+            generatedPlanetMarkers =
+                new List<UniverseObservationBodyMarkerDecorator>();
 
         public CelestialBodyFactory BodyFactory =>
             bodyFactory;
@@ -298,6 +309,8 @@ namespace jcan.CelestialSystems
 
                 SetObservationMarkerToBarycenter(
                     starSystem);
+                ConfigureObservationPlanetMarkers(
+                    starSystem);
 
                 if (logGeneratedStarSystemSummary)
                 {
@@ -328,6 +341,101 @@ namespace jcan.CelestialSystems
             generatedUniverse = null;
             ResetRuntimeSummary();
             return true;
+        }
+
+        private void ConfigureObservationPlanetMarkers(
+            CelestialStarSystemFactory.GeneratedSystem starSystem)
+        {
+            ClearObservationPlanetMarkers();
+
+            if (!generatePlanetMarkers)
+            {
+                return;
+            }
+
+            planetMarkerTemplate ??=
+                FindFirstObjectByType<UniverseObservationBodyMarkerDecorator>();
+
+            if (planetMarkerTemplate == null)
+            {
+                return;
+            }
+
+            planetMarkerTemplate.ClearTarget();
+
+            var planets =
+                new List<CelestialBodyRuntimeContext>();
+
+            foreach (var bodySystem in
+                starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in
+                    bodySystem.Bodies.Values)
+                {
+                    if (body != null &&
+                        body.Definition != null &&
+                        body.Definition.HasPlanetFormationProperties)
+                    {
+                        planets.Add(
+                            body);
+                    }
+                }
+            }
+
+            planets.Sort(
+                (left, right) =>
+                    ResolvePresentOrbit(
+                        left.Definition).CompareTo(
+                            ResolvePresentOrbit(
+                                right.Definition)));
+
+            for (var index = 0;
+                index < planets.Count;
+                index++)
+            {
+                if (index == 0)
+                {
+                    planetMarkerTemplate.SetTarget(
+                        planets[index]);
+                    continue;
+                }
+
+                var generatedMarker =
+                    planetMarkerTemplate.CreateRuntimeSibling(
+                        planets[index]);
+
+                if (generatedMarker != null)
+                {
+                    generatedPlanetMarkers.Add(
+                        generatedMarker);
+                }
+            }
+        }
+
+        private void ClearObservationPlanetMarkers()
+        {
+            if (planetMarkerTemplate != null)
+            {
+                planetMarkerTemplate.ClearTarget();
+            }
+
+            for (var index = 0;
+                index < generatedPlanetMarkers.Count;
+                index++)
+            {
+                if (generatedPlanetMarkers[index] != null)
+                {
+                    Destroy(
+                        generatedPlanetMarkers[index]);
+                }
+            }
+
+            generatedPlanetMarkers.Clear();
         }
 
         private void LogStarSystemSummary(
@@ -712,6 +820,7 @@ namespace jcan.CelestialSystems
 
             hasGeneratedStarSystemBarycenter = false;
             generatedStarSystemBarycenter = default;
+            ClearObservationPlanetMarkers();
             lastError = string.Empty;
         }
 

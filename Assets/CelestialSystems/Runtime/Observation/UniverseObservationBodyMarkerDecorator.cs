@@ -184,6 +184,30 @@ namespace jcan.CelestialSystems
             SetRenderersVisible(true);
         }
 
+        public UniverseObservationBodyMarkerDecorator CreateRuntimeSibling(
+            CelestialBodyRuntimeContext context)
+        {
+            var marker =
+                gameObject.AddComponent<UniverseObservationBodyMarkerDecorator>();
+            marker.observationController =
+                observationController;
+            marker.markerMaterial =
+                markerMaterial;
+            marker.color =
+                color;
+            marker.relativeSize =
+                relativeSize;
+            marker.planeOffsetFraction =
+                planeOffsetFraction;
+            marker.visible =
+                visible;
+            marker.ApplyMarkerMaterial();
+            marker.ApplyColor();
+            marker.SetTarget(
+                context);
+            return marker;
+        }
+
         public void SetTarget(CelestialBodyRuntimeContext context)
         {
             targetContext = context;
