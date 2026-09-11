@@ -86,6 +86,13 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool generateOrbitPaths = true;
 
+        [SerializeField]
+        [Tooltip("Optional scene trail decorator whose appearance is used for generated body trails.")]
+        private UniverseObservationTrailDecorator trailDecoratorTemplate;
+
+        [SerializeField]
+        private bool generateBodyTrails = true;
+
         [Header("Lifecycle")]
         [SerializeField]
         private Transform generatedParentOverride;
@@ -146,6 +153,10 @@ namespace jcan.CelestialSystems
         private readonly List<UniverseObservationOrbitDecorator>
             generatedOrbitDecorators =
                 new List<UniverseObservationOrbitDecorator>();
+
+        private readonly List<UniverseObservationTrailDecorator>
+            generatedTrailDecorators =
+                new List<UniverseObservationTrailDecorator>();
 
         public CelestialBodyFactory BodyFactory =>
             bodyFactory;
@@ -326,6 +337,8 @@ namespace jcan.CelestialSystems
                 ConfigureObservationBodyMarkers(
                     starSystem);
                 ConfigureObservationOrbitDecorators(
+                    starSystem);
+                ConfigureObservationTrailDecorators(
                     starSystem);
 
                 if (logGeneratedStarSystemSummary)
@@ -517,6 +530,83 @@ namespace jcan.CelestialSystems
                         generatedMarker);
                 }
             }
+        }
+
+        private void ConfigureObservationTrailDecorators(
+            CelestialStarSystemFactory.GeneratedSystem starSystem)
+        {
+            ClearObservationTrailDecorators();
+
+            if (!generateBodyTrails)
+            {
+                return;
+            }
+
+            trailDecoratorTemplate ??=
+                FindFirstObjectByType<UniverseObservationTrailDecorator>();
+
+            if (trailDecoratorTemplate == null)
+            {
+                return;
+            }
+
+            trailDecoratorTemplate.ClearTarget();
+            var bodies = new List<CelestialBodyRuntimeContext>();
+
+            foreach (var bodySystem in starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in bodySystem.Bodies.Values)
+                {
+                    if (body != null && body.Definition != null)
+                    {
+                        bodies.Add(body);
+                    }
+                }
+            }
+
+            bodies.Sort(CompareBodyMarkerTargets);
+
+            for (var index = 0; index < bodies.Count; index++)
+            {
+                if (index == 0)
+                {
+                    trailDecoratorTemplate.SetTarget(bodies[index]);
+                    continue;
+                }
+
+                var generated =
+                    trailDecoratorTemplate.CreateRuntimeSibling(bodies[index]);
+
+                if (generated != null)
+                {
+                    generatedTrailDecorators.Add(generated);
+                }
+            }
+        }
+
+        private void ClearObservationTrailDecorators()
+        {
+            if (trailDecoratorTemplate != null)
+            {
+                trailDecoratorTemplate.ClearTarget();
+            }
+
+            for (var index = 0;
+                index < generatedTrailDecorators.Count;
+                index++)
+            {
+                if (generatedTrailDecorators[index] != null)
+                {
+                    Destroy(generatedTrailDecorators[index]);
+                }
+            }
+
+            generatedTrailDecorators.Clear();
         }
 
         private static int CompareBodyMarkerTargets(
@@ -985,6 +1075,7 @@ namespace jcan.CelestialSystems
             generatedStarSystemBarycenter = default;
             ClearObservationBodyMarkers();
             ClearObservationOrbitDecorators();
+            ClearObservationTrailDecorators();
             lastError = string.Empty;
         }
 
