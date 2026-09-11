@@ -335,7 +335,7 @@ namespace jcan.CelestialSystems
             elevationLineMesh.colors = new[] { color, color };
             elevationLineMesh.SetIndices(
                 new[] { 0, 1 },
-                UnityEngine.Rendering.MeshTopology.Lines,
+                MeshTopology.Lines,
                 0,
                 false);
             elevationLineMesh.RecalculateBounds();
