@@ -255,7 +255,7 @@ namespace jcan.CelestialSystems.Editor
                         }
                     }
 
-                    if (body.HasPlanetFormationProperties)
+                    else if (body.HasPlanetFormationProperties)
                     {
                         planetCount++;
 
