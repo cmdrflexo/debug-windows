@@ -37,7 +37,7 @@ namespace jcan.CelestialSystems
         private ICelestialTimeSource timeSource;
         private Transform drivenTransform;
         private CelestialTrajectoryDefinition trajectory;
-        private CelestialBodyRuntimeContext referenceBody;
+        private ICelestialMotionStateSource referenceSource;
         private CelestialBodyDefinition bodyDefinition;
         private double referenceMassKilograms;
         private double orbitingMassKilograms;
@@ -67,8 +67,12 @@ namespace jcan.CelestialSystems
         public CelestialTrajectoryDefinition Trajectory =>
             trajectory;
 
+        public ICelestialMotionStateSource ReferenceSource =>
+            referenceSource;
+
         public CelestialBodyRuntimeContext ReferenceBody =>
-            referenceBody;
+            referenceSource as
+                CelestialBodyRuntimeContext;
 
         public bool TryEvaluateRelativeState(
             double universalTimeSeconds,
@@ -241,7 +245,7 @@ namespace jcan.CelestialSystems
             ICelestialTimeSource newTimeSource,
             Transform newDrivenTransform,
             CelestialTrajectoryDefinition newTrajectory,
-            CelestialBodyRuntimeContext newReferenceBody,
+            ICelestialMotionStateSource newReferenceSource,
             double newOrbitingMassKilograms,
             Quaternion initialRotation,
             DoubleVector3 initialAngularVelocityRadiansPerSecond)
@@ -251,7 +255,7 @@ namespace jcan.CelestialSystems
                 newTimeSource,
                 newDrivenTransform,
                 newTrajectory,
-                newReferenceBody,
+                newReferenceSource,
                 newOrbitingMassKilograms,
                 initialRotation,
                 initialAngularVelocityRadiansPerSecond,
@@ -263,7 +267,7 @@ namespace jcan.CelestialSystems
             ICelestialTimeSource newTimeSource,
             Transform newDrivenTransform,
             CelestialTrajectoryDefinition newTrajectory,
-            CelestialBodyRuntimeContext newReferenceBody,
+            ICelestialMotionStateSource newReferenceSource,
             double newOrbitingMassKilograms,
             Quaternion initialRotation,
             DoubleVector3 initialAngularVelocityRadiansPerSecond,
@@ -293,9 +297,9 @@ namespace jcan.CelestialSystems
                         : trajectoryError);
             }
 
-            if (newReferenceBody == null ||
+            if (newReferenceSource == null ||
                 !IsFinitePositive(
-                    newReferenceBody.ConfiguredMassKilograms))
+                    newReferenceSource.ConfiguredMassKilograms))
             {
                 return Fail(
                     "A trajectory motion provider requires an initialized reference body with positive mass.");
@@ -310,10 +314,10 @@ namespace jcan.CelestialSystems
 
             trajectory =
                 newTrajectory;
-            referenceBody =
-                newReferenceBody;
+            referenceSource =
+                newReferenceSource;
             referenceMassKilograms =
-                referenceBody.ConfiguredMassKilograms;
+                referenceSource.ConfiguredMassKilograms;
             orbitingMassKilograms =
                 newOrbitingMassKilograms;
             rotation =
@@ -395,8 +399,8 @@ namespace jcan.CelestialSystems
 
             if (usesTrajectory)
             {
-                if (referenceBody == null ||
-                    !referenceBody.TryGetMotionState(
+                if (referenceSource == null ||
+                    !referenceSource.TryGetMotionState(
                         out var referenceState))
                 {
                     return Fail(
@@ -739,7 +743,7 @@ namespace jcan.CelestialSystems
             timeSource = null;
             drivenTransform = null;
             trajectory = null;
-            referenceBody = null;
+            referenceSource = null;
             bodyDefinition = null;
             referenceMassKilograms = 0.0;
             orbitingMassKilograms = 0.0;

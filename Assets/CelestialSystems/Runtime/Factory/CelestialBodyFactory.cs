@@ -121,6 +121,9 @@ namespace jcan.CelestialSystems
         public UniverseFrameController UniverseFrame =>
             universeFrame;
 
+        public CelestialTimeController CelestialTime =>
+            celestialTime;
+
         public CelestialBodyRuntimeContext BodyPrefab =>
             bodyPrefab;
 
@@ -407,7 +410,7 @@ namespace jcan.CelestialSystems
 
                         orbit.InitFromActiveNBody(
                             gravityBody,
-                            request.OrbitCenter.GravityBody,
+                            (request.OrbitCenter as CelestialBodyRuntimeContext)?.GravityBody,
                             OrbitUniversal.EvolveMode.KEPLERS_EQN);
                     }
                 }
@@ -820,8 +823,8 @@ namespace jcan.CelestialSystems
             if (request.MotionMode ==
                 CelestialBodySpawnMode.OnRails &&
                 (request.OrbitCenter == null ||
-                    request.OrbitCenter.GravityBody == null ||
-                    request.OrbitCenter.Definition == null))
+                    (request.OrbitCenter as CelestialBodyRuntimeContext)?.GravityBody == null ||
+                    (request.OrbitCenter as CelestialBodyRuntimeContext)?.Definition == null))
             {
                 return RecordSpawnFailure(
                     "A Gravity Engine on-rails celestial body requires an active GE orbit-center body.");
@@ -831,10 +834,11 @@ namespace jcan.CelestialSystems
                     CelestialBodySpawnMode.PrescribedTrajectory &&
                 request.Trajectory != null &&
                 (request.OrbitCenter == null ||
-                    request.OrbitCenter.Definition == null))
+                    !IsFinitePositive(
+                        request.OrbitCenter.ConfiguredMassKilograms)))
             {
                 return RecordSpawnFailure(
-                    "A prescribed trajectory requires an active reference body.");
+                    "A prescribed trajectory requires an active positive-mass motion source.");
             }
 
             RefreshMotionBackendState();
@@ -1090,6 +1094,14 @@ namespace jcan.CelestialSystems
                 IsFinite(value.y) &&
                 IsFinite(value.z) &&
                 IsFinite(value.w);
+        }
+
+        private static bool IsFinitePositive(
+            double value)
+        {
+            return
+                IsFinite(value) &&
+                value > 0.0;
         }
 
         private static bool IsFinite(

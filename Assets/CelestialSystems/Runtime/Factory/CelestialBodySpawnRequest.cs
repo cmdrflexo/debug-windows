@@ -24,7 +24,7 @@ namespace jcan.CelestialSystems
 
         public CelestialBodySpawnMode MotionMode { get; }
 
-        public CelestialBodyRuntimeContext OrbitCenter { get; }
+        public ICelestialMotionStateSource OrbitCenter { get; }
 
         public DoubleVector3 InitialAngularVelocityRadiansPerSecond { get; }
 
@@ -39,7 +39,7 @@ namespace jcan.CelestialSystems
             RoundMapMagicSurfaceQualityProfile qualityProfile = null,
             Transform parentOverride = null,
             CelestialBodySpawnMode motionMode = CelestialBodySpawnMode.FreeSimulation,
-            CelestialBodyRuntimeContext orbitCenter = null,
+            ICelestialMotionStateSource orbitCenter = null,
             DoubleVector3 initialAngularVelocityRadiansPerSecond = default,
             CelestialTrajectoryDefinition trajectory = null)
         {

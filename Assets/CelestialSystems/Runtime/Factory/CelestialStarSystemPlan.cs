@@ -10,6 +10,28 @@ namespace jcan.CelestialSystems
 {
     public sealed class CelestialStarSystemPlan
     {
+        public sealed class ReferencePointPlan
+        {
+            public ReferencePointPlan(
+                string instanceId,
+                double massKilograms,
+                DoubleVector3 positionMetersFromStarSystemOrigin,
+                DoubleVector3 velocityMetersPerSecond)
+            {
+                InstanceId = instanceId;
+                MassKilograms = massKilograms;
+                PositionMetersFromStarSystemOrigin =
+                    positionMetersFromStarSystemOrigin;
+                VelocityMetersPerSecond =
+                    velocityMetersPerSecond;
+            }
+
+            public string InstanceId { get; }
+            public double MassKilograms { get; }
+            public DoubleVector3 PositionMetersFromStarSystemOrigin { get; }
+            public DoubleVector3 VelocityMetersPerSecond { get; }
+        }
+
         public sealed class BodySystemPlan
         {
             public BodySystemPlan(
@@ -21,7 +43,8 @@ namespace jcan.CelestialSystems
                 CelestialBodySpawnMode? rootMotionModeOverride = null,
                 string referenceBodySystemInstanceId = null,
                 string referenceBodyInstanceId = null,
-                CelestialTrajectoryDefinition trajectory = null)
+                CelestialTrajectoryDefinition trajectory = null,
+                string referencePointInstanceId = null)
             {
                 InstanceId = instanceId;
                 Definition = definition;
@@ -36,6 +59,8 @@ namespace jcan.CelestialSystems
                 ReferenceBodyInstanceId =
                     referenceBodyInstanceId;
                 Trajectory = trajectory;
+                ReferencePointInstanceId =
+                    referencePointInstanceId;
             }
 
             public string InstanceId { get; }
@@ -55,9 +80,13 @@ namespace jcan.CelestialSystems
             public string ReferenceBodyInstanceId { get; }
 
             public CelestialTrajectoryDefinition Trajectory { get; }
+
+            public string ReferencePointInstanceId { get; }
         }
 
         private readonly BodySystemPlan[] bodySystems;
+
+        private readonly ReferencePointPlan[] referencePoints;
 
         private readonly UnityEngine.Object[] ownedRuntimeObjects;
 
@@ -65,7 +94,8 @@ namespace jcan.CelestialSystems
             string definitionId,
             IReadOnlyList<BodySystemPlan> bodySystems,
             IReadOnlyList<UnityEngine.Object> ownedRuntimeObjects = null,
-            CelestialProtoplanetaryDiskResult? formationDisk = null)
+            CelestialProtoplanetaryDiskResult? formationDisk = null,
+            IReadOnlyList<ReferencePointPlan> referencePoints = null)
         {
             DefinitionId = definitionId;
             FormationDisk = formationDisk;
@@ -73,6 +103,10 @@ namespace jcan.CelestialSystems
                 bodySystems == null
                     ? Array.Empty<BodySystemPlan>()
                     : Copy(bodySystems);
+            this.referencePoints =
+                referencePoints == null
+                    ? Array.Empty<ReferencePointPlan>()
+                    : Copy(referencePoints);
             this.ownedRuntimeObjects =
                 ownedRuntimeObjects == null
                     ? Array.Empty<UnityEngine.Object>()
@@ -85,6 +119,9 @@ namespace jcan.CelestialSystems
 
         public IReadOnlyList<BodySystemPlan> BodySystems =>
             bodySystems;
+
+        public IReadOnlyList<ReferencePointPlan> ReferencePoints =>
+            referencePoints;
 
         internal void ReleaseOwnedRuntimeObjects()
         {
@@ -101,6 +138,23 @@ namespace jcan.CelestialSystems
                     ownedRuntimeObjects[index]);
                 ownedRuntimeObjects[index] = null;
             }
+        }
+
+        private static ReferencePointPlan[] Copy(
+            IReadOnlyList<ReferencePointPlan> source)
+        {
+            var result =
+                new ReferencePointPlan[source.Count];
+
+            for (var index = 0;
+                index < source.Count;
+                index++)
+            {
+                result[index] =
+                    source[index];
+            }
+
+            return result;
         }
 
         private static BodySystemPlan[] Copy(

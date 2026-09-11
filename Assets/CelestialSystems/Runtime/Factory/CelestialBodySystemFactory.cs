@@ -90,7 +90,7 @@ namespace jcan.CelestialSystems
             Quaternion rotation,
             Transform parent,
             CelestialBodySpawnMode? rootMotionModeOverride,
-            CelestialBodyRuntimeContext externalRootOrbitCenter,
+            ICelestialMotionStateSource externalRootOrbitCenter,
             CelestialTrajectoryDefinition externalRootTrajectory,
             out GeneratedSystem generatedSystem)
         {

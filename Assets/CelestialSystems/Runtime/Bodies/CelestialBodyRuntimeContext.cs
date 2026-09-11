@@ -11,7 +11,8 @@ namespace jcan.CelestialSystems
     [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
     public sealed class CelestialBodyRuntimeContext :
-        MonoBehaviour
+        MonoBehaviour,
+        ICelestialMotionStateSource
     {
         private const CelestialBodyReadiness RequiredPackageReadiness =
             CelestialBodyReadiness.Definition |

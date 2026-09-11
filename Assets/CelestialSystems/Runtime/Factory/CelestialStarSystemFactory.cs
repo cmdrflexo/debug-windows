@@ -16,6 +16,10 @@ namespace jcan.CelestialSystems
                 string,
                 CelestialBodySystemFactory.GeneratedSystem> bodySystems;
 
+            private readonly Dictionary<
+                string,
+                CelestialMotionReferencePoint> referencePoints;
+
             internal GeneratedSystem(
                 string instanceId,
                 int seed,
@@ -23,7 +27,8 @@ namespace jcan.CelestialSystems
                 CelestialGalacticEnvironmentDefinition environment,
                 CelestialStarSystemPlan plan,
                 Transform root,
-                Dictionary<string, CelestialBodySystemFactory.GeneratedSystem> bodySystems)
+                Dictionary<string, CelestialBodySystemFactory.GeneratedSystem> bodySystems,
+                Dictionary<string, CelestialMotionReferencePoint> referencePoints)
             {
                 InstanceId = instanceId;
                 Seed = seed;
@@ -32,6 +37,7 @@ namespace jcan.CelestialSystems
                 Plan = plan;
                 Root = root;
                 this.bodySystems = bodySystems;
+                this.referencePoints = referencePoints;
             }
 
             public string InstanceId { get; }
@@ -50,13 +56,22 @@ namespace jcan.CelestialSystems
                 string,
                 CelestialBodySystemFactory.GeneratedSystem> BodySystems =>
                     bodySystems;
+
+            public IReadOnlyDictionary<
+                string,
+                CelestialMotionReferencePoint> ReferencePoints =>
+                    referencePoints;
         }
+
+        private readonly CelestialBodyFactory bodyFactory;
 
         private readonly CelestialBodySystemFactory bodySystemFactory;
 
         public CelestialStarSystemFactory(
             CelestialBodyFactory bodyFactory)
         {
+            this.bodyFactory =
+                bodyFactory;
             bodySystemFactory =
                 new CelestialBodySystemFactory(
                     bodyFactory);
@@ -174,6 +189,61 @@ namespace jcan.CelestialSystems
                 parent,
                 false);
 
+            var generatedReferencePoints =
+                new Dictionary<
+                    string,
+                    CelestialMotionReferencePoint>(
+                        StringComparer.Ordinal);
+
+            foreach (var referencePointPlan in
+                plan.ReferencePoints)
+            {
+                var referenceObject =
+                    new GameObject(
+                        referencePointPlan.InstanceId);
+                referenceObject.transform.SetParent(
+                    root,
+                    false);
+                var provider =
+                    referenceObject.AddComponent<
+                        TrajectoryCelestialBodyMotionProvider>();
+                var referencePoint =
+                    referenceObject.AddComponent<
+                        CelestialMotionReferencePoint>();
+                var referenceInstanceId =
+                    $"{starSystemInstanceId}/{referencePointPlan.InstanceId}";
+
+                if (!referencePoint.Initialize(
+                        referenceInstanceId,
+                        referencePointPlan.MassKilograms,
+                        provider) ||
+                    !provider.InitializeInertial(
+                        bodyFactory.UniverseFrame,
+                        bodyFactory.CelestialTime,
+                        referenceObject.transform,
+                        positionMetersFromFrameOrigin +
+                            Rotate(
+                                rotation,
+                                referencePointPlan.PositionMetersFromStarSystemOrigin),
+                        velocityMetersPerSecond +
+                            Rotate(
+                                rotation,
+                                referencePointPlan.VelocityMetersPerSecond),
+                        rotation,
+                        new DoubleVector3()))
+                {
+                    UnityEngine.Object.Destroy(
+                        rootObject);
+                    plan.ReleaseOwnedRuntimeObjects();
+                    return SetError(
+                        $"Failed to create motion reference point '{referencePointPlan.InstanceId}'.");
+                }
+
+                generatedReferencePoints.Add(
+                    referencePointPlan.InstanceId,
+                    referencePoint);
+            }
+
             var generatedBodySystems =
                 new Dictionary<
                     string,
@@ -195,9 +265,27 @@ namespace jcan.CelestialSystems
                 {
                     var bodySystemPlan =
                         pendingBodySystems[index];
-                    CelestialBodyRuntimeContext referenceBody = null;
+                    ICelestialMotionStateSource referenceSource = null;
 
                     if (!string.IsNullOrWhiteSpace(
+                            bodySystemPlan.ReferencePointInstanceId))
+                    {
+                        if (!generatedReferencePoints.TryGetValue(
+                                bodySystemPlan.ReferencePointInstanceId,
+                                out var referencePoint))
+                        {
+                            RollBack(
+                                generatedBodySystems,
+                                rootObject,
+                                plan);
+                            return SetError(
+                                $"Star-system entry '{bodySystemPlan.InstanceId}' could not resolve reference point '{bodySystemPlan.ReferencePointInstanceId}'.");
+                        }
+
+                        referenceSource =
+                            referencePoint;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(
                             bodySystemPlan.ReferenceBodySystemInstanceId))
                     {
                         if (!generatedBodySystems.TryGetValue(
@@ -209,7 +297,7 @@ namespace jcan.CelestialSystems
 
                         if (!referenceBodySystem.TryGetBody(
                                 bodySystemPlan.ReferenceBodyInstanceId,
-                                out referenceBody))
+                                out var referenceBody))
                         {
                             RollBack(
                                 generatedBodySystems,
@@ -218,6 +306,9 @@ namespace jcan.CelestialSystems
                             return SetError(
                                 $"Star-system entry '{bodySystemPlan.InstanceId}' could not resolve reference body '{bodySystemPlan.ReferenceBodySystemInstanceId}/{bodySystemPlan.ReferenceBodyInstanceId}'.");
                         }
+
+                        referenceSource =
+                            referenceBody;
                     }
 
                     var bodySystemInstanceId =
@@ -238,7 +329,7 @@ namespace jcan.CelestialSystems
                                 bodySystemPlan.Rotation,
                             root,
                             bodySystemPlan.RootMotionModeOverride,
-                            referenceBody,
+                            referenceSource,
                             bodySystemPlan.Trajectory,
                             out var generatedBodySystem))
                     {
@@ -279,7 +370,8 @@ namespace jcan.CelestialSystems
                     environment,
                     plan,
                     root,
-                    generatedBodySystems);
+                    generatedBodySystems,
+                    generatedReferencePoints);
             return true;
         }
 
@@ -353,6 +445,31 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            var referencePointIds =
+                new HashSet<string>(
+                    StringComparer.Ordinal);
+
+            foreach (var referencePoint in
+                plan.ReferencePoints)
+            {
+                if (referencePoint == null ||
+                    string.IsNullOrWhiteSpace(
+                        referencePoint.InstanceId) ||
+                    !referencePointIds.Add(
+                        referencePoint.InstanceId) ||
+                    !IsFinitePositive(
+                        referencePoint.MassKilograms) ||
+                    !IsFinite(
+                        referencePoint.PositionMetersFromStarSystemOrigin) ||
+                    !IsFinite(
+                        referencePoint.VelocityMetersPerSecond))
+                {
+                    error =
+                        "A generated star-system plan contains an invalid or duplicate motion reference point.";
+                    return false;
+                }
+            }
+
             var instanceIds =
                 new HashSet<string>(
                     StringComparer.Ordinal);
@@ -399,15 +516,33 @@ namespace jcan.CelestialSystems
                     return false;
                 }
 
-                if (bodySystem.Trajectory != null &&
-                    (string.IsNullOrWhiteSpace(
-                        bodySystem.ReferenceBodySystemInstanceId) ||
-                    string.IsNullOrWhiteSpace(
-                        bodySystem.ReferenceBodyInstanceId)))
+                if (bodySystem.Trajectory != null)
                 {
-                    error =
-                        $"The star-system entry '{bodySystem.InstanceId}' trajectory requires a reference body system and body instance ID.";
-                    return false;
+                    var hasReferencePoint =
+                        !string.IsNullOrWhiteSpace(
+                            bodySystem.ReferencePointInstanceId);
+                    var hasCompleteBodyReference =
+                        !string.IsNullOrWhiteSpace(
+                            bodySystem.ReferenceBodySystemInstanceId) &&
+                        !string.IsNullOrWhiteSpace(
+                            bodySystem.ReferenceBodyInstanceId);
+
+                    if (hasReferencePoint ==
+                        hasCompleteBodyReference)
+                    {
+                        error =
+                            $"The star-system entry '{bodySystem.InstanceId}' trajectory requires exactly one body or motion-reference-point source.";
+                        return false;
+                    }
+
+                    if (hasReferencePoint &&
+                        !referencePointIds.Contains(
+                            bodySystem.ReferencePointInstanceId))
+                    {
+                        error =
+                            $"The star-system entry '{bodySystem.InstanceId}' references missing motion reference point '{bodySystem.ReferencePointInstanceId}'.";
+                        return false;
+                    }
                 }
 
                 if (!IsFinite(
@@ -426,7 +561,9 @@ namespace jcan.CelestialSystems
             foreach (var bodySystem in
                 plan.BodySystems)
             {
-                if (string.IsNullOrWhiteSpace(
+                if (!string.IsNullOrWhiteSpace(
+                        bodySystem.ReferencePointInstanceId) ||
+                    string.IsNullOrWhiteSpace(
                         bodySystem.ReferenceBodySystemInstanceId))
                 {
                     continue;
@@ -523,6 +660,14 @@ namespace jcan.CelestialSystems
                     (scalar * scalar - axisSquared) +
                 axisCrossVector *
                     (2.0 * scalar);
+        }
+
+        private static bool IsFinitePositive(
+            double value)
+        {
+            return
+                IsFinite(value) &&
+                value > 0.0;
         }
 
         private static bool IsFinite(
