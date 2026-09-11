@@ -4,6 +4,9 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -12,6 +15,18 @@ namespace jcan.CelestialSystems
     public sealed class CelestialUniverseRuntimeController :
         MonoBehaviour
     {
+        private const double SolarMassKilograms =
+            1.98847e30;
+
+        private const double SolarRadiusMeters =
+            6.957e8;
+
+        private const double EarthMassKilograms =
+            5.9722e24;
+
+        private const double EarthRadiusMeters =
+            6371000.0;
+
         [Header("Factory")]
         [SerializeField]
         private CelestialBodyFactory bodyFactory;
@@ -59,6 +74,11 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private bool generateOnStart = true;
+
+        [Header("Development")]
+        [SerializeField]
+        [Tooltip("Print a compact star-and-planet summary after generation.")]
+        private bool logGeneratedStarSystemSummary = true;
 
         [Header("Runtime")]
         [SerializeField]
@@ -267,6 +287,12 @@ namespace jcan.CelestialSystems
 
                 SetObservationMarkerToBarycenter(
                     starSystem);
+
+                if (logGeneratedStarSystemSummary)
+                {
+                    LogStarSystemSummary(
+                        starSystem);
+                }
             }
 
             return true;
@@ -291,6 +317,214 @@ namespace jcan.CelestialSystems
             generatedUniverse = null;
             ResetRuntimeSummary();
             return true;
+        }
+
+        private void LogStarSystemSummary(
+            CelestialStarSystemFactory.GeneratedSystem starSystem)
+        {
+            CelestialBodyDefinition star = null;
+            var planets =
+                new List<CelestialBodyDefinition>();
+
+            foreach (var bodySystem in
+                starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in
+                    bodySystem.Bodies.Values)
+                {
+                    var definition =
+                        body != null
+                            ? body.Definition
+                            : null;
+
+                    if (definition == null)
+                    {
+                        continue;
+                    }
+
+                    if (definition.HasStellarProperties)
+                    {
+                        star ??= definition;
+                    }
+                    else if (definition.HasPlanetFormationProperties)
+                    {
+                        planets.Add(
+                            definition);
+                    }
+                }
+            }
+
+            planets.Sort(
+                (left, right) =>
+                    ResolvePresentOrbit(left).CompareTo(
+                        ResolvePresentOrbit(right)));
+
+            var builder =
+                new StringBuilder();
+            builder.Append(
+                "Generated star system '");
+            builder.Append(
+                starSystem.InstanceId);
+            builder.Append(
+                "' (seed ");
+            builder.Append(
+                starSystem.Seed);
+            builder.AppendLine(
+                "):");
+
+            if (star != null)
+            {
+                AppendSummaryLine(
+                    builder,
+                    "star",
+                    DescribeStarClassification(
+                        star),
+                    star.MassKilograms /
+                        SolarMassKilograms,
+                    "Solar masses",
+                    star.ReferenceRadiusMeters /
+                        SolarRadiusMeters,
+                    "Solar radii");
+            }
+
+            for (var index = 0;
+                index < planets.Count;
+                index++)
+            {
+                var planet =
+                    planets[index];
+
+                AppendSummaryLine(
+                    builder,
+                    $"planet {index + 1}",
+                    DescribePlanetClassification(
+                        planet.PlanetFormationClass),
+                    planet.MassKilograms /
+                        EarthMassKilograms,
+                    "Earth masses",
+                    planet.ReferenceRadiusMeters /
+                        EarthRadiusMeters,
+                    "Earth radii");
+            }
+
+            Debug.Log(
+                builder.ToString().TrimEnd(),
+                this);
+        }
+
+        private static void AppendSummaryLine(
+            StringBuilder builder,
+            string label,
+            string classification,
+            double mass,
+            string massUnit,
+            double radius,
+            string radiusUnit)
+        {
+            builder.Append(
+                label.PadRight(
+                    9));
+            builder.Append(
+                "- ");
+            builder.Append(
+                classification.PadRight(
+                    31));
+            builder.Append(
+                " [");
+            builder.Append(
+                FormatSummaryValue(
+                    mass).PadLeft(
+                        10));
+            builder.Append(
+                " ");
+            builder.Append(
+                massUnit.PadRight(
+                    12));
+            builder.Append(
+                "] [");
+            builder.Append(
+                FormatSummaryValue(
+                    radius).PadLeft(
+                        7));
+            builder.Append(
+                " ");
+            builder.Append(
+                radiusUnit);
+            builder.AppendLine(
+                "]");
+        }
+
+        private static string DescribeStarClassification(
+            CelestialBodyDefinition star)
+        {
+            switch (star.StellarEvolutionState)
+            {
+                case CelestialStellarEvolutionState.WhiteDwarf:
+                    return "white dwarf";
+                case CelestialStellarEvolutionState.NeutronStar:
+                    return "neutron star";
+                case CelestialStellarEvolutionState.BlackHole:
+                    return "stellar-mass black hole";
+                case CelestialStellarEvolutionState.MainSequence:
+                    var massSolar =
+                        star.MassKilograms /
+                        SolarMassKilograms;
+
+                    if (massSolar < 0.5)
+                    {
+                        return "low-mass main-sequence star";
+                    }
+
+                    if (massSolar < 1.5)
+                    {
+                        return "solar-type main-sequence star";
+                    }
+
+                    return "intermediate-mass main-sequence star";
+                default:
+                    return "unclassified star";
+            }
+        }
+
+        private static string DescribePlanetClassification(
+            CelestialPlanetFormationClass formationClass)
+        {
+            switch (formationClass)
+            {
+                case CelestialPlanetFormationClass.Rocky:
+                    return "rocky planet";
+                case CelestialPlanetFormationClass.VolatileRich:
+                    return "volatile-rich planet";
+                case CelestialPlanetFormationClass.GasRich:
+                    return "gas-rich planet";
+                case CelestialPlanetFormationClass.Giant:
+                    return "giant planet";
+                default:
+                    return "unclassified planet";
+            }
+        }
+
+        private static double ResolvePresentOrbit(
+            CelestialBodyDefinition planet)
+        {
+            return
+                planet.HasPostMainSequenceProperties
+                    ? planet.PlanetPresentOrbitAstronomicalUnits
+                    : planet.PlanetFinalOrbitAstronomicalUnits;
+        }
+
+        private static string FormatSummaryValue(
+            double value)
+        {
+            return
+                value.ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture);
         }
 
         private void SetObservationMarkerToBarycenter(
