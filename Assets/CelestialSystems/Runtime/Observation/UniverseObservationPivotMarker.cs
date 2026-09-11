@@ -1,22 +1,21 @@
 /*
- * Places and orients a visual marker at the universe observation pivot.
+ * Generates a scale-aware pivot marker as a child decoration of the observation grid.
  */
 
 using System;
-using SpaceGraphicsToolkit;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
     [DefaultExecutionOrder(380)]
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(SgtFloatingObject))]
+    [RequireComponent(typeof(UniverseObservationGridRenderer))]
     public sealed class UniverseObservationPivotMarker : MonoBehaviour
     {
-        [Header("References")]
-        [SerializeField]
-        private UniverseObservationAnchorController observationController;
+        private const string GeneratedVisualName = "Generated Observation Pivot Marker";
 
+        [Header("References")]
+        [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField]
         [Tooltip("Optional moving point that the marker's local Z axis faces.")]
         private CelestialBodyRuntimeContext directionReferenceContext;
@@ -25,78 +24,92 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("Use the observation target when no explicit direction reference is assigned.")]
         private bool useObservationTargetWhenUnset = true;
+        [SerializeField] private bool hasDirectionReferencePosition;
+        [SerializeField] private UniversePosition directionReferencePosition;
 
+        [Header("Marker")]
+        [SerializeField] private Material markerMaterial;
         [SerializeField]
-        private bool hasDirectionReferencePosition;
-
+        [Tooltip("Marker width as a fraction of the camera's observation distance.")]
+        [Min(0.000001f)]
+        private float relativeSize = 0.05f;
         [SerializeField]
-        private UniversePosition directionReferencePosition;
-
-        [Header("Rendering")]
-        [SerializeField]
-        private Renderer markerRenderer;
-
-        [SerializeField]
-        private bool visible = true;
+        [Tooltip("Small lift above the grid as a fraction of marker size.")]
+        [Min(0.0f)]
+        private float planeOffsetFraction = 0.001f;
+        [SerializeField] private bool visible = true;
 
         [Header("Runtime")]
-        [SerializeField]
-        private bool hasPivotPosition;
+        [SerializeField] private bool hasPivotPosition;
+        [SerializeField] private UniversePosition pivotPosition;
+        [SerializeField] private bool hasResolvedDirectionReference;
+        [SerializeField] private UniversePosition resolvedDirectionReferencePosition;
 
-        [SerializeField]
-        private UniversePosition pivotPosition;
+        private Transform markerVisual;
+        private MeshRenderer markerRenderer;
+        private Mesh generatedMesh;
 
-        [SerializeField]
-        private bool hasResolvedDirectionReference;
-
-        [SerializeField]
-        private UniversePosition resolvedDirectionReferencePosition;
-
-        private SgtFloatingObject floatingObject;
-
-        public UniverseObservationAnchorController ObservationController =>
-            observationController;
-
-        public CelestialBodyRuntimeContext DirectionReferenceContext =>
-            directionReferenceContext;
-
+        public UniverseObservationAnchorController ObservationController => observationController;
+        public CelestialBodyRuntimeContext DirectionReferenceContext => directionReferenceContext;
         public bool HasPivotPosition => hasPivotPosition;
-
         public UniversePosition PivotPosition => pivotPosition;
-
         public bool HasDirectionReference => hasResolvedDirectionReference;
+        public UniversePosition DirectionReferencePosition => resolvedDirectionReferencePosition;
 
-        public UniversePosition DirectionReferencePosition =>
-            resolvedDirectionReferencePosition;
+        public float RelativeSize
+        {
+            get => relativeSize;
+            set => relativeSize = Mathf.Max(0.000001f, value);
+        }
+
+        public Material MarkerMaterial
+        {
+            get => markerMaterial;
+            set
+            {
+                markerMaterial = value;
+                ApplyMaterial();
+            }
+        }
 
         private void Awake()
         {
             ResolveReferences();
+            EnsureGeneratedVisual();
         }
 
         private void OnEnable()
         {
             ResolveReferences();
+            EnsureGeneratedVisual();
+        }
+
+        private void OnDestroy()
+        {
+            if (generatedMesh != null)
+            {
+                Destroy(generatedMesh);
+            }
+        }
+
+        private void OnValidate()
+        {
+            relativeSize = Mathf.Max(0.000001f, relativeSize);
+            planeOffsetFraction = Mathf.Max(0.0f, planeOffsetFraction);
+            ApplyMaterial();
         }
 
         private void LateUpdate()
         {
             ResolveReferences();
+            EnsureGeneratedVisual();
 
-            if (!visible ||
-                observationController == null ||
-                floatingObject == null ||
+            if (!visible || observationController == null || markerVisual == null ||
                 !observationController.TryGetObservationPlane(
                     out var currentPivotPosition,
                     out var planeRight,
                     out var planeForward,
-                    out var planeUp) ||
-                !SgtUniversePositionConverter.TryToSgtPosition(
-                    currentPivotPosition,
-                    0.0,
-                    0.0,
-                    0.0,
-                    out var markerPosition))
+                    out var planeUp))
             {
                 hasPivotPosition = false;
                 hasResolvedDirectionReference = false;
@@ -106,9 +119,6 @@ namespace jcan.CelestialSystems
 
             pivotPosition = currentPivotPosition;
             hasPivotPosition = true;
-            floatingObject.SetPosition(markerPosition);
-            floatingObject.ApplyPosition();
-
             var markerForward = planeForward;
 
             if (TryResolveDirectionReference(out var referencePosition))
@@ -131,19 +141,28 @@ namespace jcan.CelestialSystems
                 hasResolvedDirectionReference = false;
             }
 
-            transform.rotation = Quaternion.LookRotation(
-                markerForward,
-                planeUp);
+            markerVisual.rotation = Quaternion.LookRotation(markerForward, planeUp);
+
+            var worldSize = Math.Max(
+                0.000001,
+                observationController.DistanceMeters * relativeSize);
+            var parentScale = transform.lossyScale;
+            var scaleCompensation = Math.Max(
+                0.000001,
+                Math.Max(Math.Abs(parentScale.x), Math.Abs(parentScale.z)));
+            var localSize = (float)(worldSize / scaleCompensation);
+            markerVisual.localScale = Vector3.one * localSize;
+            markerVisual.position =
+                transform.position +
+                planeUp * (float)(worldSize * planeOffsetFraction);
             SetRendererVisible(true);
         }
 
-        public void SetDirectionReference(
-            CelestialBodyRuntimeContext context)
+        public void SetDirectionReference(CelestialBodyRuntimeContext context)
         {
             directionReferenceContext = context;
 
-            if (context != null &&
-                context.TryGetMotionState(out var motionState))
+            if (context != null && context.TryGetMotionState(out var motionState))
             {
                 directionReferencePosition = motionState.Position;
                 hasDirectionReferencePosition = true;
@@ -174,12 +193,10 @@ namespace jcan.CelestialSystems
             }
         }
 
-        private bool TryResolveDirectionReference(
-            out UniversePosition position)
+        private bool TryResolveDirectionReference(out UniversePosition position)
         {
             if (directionReferenceContext != null &&
-                directionReferenceContext.TryGetMotionState(
-                    out var directionMotion))
+                directionReferenceContext.TryGetMotionState(out var directionMotion))
             {
                 position = directionMotion.Position;
                 directionReferencePosition = position;
@@ -195,10 +212,8 @@ namespace jcan.CelestialSystems
 
             var observationTarget = observationController.Target;
 
-            if (useObservationTargetWhenUnset &&
-                observationTarget != null &&
-                observationTarget.TryGetMotionState(
-                    out var targetMotion))
+            if (useObservationTargetWhenUnset && observationTarget != null &&
+                observationTarget.TryGetMotionState(out var targetMotion))
             {
                 position = targetMotion.Position;
                 return true;
@@ -215,12 +230,40 @@ namespace jcan.CelestialSystems
                 observationController =
                     FindFirstObjectByType<UniverseObservationAnchorController>();
             }
+        }
 
-            floatingObject ??= GetComponent<SgtFloatingObject>();
-
-            if (markerRenderer == null)
+        private void EnsureGeneratedVisual()
+        {
+            if (markerVisual != null)
             {
-                markerRenderer = GetComponentInChildren<Renderer>();
+                return;
+            }
+
+            var existing = transform.Find(GeneratedVisualName);
+
+            if (existing != null)
+            {
+                markerVisual = existing;
+                markerRenderer = existing.GetComponent<MeshRenderer>();
+                ApplyMaterial();
+                return;
+            }
+
+            var visualObject = new GameObject(GeneratedVisualName);
+            markerVisual = visualObject.transform;
+            markerVisual.SetParent(transform, false);
+            var meshFilter = visualObject.AddComponent<MeshFilter>();
+            markerRenderer = visualObject.AddComponent<MeshRenderer>();
+            generatedMesh = CreatePlaneMesh();
+            meshFilter.sharedMesh = generatedMesh;
+            ApplyMaterial();
+        }
+
+        private void ApplyMaterial()
+        {
+            if (markerRenderer != null)
+            {
+                markerRenderer.sharedMaterial = markerMaterial;
             }
         }
 
@@ -232,6 +275,36 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private static Mesh CreatePlaneMesh()
+        {
+            var mesh = new Mesh
+            {
+                name = "Generated Observation Pivot Marker Plane",
+                vertices = new[]
+                {
+                    new Vector3(-0.5f, 0.0f, -0.5f),
+                    new Vector3(-0.5f, 0.0f, 0.5f),
+                    new Vector3(0.5f, 0.0f, 0.5f),
+                    new Vector3(0.5f, 0.0f, -0.5f)
+                },
+                uv = new[]
+                {
+                    new Vector2(0.0f, 0.0f),
+                    new Vector2(0.0f, 1.0f),
+                    new Vector2(1.0f, 1.0f),
+                    new Vector2(1.0f, 0.0f)
+                },
+                normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up },
+                triangles = new[]
+                {
+                    0, 1, 2, 0, 2, 3,
+                    2, 1, 0, 3, 2, 0
+                }
+            };
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
         private static bool TryGetPlanarDirection(
             UniversePosition from,
             UniversePosition to,
@@ -239,43 +312,26 @@ namespace jcan.CelestialSystems
             Vector3 planeForward,
             out Vector3 direction)
         {
-            var deltaX =
-                ((double)to.CellX - from.CellX) *
-                    UniversePosition.CellSizeMeters +
-                to.LocalXMeters -
-                from.LocalXMeters;
-            var deltaY =
-                ((double)to.CellY - from.CellY) *
-                    UniversePosition.CellSizeMeters +
-                to.LocalYMeters -
-                from.LocalYMeters;
-            var deltaZ =
-                ((double)to.CellZ - from.CellZ) *
-                    UniversePosition.CellSizeMeters +
-                to.LocalZMeters -
-                from.LocalZMeters;
-            var right =
-                deltaX * planeRight.x +
-                deltaY * planeRight.y +
+            var deltaX = ((double)to.CellX - from.CellX) *
+                UniversePosition.CellSizeMeters + to.LocalXMeters - from.LocalXMeters;
+            var deltaY = ((double)to.CellY - from.CellY) *
+                UniversePosition.CellSizeMeters + to.LocalYMeters - from.LocalYMeters;
+            var deltaZ = ((double)to.CellZ - from.CellZ) *
+                UniversePosition.CellSizeMeters + to.LocalZMeters - from.LocalZMeters;
+            var right = deltaX * planeRight.x + deltaY * planeRight.y +
                 deltaZ * planeRight.z;
-            var forward =
-                deltaX * planeForward.x +
-                deltaY * planeForward.y +
+            var forward = deltaX * planeForward.x + deltaY * planeForward.y +
                 deltaZ * planeForward.z;
-            var magnitude = Math.Sqrt(
-                right * right +
-                forward * forward);
+            var magnitude = Math.Sqrt(right * right + forward * forward);
 
-            if (magnitude <= 1.0e-9 ||
-                double.IsNaN(magnitude) ||
+            if (magnitude <= 1.0e-9 || double.IsNaN(magnitude) ||
                 double.IsInfinity(magnitude))
             {
                 direction = default;
                 return false;
             }
 
-            direction =
-                planeRight * (float)(right / magnitude) +
+            direction = planeRight * (float)(right / magnitude) +
                 planeForward * (float)(forward / magnitude);
             direction.Normalize();
             return true;
