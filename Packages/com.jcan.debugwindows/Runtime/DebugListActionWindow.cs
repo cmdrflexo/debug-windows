@@ -1,5 +1,5 @@
 /*
- * Provides a reusable scrollable list with side actions, a text input, and one input action.
+ * Provides a reusable scrollable list with side actions, one or more input fields, and one input action.
  */
 
 using System;
@@ -45,30 +45,69 @@ namespace jcan.DebugWindows
         public bool ShowFeedbackOnInvoke { get; }
     }
 
+    public sealed class DebugListInput
+    {
+        public DebugListInput(
+            string uniqueId,
+            string label,
+            TMP_InputField.ContentType contentType =
+                TMP_InputField.ContentType.Standard,
+            float widthWeight = 1.0f)
+        {
+            if (string.IsNullOrWhiteSpace(uniqueId))
+                throw new ArgumentException(
+                    "A list input requires a unique ID.",
+                    nameof(uniqueId));
+
+            UniqueId = uniqueId.Trim();
+            Label = label ?? string.Empty;
+            ContentType = contentType;
+            WidthWeight = Mathf.Max(0.01f, widthWeight);
+        }
+
+        public string UniqueId { get; }
+        public string Label { get; }
+        public TMP_InputField.ContentType ContentType { get; }
+        public float WidthWeight { get; }
+    }
+
     public sealed class DebugListActionInvocation
     {
         internal DebugListActionInvocation(
             string actionId,
             IReadOnlyList<DebugListItem> items,
             DebugListItem selectedItem,
-            string inputText)
+            string inputText,
+            IReadOnlyDictionary<string, string> inputValues)
         {
             ActionId = actionId;
             Items = items;
             SelectedItem = selectedItem;
             InputText = inputText;
+            InputValues = inputValues;
         }
 
         public string ActionId { get; }
         public IReadOnlyList<DebugListItem> Items { get; }
         public DebugListItem SelectedItem { get; }
         public string InputText { get; }
+        public IReadOnlyDictionary<string, string> InputValues { get; }
+
+        public string GetInputText(string inputId)
+        {
+            return inputId != null &&
+                InputValues != null &&
+                InputValues.TryGetValue(inputId, out var value)
+                    ? value
+                    : string.Empty;
+        }
     }
 
     public sealed class DebugListActionWindow
     {
         private readonly List<DebugListItem> items = new List<DebugListItem>();
-        private string inputText = string.Empty;
+        private readonly Dictionary<string, string> inputValues =
+            new Dictionary<string, string>(StringComparer.Ordinal);
 
         public DebugListActionWindow(
             string uniqueId,
@@ -78,6 +117,29 @@ namespace jcan.DebugWindows
             Vector2 preferredContentSize,
             DebugWindowDisplayState defaultState = DebugWindowDisplayState.Closed,
             Vector2? defaultPosition = null)
+            : this(
+                uniqueId,
+                title,
+                sideActions,
+                new[] { new DebugListInput("input", string.Empty) },
+                inputAction,
+                preferredContentSize,
+                defaultState,
+                defaultPosition,
+                true)
+        {
+        }
+
+        public DebugListActionWindow(
+            string uniqueId,
+            string title,
+            IReadOnlyList<DebugListAction> sideActions,
+            IReadOnlyList<DebugListInput> inputs,
+            DebugListAction inputAction,
+            Vector2 preferredContentSize,
+            DebugWindowDisplayState defaultState = DebugWindowDisplayState.Closed,
+            Vector2? defaultPosition = null,
+            bool populatePrimaryInputOnSelection = false)
         {
             if (string.IsNullOrWhiteSpace(uniqueId))
                 throw new ArgumentException("A list-action window requires a unique ID.", nameof(uniqueId));
@@ -87,7 +149,28 @@ namespace jcan.DebugWindows
             UniqueId = uniqueId.Trim();
             Title = title.Trim();
             SideActions = sideActions ?? Array.Empty<DebugListAction>();
+            Inputs = inputs != null && inputs.Count > 0
+                ? inputs
+                : new[] { new DebugListInput("input", string.Empty) };
             InputAction = inputAction;
+            PopulatePrimaryInputOnSelection =
+                populatePrimaryInputOnSelection;
+
+            for (var i = 0; i < Inputs.Count; i++)
+            {
+                var input = Inputs[i];
+                if (input == null)
+                    continue;
+                if (inputValues.ContainsKey(input.UniqueId))
+                {
+                    throw new ArgumentException(
+                        $"Duplicate list input ID '{input.UniqueId}'.",
+                        nameof(inputs));
+                }
+
+                inputValues.Add(input.UniqueId, string.Empty);
+            }
+
             PreferredContentSize = new Vector2(
                 Mathf.Max(180.0f, preferredContentSize.x),
                 Mathf.Max(120.0f, preferredContentSize.y));
@@ -98,16 +181,18 @@ namespace jcan.DebugWindows
         public string UniqueId { get; }
         public string Title { get; }
         public IReadOnlyList<DebugListAction> SideActions { get; }
+        public IReadOnlyList<DebugListInput> Inputs { get; }
         public DebugListAction InputAction { get; }
+        public bool PopulatePrimaryInputOnSelection { get; }
         public Vector2 PreferredContentSize { get; }
         public DebugWindowDisplayState DefaultState { get; }
         public Vector2 DefaultPosition { get; }
         public IReadOnlyList<DebugListItem> Items => items;
-        public string InputText => inputText;
+        public string InputText => GetPrimaryInputText();
 
         public event Action<DebugListActionInvocation> ActionInvoked;
         internal event Action ItemsChanged;
-        internal event Action<string> InputTextChanged;
+        internal event Action<string, string> InputTextChanged;
         internal event Action<string> FeedbackRequested;
 
         public DebugWindowRegistration CreateRegistration()
@@ -122,8 +207,29 @@ namespace jcan.DebugWindows
 
         public void SetInputText(string value)
         {
-            inputText = value ?? string.Empty;
-            InputTextChanged?.Invoke(inputText);
+            var primaryId = GetPrimaryInputId();
+            if (primaryId != null)
+                SetInputText(primaryId, value);
+        }
+
+        public void SetInputText(string inputId, string value)
+        {
+            if (string.IsNullOrWhiteSpace(inputId) ||
+                !inputValues.ContainsKey(inputId))
+            {
+                return;
+            }
+
+            inputValues[inputId] = value ?? string.Empty;
+            InputTextChanged?.Invoke(inputId, inputValues[inputId]);
+        }
+
+        public string GetInputText(string inputId)
+        {
+            return inputId != null &&
+                inputValues.TryGetValue(inputId, out var value)
+                    ? value
+                    : string.Empty;
         }
 
         public void ShowActionFeedback(string actionId)
@@ -152,9 +258,29 @@ namespace jcan.DebugWindows
             DebugListActionControl.Create(content, this);
         }
 
-        internal void UpdateInputText(string value)
+        internal void UpdateInputText(string inputId, string value)
         {
-            inputText = value ?? string.Empty;
+            if (inputId != null && inputValues.ContainsKey(inputId))
+                inputValues[inputId] = value ?? string.Empty;
+        }
+
+        private string GetPrimaryInputId()
+        {
+            for (var i = 0; i < Inputs.Count; i++)
+            {
+                if (Inputs[i] != null)
+                    return Inputs[i].UniqueId;
+            }
+
+            return null;
+        }
+
+        private string GetPrimaryInputText()
+        {
+            var primaryId = GetPrimaryInputId();
+            return primaryId != null
+                ? GetInputText(primaryId)
+                : string.Empty;
         }
 
         internal void Invoke(string actionId, DebugListItem selectedItem)
@@ -163,7 +289,10 @@ namespace jcan.DebugWindows
                 actionId,
                 items.ToArray(),
                 selectedItem,
-                inputText));
+                GetPrimaryInputText(),
+                new Dictionary<string, string>(
+                    inputValues,
+                    StringComparer.Ordinal)));
         }
     }
 
@@ -172,7 +301,8 @@ namespace jcan.DebugWindows
         private DebugWindowContent windowContent;
         private DebugListActionWindow definition;
         private RectTransform listContent;
-        private TMP_InputField input;
+        private readonly Dictionary<string, TMP_InputField> inputs =
+            new Dictionary<string, TMP_InputField>(StringComparer.Ordinal);
         private DebugListItem selectedItem;
         private readonly Dictionary<string, DebugButtonFeedback> actionFeedback =
             new Dictionary<string, DebugButtonFeedback>(StringComparer.Ordinal);
@@ -210,7 +340,16 @@ namespace jcan.DebugWindows
             definition.ItemsChanged += RebuildItems;
             definition.InputTextChanged += SetInputText;
             definition.FeedbackRequested += ShowFeedback;
-            SetInputText(definition.InputText);
+            for (var i = 0; i < definition.Inputs.Count; i++)
+            {
+                var inputDefinition = definition.Inputs[i];
+                if (inputDefinition != null)
+                {
+                    SetInputText(
+                        inputDefinition.UniqueId,
+                        definition.GetInputText(inputDefinition.UniqueId));
+                }
+            }
             RebuildItems();
         }
 
@@ -346,26 +485,106 @@ namespace jcan.DebugWindows
         private void BuildInputRow(RectTransform parent)
         {
             var row = DebugWindowUi.CreateRect("Input Row", parent);
-            var rowSize = row.gameObject.AddComponent<LayoutElement>();
-            rowSize.preferredHeight =
+            var hasLabels = false;
+            for (var i = 0; i < definition.Inputs.Count; i++)
+            {
+                if (definition.Inputs[i] != null &&
+                    !string.IsNullOrWhiteSpace(definition.Inputs[i].Label))
+                {
+                    hasLabels = true;
+                    break;
+                }
+            }
+
+            var controlHeight =
                 windowContent.Manager.TextSize +
                 windowContent.Manager.ControlVerticalPadding * 2.0f;
+            var rowSize = row.gameObject.AddComponent<LayoutElement>();
+            rowSize.preferredHeight = hasLabels
+                ? controlHeight * 2.0f + windowContent.Manager.Spacing
+                : controlHeight;
             rowSize.flexibleHeight = 0.0f;
 
             var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = windowContent.Manager.Spacing;
+            layout.childAlignment = TextAnchor.LowerLeft;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandHeight = false;
 
-            var inputFrame = DebugWindowUi.CreateRect("Input", row);
-            var inputSize = inputFrame.gameObject.AddComponent<LayoutElement>();
-            inputSize.flexibleWidth = 1.0f;
+            for (var i = 0; i < definition.Inputs.Count; i++)
+            {
+                var inputDefinition = definition.Inputs[i];
+                if (inputDefinition != null)
+                    BuildInput(row, inputDefinition, hasLabels);
+            }
+
+            var action = definition.InputAction;
+            if (action != null)
+            {
+                var button = DebugWindowUi.CreateButton(
+                    action.ActionId,
+                    row,
+                    action.Text,
+                    windowContent.Manager.TextSize,
+                    windowContent.Manager.ButtonColor,
+                    windowContent.Manager.TextColor,
+                    () => Invoke(action.ActionId),
+                    Mathf.Max(
+                        64.0f,
+                        windowContent.Manager.MinimumWindowWidth * 0.4f),
+                    windowContent.Manager.ControlHorizontalPadding,
+                    windowContent.Manager.ControlVerticalPadding,
+                    action.FeedbackMessage,
+                    action.FeedbackDuration,
+                    action.ShowFeedbackOnInvoke);
+                RememberFeedback(action.ActionId, button);
+            }
+        }
+
+        private void BuildInput(
+            RectTransform parent,
+            DebugListInput inputDefinition,
+            bool reserveLabelSpace)
+        {
+            var group = DebugWindowUi.CreateRect(
+                inputDefinition.UniqueId,
+                parent);
+            var groupSize = group.gameObject.AddComponent<LayoutElement>();
+            groupSize.flexibleWidth = inputDefinition.WidthWeight;
+
+            var groupLayout =
+                group.gameObject.AddComponent<VerticalLayoutGroup>();
+            groupLayout.spacing = windowContent.Manager.Spacing;
+            groupLayout.childControlWidth = true;
+            groupLayout.childControlHeight = true;
+            groupLayout.childForceExpandWidth = true;
+            groupLayout.childForceExpandHeight = false;
+
+            if (reserveLabelSpace)
+            {
+                var label = DebugWindowUi.CreateText(
+                    "Label",
+                    group,
+                    inputDefinition.Label,
+                    windowContent.Manager.TextSize,
+                    windowContent.Manager.TextColor,
+                    TextAlignmentOptions.MidlineLeft);
+                label.gameObject.AddComponent<LayoutElement>().preferredHeight =
+                    windowContent.Manager.TextSize +
+                    windowContent.Manager.ControlVerticalPadding * 2.0f;
+            }
+
+            var inputFrame = DebugWindowUi.CreateRect("Input", group);
+            var inputSize =
+                inputFrame.gameObject.AddComponent<LayoutElement>();
             inputSize.preferredHeight =
                 windowContent.Manager.TextSize +
                 windowContent.Manager.ControlVerticalPadding * 2.0f;
-            var inputImage = DebugWindowUi.AddImage(inputFrame.gameObject, windowContent.Manager.ElementColor);
+            var inputImage = DebugWindowUi.AddImage(
+                inputFrame.gameObject,
+                windowContent.Manager.ElementColor);
             if (windowContent.Manager.ListFrameSprite != null)
             {
                 inputImage.sprite = windowContent.Manager.ListFrameSprite;
@@ -394,44 +613,29 @@ namespace jcan.DebugWindows
             text.enableWordWrapping = false;
             text.overflowMode = TextOverflowModes.Overflow;
 
-            input = inputFrame.gameObject.AddComponent<TMP_InputField>();
+            var input = inputFrame.gameObject.AddComponent<TMP_InputField>();
             input.textViewport = textArea;
             input.textComponent = text;
             input.targetGraphic = inputImage;
             input.lineType = TMP_InputField.LineType.SingleLine;
+            input.contentType = inputDefinition.ContentType;
             input.richText = false;
             input.customCaretColor = true;
             input.caretColor = windowContent.Manager.AccentColor;
             input.selectionColor = windowContent.Manager.SelectionColor;
             input.caretWidth = 2;
-            input.onValueChanged.AddListener(definition.UpdateInputText);
+            input.onValueChanged.AddListener(
+                value => definition.UpdateInputText(
+                    inputDefinition.UniqueId,
+                    value));
 
-            var action = definition.InputAction;
-            if (action != null)
+            if (definition.InputAction != null)
             {
-                var submitActionId = action.ActionId;
-                input.onSubmit.AddListener(_ => Invoke(submitActionId));
+                var actionId = definition.InputAction.ActionId;
+                input.onSubmit.AddListener(_ => Invoke(actionId));
             }
 
-
-            if (action != null)
-            {
-                var button = DebugWindowUi.CreateButton(
-                    action.ActionId,
-                    row,
-                    action.Text,
-                    windowContent.Manager.TextSize,
-                    windowContent.Manager.ButtonColor,
-                    windowContent.Manager.TextColor,
-                    () => Invoke(action.ActionId),
-                    Mathf.Max(64.0f, windowContent.Manager.MinimumWindowWidth * 0.4f),
-                    windowContent.Manager.ControlHorizontalPadding,
-                    windowContent.Manager.ControlVerticalPadding,
-                    action.FeedbackMessage,
-                    action.FeedbackDuration,
-                    action.ShowFeedbackOnInvoke);
-                RememberFeedback(action.ActionId, button);
-            }
+            inputs.Add(inputDefinition.UniqueId, input);
         }
 
         private void RebuildItems()
@@ -480,7 +684,8 @@ namespace jcan.DebugWindows
         private void Select(DebugListItem item)
         {
             selectedItem = item;
-            definition.SetInputText(item?.DisplayName ?? string.Empty);
+            if (definition.PopulatePrimaryInputOnSelection)
+                definition.SetInputText(item?.DisplayName ?? string.Empty);
             RebuildItems();
         }
 
@@ -488,13 +693,19 @@ namespace jcan.DebugWindows
         {
             selectedItem = item;
             selectedImage.color = windowContent.Manager.SelectionColor;
-            definition.SetInputText(item?.DisplayName ?? string.Empty);
+            if (definition.PopulatePrimaryInputOnSelection)
+                definition.SetInputText(item?.DisplayName ?? string.Empty);
         }
 
-        private void SetInputText(string value)
+        private void SetInputText(string inputId, string value)
         {
-            if (input != null && input.text != value)
+            if (inputId != null &&
+                inputs.TryGetValue(inputId, out var input) &&
+                input != null &&
+                input.text != value)
+            {
                 input.SetTextWithoutNotify(value ?? string.Empty);
+            }
         }
 
         private void RememberFeedback(string actionId, Button button)
@@ -518,7 +729,12 @@ namespace jcan.DebugWindows
 
         private void Invoke(string actionId)
         {
-            definition.UpdateInputText(input.text);
+            foreach (var pair in inputs)
+            {
+                if (pair.Value != null)
+                    definition.UpdateInputText(pair.Key, pair.Value.text);
+            }
+
             definition.Invoke(actionId, selectedItem);
         }
     }
