@@ -7,7 +7,11 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
-    [DefaultExecutionOrder(-95)]
+    // Project body transforms only after the observation camera (order 50) has
+    // applied its pose and synchronously snapped the SGT/universe origin.
+    // TryGetMotionState evaluates on demand, so the camera can still query the
+    // current simulation state before this component's LateUpdate runs.
+    [DefaultExecutionOrder(100)]
     [DisallowMultipleComponent]
     public sealed class TrajectoryCelestialBodyMotionProvider :
         MonoBehaviour,
