@@ -507,6 +507,23 @@ namespace jcan.CelestialSystems
                 target != null &&
                 newTarget != null &&
                 viewInitialized;
+            var preservedPlaneElevationMeters = 0.0;
+
+            if (preserveDistance &&
+                TryGetObservationPlane(
+                    out var currentPivotPosition,
+                    out _,
+                    out _,
+                    out var planeUp) &&
+                newTarget.TryGetMotionState(out var newTargetMotion) &&
+                currentPivotPosition.TryGetOffsetMetersFrom(
+                    newTargetMotion.Position,
+                    out var pivotOffsetFromNewTarget))
+            {
+                preservedPlaneElevationMeters = Dot(
+                    pivotOffsetFromNewTarget,
+                    planeUp);
+            }
 
             target = newTarget;
             targetInstanceId =
@@ -515,8 +532,8 @@ namespace jcan.CelestialSystems
                     : string.Empty;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
-            planeElevationMeters = 0.0;
-            targetPlaneElevationMeters = 0.0;
+            planeElevationMeters = preservedPlaneElevationMeters;
+            targetPlaneElevationMeters = preservedPlaneElevationMeters;
             ClearPanVelocity();
             viewInitialized = preserveDistance;
             hasTargetMotion = false;
