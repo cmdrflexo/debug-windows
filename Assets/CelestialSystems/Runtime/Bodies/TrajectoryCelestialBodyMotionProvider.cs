@@ -316,10 +316,20 @@ namespace jcan.CelestialSystems
                 newTrajectory;
             referenceSource =
                 newReferenceSource;
-            referenceMassKilograms =
-                referenceSource.ConfiguredMassKilograms;
             orbitingMassKilograms =
                 newOrbitingMassKilograms;
+            referenceMassKilograms =
+                trajectory.GravitatingMassKilogramsOverride > 0.0
+                    ? trajectory.GravitatingMassKilogramsOverride -
+                        orbitingMassKilograms
+                    : referenceSource.ConfiguredMassKilograms;
+
+            if (!IsFinitePositive(
+                    referenceMassKilograms))
+            {
+                return Fail(
+                    "A trajectory's total gravitating-mass override must exceed the orbiting-body mass.");
+            }
             rotation =
                 initialRotation;
             angularVelocityRadiansPerSecond =

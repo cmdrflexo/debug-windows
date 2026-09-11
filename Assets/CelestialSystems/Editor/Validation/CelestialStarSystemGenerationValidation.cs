@@ -235,8 +235,9 @@ namespace jcan.CelestialSystems.Editor
                     {
                         stellarBodyCount++;
                         isRemnant =
+                            isRemnant ||
                             body.StellarEvolutionState !=
-                            CelestialStellarEvolutionState.MainSequence;
+                                CelestialStellarEvolutionState.MainSequence;
 
                         if (!PositiveFinite(
                                 body.MassKilograms) ||
@@ -329,10 +330,11 @@ namespace jcan.CelestialSystems.Editor
                 }
             }
 
-            if (stellarBodyCount != 1)
+            if (stellarBodyCount < 1 ||
+                stellarBodyCount > 2)
             {
                 error =
-                    $"Expected exactly one generated stellar body, but found {stellarBodyCount}.";
+                    $"Expected one or two generated stellar bodies, but found {stellarBodyCount}.";
                 return false;
             }
 

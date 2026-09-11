@@ -142,6 +142,47 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            var hasBinary = false;
+            var companionFormation = default(CelestialStellarCompanionFormation);
+            var companionPopulation = default(CelestialStellarPopulationSample);
+            var companionProperties = default(CelestialStellarEvolutionResult);
+
+            if (!CelestialStellarMultiplicityModel.TryGenerate(
+                    request.Seed,
+                    stellarPopulation.InitialMassSolar,
+                    request.Environment.IronMetallicityDex,
+                    request.Environment.BirthStellarDensityPerCubicParsec,
+                    out var multiplicity,
+                    out error))
+            {
+                return false;
+            }
+
+            // Triples remain data-model outcomes until the binary runtime path is validated.
+            if (multiplicity.Multiplicity == CelestialStellarMultiplicity.Binary)
+            {
+                companionFormation = multiplicity.Companions[0];
+                companionPopulation =
+                    CreatePopulationSample(
+                        companionFormation.BirthMassSolar,
+                        request.Environment.SystemAgeGigayears);
+
+                if (!CelestialStellarEvolutionModel.TryEvaluate(
+                        companionPopulation,
+                        request.Environment,
+                        out companionProperties,
+                        out error))
+                {
+                    return false;
+                }
+
+                hasBinary =
+                    IsBinarySceneCandidate(
+                        stellarProperties,
+                        companionProperties,
+                        companionFormation);
+            }
+
             if (!CelestialProtoplanetaryDiskModel.TryGenerate(
                     request.Seed,
                     stellarPopulation,
@@ -175,6 +216,25 @@ namespace jcan.CelestialSystems
                     outerPlanetOrbitMeters,
                     innerPlanetOrbitMeters *
                         2.0);
+
+            if (hasBinary)
+            {
+                var circumprimaryStableLimitMeters =
+                    companionFormation.PeriapsisAstronomicalUnits *
+                    0.2 *
+                    AstronomicalUnitMeters;
+                outerPlanetOrbitMeters =
+                    Math.Min(
+                        outerPlanetOrbitMeters,
+                        circumprimaryStableLimitMeters);
+
+                if (outerPlanetOrbitMeters <=
+                    innerPlanetOrbitMeters * 1.25)
+                {
+                    planetCount = 0;
+                }
+            }
+
             var initialPlanetOrbitsAu =
                 new double[planetCount];
 
@@ -230,7 +290,15 @@ namespace jcan.CelestialSystems
                     return false;
                 }
 
-                if (systemEvolution.Survived)
+                var stableInBinary =
+                    !hasBinary ||
+                    systemEvolution.PresentOrbitAstronomicalUnits *
+                        (1.0 + maximumPlanetEccentricity) <
+                    companionFormation.PeriapsisAstronomicalUnits *
+                        0.2;
+
+                if (systemEvolution.Survived &&
+                    stableInBinary)
                 {
                     survivingPlanets.Add(
                         new SurvivingPlanet(
@@ -249,10 +317,10 @@ namespace jcan.CelestialSystems
                     survivingPlanets);
             var bodySystems =
                 new List<CelestialStarSystemPlan.BodySystemPlan>(
-                    survivingPlanets.Count + 1);
+                    survivingPlanets.Count + (hasBinary ? 2 : 1));
             var ownedRuntimeObjects =
                 new List<UnityEngine.Object>(
-                    (survivingPlanets.Count + 1) *
+                    (survivingPlanets.Count + (hasBinary ? 2 : 1)) *
                     2);
             var starDescription =
                 CelestialObjectDescriptionGenerator.DescribeStar(
@@ -269,15 +337,109 @@ namespace jcan.CelestialSystems
             ownedRuntimeObjects.Add(
                 star);
 
-            bodySystems.Add(
-                CreateSingleBodySystem(
-                    "stellar",
-                    "star",
-                    star,
-                    starQualityProfile,
-                    new DoubleVector3(),
-                    new DoubleVector3(),
-                    ownedRuntimeObjects));
+            var referencePoints =
+                new List<CelestialStarSystemPlan.ReferencePointPlan>();
+
+            if (hasBinary)
+            {
+                var companionDescription =
+                    CelestialObjectDescriptionGenerator.DescribeStar(
+                        companionPopulation,
+                        companionProperties,
+                        request.Environment);
+                star.ConfigureRuntimeDescription(
+                    starDescription +
+                    " It is the primary member of a binary stellar system.");
+                var companion =
+                    CreateStellarDefinition(
+                        starDefinition,
+                        "generated-star-companion",
+                        random.NextInt(),
+                        companionProperties,
+                        companionDescription +
+                        " It is the secondary member of a binary stellar system.");
+                ownedRuntimeObjects.Add(
+                    companion);
+
+                var totalStellarMassKilograms =
+                    star.MassKilograms +
+                    companion.MassKilograms;
+                var primaryPeriapsisMeters =
+                    companionFormation.PeriapsisAstronomicalUnits *
+                    AstronomicalUnitMeters *
+                    companion.MassKilograms /
+                    totalStellarMassKilograms;
+                var companionPeriapsisMeters =
+                    companionFormation.PeriapsisAstronomicalUnits *
+                    AstronomicalUnitMeters *
+                    star.MassKilograms /
+                    totalStellarMassKilograms;
+                var phaseRadians =
+                    random.Next01() *
+                    Math.PI *
+                    2.0;
+                const string barycenterId =
+                    "stellar-barycenter";
+                referencePoints.Add(
+                    new CelestialStarSystemPlan.ReferencePointPlan(
+                        barycenterId,
+                        totalStellarMassKilograms,
+                        new DoubleVector3(),
+                        new DoubleVector3()));
+
+                bodySystems.Add(
+                    CreateSingleBodySystem(
+                        "stellar",
+                        "star",
+                        star,
+                        starQualityProfile,
+                        new DoubleVector3(),
+                        new DoubleVector3(),
+                        ownedRuntimeObjects,
+                        CreateConicTrajectory(
+                            barycenterId,
+                            primaryPeriapsisMeters,
+                            companionFormation.Eccentricity,
+                            phaseRadians,
+                            companionFormation.InclinationDegrees *
+                                Math.PI / 180.0,
+                            0.0,
+                            1.0,
+                            totalStellarMassKilograms),
+                        barycenterId));
+                bodySystems.Add(
+                    CreateSingleBodySystem(
+                        "stellar-companion",
+                        "star",
+                        companion,
+                        starQualityProfile,
+                        new DoubleVector3(),
+                        new DoubleVector3(),
+                        ownedRuntimeObjects,
+                        CreateConicTrajectory(
+                            barycenterId,
+                            companionPeriapsisMeters,
+                            companionFormation.Eccentricity,
+                            phaseRadians + Math.PI,
+                            companionFormation.InclinationDegrees *
+                                Math.PI / 180.0,
+                            0.0,
+                            1.0,
+                            totalStellarMassKilograms),
+                        barycenterId));
+            }
+            else
+            {
+                bodySystems.Add(
+                    CreateSingleBodySystem(
+                        "stellar",
+                        "star",
+                        star,
+                        starQualityProfile,
+                        new DoubleVector3(),
+                        new DoubleVector3(),
+                        ownedRuntimeObjects));
+            }
 
             for (var index = 0;
                 index < survivingPlanets.Count;
@@ -511,7 +673,8 @@ namespace jcan.CelestialSystems
                     planDefinitionId,
                     bodySystems,
                     ownedRuntimeObjects,
-                    formationDisk);
+                    formationDisk,
+                    referencePoints);
             error = string.Empty;
             return true;
         }
@@ -729,7 +892,9 @@ namespace jcan.CelestialSystems
             RoundMapMagicSurfaceQualityProfile qualityProfile,
             DoubleVector3 position,
             DoubleVector3 velocity,
-            ICollection<UnityEngine.Object> ownedRuntimeObjects)
+            ICollection<UnityEngine.Object> ownedRuntimeObjects,
+            CelestialTrajectoryDefinition trajectory = null,
+            string referencePointInstanceId = null)
         {
             var entry =
                 new CelestialBodySystemDefinition.BodyEntry(
@@ -761,7 +926,11 @@ namespace jcan.CelestialSystems
                     position,
                     velocity,
                     Quaternion.identity,
-                    CelestialBodySpawnMode.PrescribedTrajectory);
+                    CelestialBodySpawnMode.PrescribedTrajectory,
+                    null,
+                    null,
+                    trajectory,
+                    referencePointInstanceId);
         }
 
         private static CelestialStarSystemPlan.BodySystemPlan CreatePlanetaryBodySystem(
@@ -963,7 +1132,8 @@ namespace jcan.CelestialSystems
             double meanAnomalyRadians,
             double inclinationRadians,
             double argumentOfPeriapsisRadians,
-            double direction)
+            double direction,
+            double gravitatingMassKilogramsOverride = 0.0)
         {
             return
                 new CelestialTrajectoryDefinition(
@@ -985,7 +1155,57 @@ namespace jcan.CelestialSystems
                             Math.PI,
                         direction < 0.0
                             ? CelestialOrbitDirection.Retrograde
-                            : CelestialOrbitDirection.Prograde));
+                            : CelestialOrbitDirection.Prograde),
+                    gravitatingMassKilogramsOverride);
+        }
+
+        private static CelestialStellarPopulationSample CreatePopulationSample(
+            double birthMassSolar,
+            double systemAgeGigayears)
+        {
+            var lifetimeGigayears =
+                10.0 *
+                Math.Pow(
+                    birthMassSolar,
+                    -2.5);
+            CelestialStellarEvolutionState state;
+
+            if (systemAgeGigayears <= lifetimeGigayears)
+            {
+                state = CelestialStellarEvolutionState.MainSequence;
+            }
+            else if (birthMassSolar < 8.0)
+            {
+                state = CelestialStellarEvolutionState.WhiteDwarf;
+            }
+            else if (birthMassSolar < 25.0)
+            {
+                state = CelestialStellarEvolutionState.NeutronStar;
+            }
+            else
+            {
+                state = CelestialStellarEvolutionState.BlackHole;
+            }
+
+            return
+                new CelestialStellarPopulationSample(
+                    birthMassSolar,
+                    lifetimeGigayears,
+                    state);
+        }
+
+        public static bool IsBinarySceneCandidate(
+            CelestialStellarEvolutionResult primary,
+            CelestialStellarEvolutionResult companion,
+            CelestialStellarCompanionFormation formation)
+        {
+            var combinedRadiusAstronomicalUnits =
+                (primary.RadiusSolar + companion.RadiusSolar) *
+                SolarRadiusMeters /
+                AstronomicalUnitMeters;
+            return
+                formation.PeriapsisAstronomicalUnits >
+                    combinedRadiusAstronomicalUnits * 3.0;
         }
 
         private static int SelectPlanetCount(
