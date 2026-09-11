@@ -57,6 +57,13 @@ namespace jcan.CelestialSystems
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
 
+        public bool IsOriginLocked { get; private set; } = true;
+
+        public void LockToOrigin()
+        {
+            IsOriginLocked = true;
+        }
+
         public CelestialBodyRuntimeContext SelectedTarget => selectedTarget;
 
         public int SelectedTargetIndex => selectedTargetIndex;
@@ -93,7 +100,7 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
-            if (selectedTarget == null && automaticallySelectFirstTarget)
+            if (!IsOriginLocked && selectedTarget == null && automaticallySelectFirstTarget)
             {
                 RefreshTargets();
 
@@ -144,6 +151,7 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            IsOriginLocked = newTarget == null;
             var previousTarget = selectedTarget;
 
             if (previousTarget == newTarget)
