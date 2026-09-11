@@ -67,6 +67,10 @@ namespace jcan.CelestialSystems
 
         [Header("Observation")]
         [SerializeField]
+        [Tooltip("Grid whose cell alignment origin is the generated system barycenter.")]
+        private UniverseObservationGridRenderer observationGrid;
+
+        [SerializeField]
         [Tooltip("Optional grid pivot marker that will point toward the generated star system's barycenter.")]
         private UniverseObservationPivotMarker observationPivotMarker;
 
@@ -969,8 +973,10 @@ namespace jcan.CelestialSystems
             observationPivotMarker ??=
                 FindFirstObjectByType<UniverseObservationPivotMarker>();
 
-            if (observationPivotMarker == null ||
-                !TryCalculateBarycenter(
+            observationGrid ??=
+                FindFirstObjectByType<UniverseObservationGridRenderer>();
+
+            if (!TryCalculateBarycenter(
                     starSystem,
                     out generatedStarSystemBarycenter))
             {
@@ -979,8 +985,17 @@ namespace jcan.CelestialSystems
             }
 
             hasGeneratedStarSystemBarycenter = true;
-            observationPivotMarker.SetDirectionReference(
-                generatedStarSystemBarycenter);
+            if (observationPivotMarker != null)
+            {
+                observationPivotMarker.SetDirectionReference(
+                    generatedStarSystemBarycenter);
+            }
+
+            if (observationGrid != null)
+            {
+                observationGrid.SetGridOrigin(
+                    generatedStarSystemBarycenter);
+            }
         }
 
         private static bool TryCalculateBarycenter(
@@ -1116,6 +1131,12 @@ namespace jcan.CelestialSystems
                 observationPivotMarker != null)
             {
                 observationPivotMarker.ClearDirectionReference();
+            }
+
+            if (hasGeneratedStarSystemBarycenter &&
+                observationGrid != null)
+            {
+                observationGrid.ClearGridOrigin();
             }
 
             hasGeneratedStarSystemBarycenter = false;
