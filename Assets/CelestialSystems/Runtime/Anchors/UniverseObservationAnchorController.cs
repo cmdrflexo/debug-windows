@@ -93,6 +93,10 @@ namespace jcan.CelestialSystems
         private InputActionReference zoomOutAction;
 
         [SerializeField]
+        [Tooltip("Modifier that changes scroll wheel input from zoom to plane elevation.")]
+        private InputActionReference planeElevationModifierAction;
+
+        [SerializeField]
         private InputActionReference recenterAction;
 
         [SerializeField]
@@ -154,6 +158,16 @@ namespace jcan.CelestialSystems
         private float keyboardZoomStepMultiplier = 2.0f;
 
         [SerializeField]
+        [Tooltip("Plane-normal movement per scroll-wheel unit, as a fraction of camera distance.")]
+        [Min(0.0f)]
+        private float planeElevationFractionPerWheelUnit = 0.002f;
+
+        [SerializeField]
+        [Tooltip("How quickly the plane settles on its selected elevation.")]
+        [Min(0.0f)]
+        private float planeElevationResponse = 12.0f;
+
+        [SerializeField]
         private bool listen = true;
 
         [Header("Runtime")]
@@ -162,6 +176,12 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private double targetDistanceMeters;
+
+        [SerializeField]
+        private double planeElevationMeters;
+
+        [SerializeField]
+        private double targetPlaneElevationMeters;
 
         [SerializeField]
         private double plateOffsetRightMeters;
@@ -193,6 +213,7 @@ namespace jcan.CelestialSystems
         private bool enabledZoomAction;
         private bool enabledZoomInAction;
         private bool enabledZoomOutAction;
+        private bool enabledPlaneElevationModifierAction;
         private bool enabledRecenterAction;
         private bool recenterZoomArmed;
         private double yawVelocityDegreesPerSecond;
@@ -203,6 +224,16 @@ namespace jcan.CelestialSystems
         public double DistanceMeters => distanceMeters;
 
         public double TargetDistanceMeters => targetDistanceMeters;
+
+        public double PlaneElevationMeters => planeElevationMeters;
+
+        public double TargetPlaneElevationMeters => targetPlaneElevationMeters;
+
+        public InputActionReference PlaneElevationModifierAction =>
+            planeElevationModifierAction;
+
+        public bool PlaneElevationModifierPressed =>
+            IsPressed(planeElevationModifierAction);
 
         public double PlateOffsetRightMeters => plateOffsetRightMeters;
 
@@ -235,7 +266,8 @@ namespace jcan.CelestialSystems
 
             var pivotOffset =
                 ToDoubleVector(planeRight) * plateOffsetRightMeters +
-                ToDoubleVector(planeForward) * plateOffsetForwardMeters;
+                ToDoubleVector(planeForward) * plateOffsetForwardMeters +
+                ToDoubleVector(planeUp) * planeElevationMeters;
             pivotPosition = targetMotion.Position;
             pivotPosition.AddLocalMeters(
                 pivotOffset.x,
@@ -262,6 +294,8 @@ namespace jcan.CelestialSystems
             enabledZoomAction = EnableAction(zoomAction);
             enabledZoomInAction = EnableAction(zoomInAction);
             enabledZoomOutAction = EnableAction(zoomOutAction);
+            enabledPlaneElevationModifierAction =
+                EnableAction(planeElevationModifierAction);
             enabledRecenterAction = EnableAction(recenterAction);
             SubscribeToDebugMenu();
         }
@@ -283,6 +317,9 @@ namespace jcan.CelestialSystems
             DisableAction(zoomAction, enabledZoomAction);
             DisableAction(zoomInAction, enabledZoomInAction);
             DisableAction(zoomOutAction, enabledZoomOutAction);
+            DisableAction(
+                planeElevationModifierAction,
+                enabledPlaneElevationModifierAction);
             DisableAction(recenterAction, enabledRecenterAction);
             enabledPointerDeltaAction = false;
             enabledOrbitAction = false;
@@ -293,6 +330,7 @@ namespace jcan.CelestialSystems
             enabledZoomAction = false;
             enabledZoomInAction = false;
             enabledZoomOutAction = false;
+            enabledPlaneElevationModifierAction = false;
             enabledRecenterAction = false;
             ClearPanVelocity();
             ClearOrbitVelocity();
@@ -319,6 +357,12 @@ namespace jcan.CelestialSystems
             keyboardZoomStepMultiplier = Mathf.Max(
                 1.01f,
                 keyboardZoomStepMultiplier);
+            planeElevationFractionPerWheelUnit = Mathf.Max(
+                0.0f,
+                planeElevationFractionPerWheelUnit);
+            planeElevationResponse = Mathf.Max(
+                0.0f,
+                planeElevationResponse);
             NormalizeReferencePlane();
         }
 
@@ -386,6 +430,25 @@ namespace jcan.CelestialSystems
                 minimumDistanceMeters,
                 Math.Min(maximumDistanceMeters, distanceMeters));
 
+            var elevationBlend = planeElevationResponse <= Mathf.Epsilon
+                ? 1.0
+                : 1.0 - Math.Exp(
+                    -planeElevationResponse * Time.unscaledDeltaTime);
+            planeElevationMeters = Lerp(
+                planeElevationMeters,
+                targetPlaneElevationMeters,
+                elevationBlend);
+
+            if (Math.Abs(
+                    planeElevationMeters -
+                    targetPlaneElevationMeters) <=
+                Math.Max(
+                    0.001,
+                    Math.Abs(targetPlaneElevationMeters) * 1.0e-9))
+            {
+                planeElevationMeters = targetPlaneElevationMeters;
+            }
+
             GetReferencePlaneAxes(
                 out var planeRight,
                 out var planeForward,
@@ -393,7 +456,8 @@ namespace jcan.CelestialSystems
 
             var pivotOffset =
                 ToDoubleVector(planeRight) * plateOffsetRightMeters +
-                ToDoubleVector(planeForward) * plateOffsetForwardMeters;
+                ToDoubleVector(planeForward) * plateOffsetForwardMeters +
+                ToDoubleVector(planeUp) * planeElevationMeters;
             var pivotPosition = targetMotion.Position;
             pivotPosition.AddLocalMeters(
                 pivotOffset.x,
@@ -451,6 +515,8 @@ namespace jcan.CelestialSystems
                     : string.Empty;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            planeElevationMeters = 0.0;
+            targetPlaneElevationMeters = 0.0;
             ClearPanVelocity();
             viewInitialized = preserveDistance;
             hasTargetMotion = false;
@@ -495,6 +561,8 @@ namespace jcan.CelestialSystems
         {
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
+            planeElevationMeters = 0.0;
+            targetPlaneElevationMeters = 0.0;
             ClearPanVelocity();
         }
 
@@ -508,6 +576,8 @@ namespace jcan.CelestialSystems
             yawDegrees = 0.0f;
             ClearOrbitVelocity();
             targetDistanceMeters = 0.0;
+            planeElevationMeters = 0.0;
+            targetPlaneElevationMeters = 0.0;
             viewInitialized = false;
             recenterZoomArmed = false;
         }
@@ -552,6 +622,8 @@ namespace jcan.CelestialSystems
                 GetTargetRadiusMeters() * initialDistanceInTargetRadii,
                 1.0);
             targetDistanceMeters = distanceMeters;
+            planeElevationMeters = 0.0;
+            targetPlaneElevationMeters = 0.0;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
             ClearPanVelocity();
@@ -592,14 +664,25 @@ namespace jcan.CelestialSystems
             if (!Mathf.Approximately(zoomInput, 0.0f))
             {
                 recenterZoomArmed = false;
-                targetDistanceMeters = Math.Max(
-                    1.0,
-                    targetDistanceMeters > 0.0
-                        ? targetDistanceMeters
-                        : distanceMeters);
-                targetDistanceMeters *= Math.Pow(
-                    2.0,
-                    -zoomInput * zoomExponentPerWheelUnit);
+
+                if (IsPressed(planeElevationModifierAction))
+                {
+                    targetPlaneElevationMeters +=
+                        zoomInput *
+                        distanceMeters *
+                        planeElevationFractionPerWheelUnit;
+                }
+                else
+                {
+                    targetDistanceMeters = Math.Max(
+                        1.0,
+                        targetDistanceMeters > 0.0
+                            ? targetDistanceMeters
+                            : distanceMeters);
+                    targetDistanceMeters *= Math.Pow(
+                        2.0,
+                        -zoomInput * zoomExponentPerWheelUnit);
+                }
             }
 
             if (WasPressedThisFrame(zoomInAction))
