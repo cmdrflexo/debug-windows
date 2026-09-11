@@ -151,7 +151,7 @@ MonoBehaviour:
   bodyFactory: {fileID: 316926649}
   starSystemGuide: {fileID: 11400000, guid: e4ca6e4a9245841408f006d1c0618152, type: 2}
   galacticEnvironment: {fileID: 11400000, guid: ee8f8e60ea254a65b102ad92a42e2907, type: 2}
-  seed: 4090
+  seed: -386584318
   universeInstanceId: universe-runtime
   galaxyInstanceId: prototype-galaxy
   starSystemInstanceId: prototype-star-system
@@ -165,12 +165,19 @@ MonoBehaviour:
     z: 0
   rotationEulerDegrees: {x: 0, y: 0, z: 0}
   observationPivotMarker: {fileID: 0}
+  bodyMarkerTemplate: {fileID: 0}
+  generateBodyMarkers: 1
+  orbitDecoratorTemplate: {fileID: 0}
+  generateOrbitPaths: 1
+  trailDecoratorTemplate: {fileID: 0}
+  generateBodyTrails: 1
   generatedParentOverride: {fileID: 0}
   generateOnStart: 1
   logGeneratedStarSystemSummary: 1
   waitingForFactory: 0
   generationAttempted: 0
   generationSucceeded: 0
+  resolvedSeed: 0
   generatedUniverseRoot: {fileID: 0}
   generatedGalaxyCount: 0
   generatedStarSystemCount: 0
@@ -385,6 +392,7 @@ MonoBehaviour:
   zoomAction: {fileID: 4369740539164405390, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   zoomInAction: {fileID: -1028233289949196988, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   zoomOutAction: {fileID: 2530486801309968657, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  planeElevationModifierAction: {fileID: 5063237436185442808, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   recenterAction: {fileID: -1466553362185345752, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
   invertPitch: 1
   orbitDegreesPerPixel: 0.2
@@ -398,11 +406,19 @@ MonoBehaviour:
   zoomExponentPerWheelUnit: 0.2
   zoomResponse: 12
   keyboardZoomStepMultiplier: 2
+  planeElevationFractionPerWheelUnit: 0.1
+  planeElevationResponse: 12
+  targetTransitionResponse: 30
   listen: 1
   distanceMeters: 0
   targetDistanceMeters: 0
+  planeElevationMeters: 0
+  targetPlaneElevationMeters: 0
   plateOffsetRightMeters: 0
   plateOffsetForwardMeters: 0
+  targetTransitionOffsetXMeters: 0
+  targetTransitionOffsetYMeters: 0
+  targetTransitionOffsetZMeters: 0
   panVelocityRightMetersPerSecond: 0
   panVelocityForwardMetersPerSecond: 0
   hasTargetMotion: 0
@@ -1307,6 +1323,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1299841569}
   - component: {fileID: 1299841570}
+  - component: {fileID: 1299841571}
   m_Layer: 0
   m_Name: Debug
   m_TagString: Untagged
@@ -1345,6 +1362,22 @@ MonoBehaviour:
   toggleAction: {fileID: 8987666144617521417, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
   toggleOnStart: 1
   windowManager: {fileID: 1757395889}
+--- !u!114 &1299841571
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1299841568}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b1bbeabe88c50046845965d712a3457, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BasicToggleGameObjects
+  toggleAction: {fileID: -672575093541476086, guid: 9df6978fc44d9e84b8294189c138b414, type: 3}
+  toggleOnStart: 0
+  gameObjects:
+  - {fileID: 363207314}
 --- !u!1 &1557184261
 GameObject:
   m_ObjectHideFlags: 0
@@ -1565,6 +1598,9 @@ GameObject:
   - component: {fileID: 1714501037}
   - component: {fileID: 1714501038}
   - component: {fileID: 1714501039}
+  - component: {fileID: 1714501040}
+  - component: {fileID: 1714501041}
+  - component: {fileID: 1714501042}
   m_Layer: 0
   m_Name: Universe Observation Grid
   m_TagString: Untagged
@@ -1718,6 +1754,7 @@ MonoBehaviour:
     localYMeters: 0
     localZMeters: 0
   markerMaterial: {fileID: 2100000, guid: 50292b1468c5c3343b61279615325b03, type: 2}
+  markerColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   relativeSize: 0.25
   planeOffsetFraction: 0.001
   visible: 1
@@ -1737,6 +1774,99 @@ MonoBehaviour:
     localXMeters: 0
     localYMeters: 0
     localZMeters: 0
+--- !u!114 &1714501040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1714501033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94dc11657bd24484bb68d6c2fb1b0096, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseObservationBodyMarkerDecorator
+  observationController: {fileID: 0}
+  targetContext: {fileID: 0}
+  hasTargetPosition: 0
+  targetPosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
+  markerMaterial: {fileID: 2100000, guid: 4ce05faea7142e34184348c9f9941ccd, type: 2}
+  color: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  relativeSize: 0.035
+  planeOffsetFraction: 0.001
+  visible: 1
+  hasResolvedTarget: 0
+  resolvedTargetPosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
+  projectedGridPosition:
+    cellX: 0
+    cellY: 0
+    cellZ: 0
+    localXMeters: 0
+    localYMeters: 0
+    localZMeters: 0
+  elevationMeters: 0
+--- !u!114 &1714501041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1714501033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f43fd79017b4f27af6243f50eca3c08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseObservationOrbitDecorator
+  observationController: {fileID: 0}
+  selectionController: {fileID: 0}
+  targetContext: {fileID: 0}
+  toggleVisibilityAction: {fileID: -5243654529008114638, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  orbitMaterial: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0.03137255}
+  targetedColor: {r: 1, g: 1, b: 1, a: 0.078431375}
+  colorTransitionResponse: 8
+  pathSegments: 128
+  visible: 1
+  hasResolvedOrbit: 0
+  isTargeted: 0
+  targetedColorBlend: 0
+  lastError: 
+--- !u!114 &1714501042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1714501033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9356bc0cd9264b69ab3490c25d42163a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseObservationTrailDecorator
+  targetContext: {fileID: 0}
+  toggleVisibilityAction: {fileID: 6343794117309678388, guid: 7bb9e72003089074f80fb989cd47e881, type: 3}
+  trailMaterial: {fileID: 0}
+  color: {r: 0.25, g: 0.8, b: 1, a: 0.85}
+  durationSeconds: 20
+  fadeOutFraction: 0.2
+  sampleIntervalSeconds: 0.05
+  maximumSamples: 4096
+  visible: 1
+  sampleCount: 0
+  recording: 0
+  lastError: 
 --- !u!1 &1757395887
 GameObject:
   m_ObjectHideFlags: 0
