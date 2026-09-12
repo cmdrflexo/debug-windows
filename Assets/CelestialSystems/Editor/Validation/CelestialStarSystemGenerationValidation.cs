@@ -391,6 +391,8 @@ namespace jcan.CelestialSystems.Editor
             IReadOnlyList<CelestialTrajectoryDefinition> trajectories,
             out string error)
         {
+            error = string.Empty;
+
             if (trajectories.Count != 2 ||
                 trajectories[0] == null ||
                 trajectories[1] == null ||
