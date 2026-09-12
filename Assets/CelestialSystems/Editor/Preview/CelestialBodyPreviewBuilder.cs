@@ -3,7 +3,9 @@
  */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Den.Tools;
 using Den.Tools.Matrices;
 using MapMagic.Core;
@@ -621,6 +623,7 @@ namespace jcan.CelestialSystems.Editor
                     CreateFaceMaterial(
                         data,
                         surfaceDefinition.Material,
+                        surfaceDefinition.SurfaceAppearance,
                         planetRadiusMeters);
                 meshRenderer.sharedMaterial =
                     material;
@@ -1232,6 +1235,7 @@ namespace jcan.CelestialSystems.Editor
         private static Material CreateFaceMaterial(
             FaceGenerationData data,
             Material templateMaterial,
+            object surfaceAppearance,
             double planetRadiusMeters)
         {
             Material material =
@@ -1254,6 +1258,7 @@ namespace jcan.CelestialSystems.Editor
                         material,
                         controlTexture,
                         data.TerrainLayers,
+                        surfaceAppearance,
                         planetRadiusMeters);
                 }
                 else
@@ -1446,6 +1451,7 @@ namespace jcan.CelestialSystems.Editor
             Material material,
             Texture2D controlTexture,
             TerrainLayer[] terrainLayers,
+            object surfaceAppearance,
             double planetRadiusMeters)
         {
             ApplyTexture(
@@ -1466,6 +1472,13 @@ namespace jcan.CelestialSystems.Editor
                 material,
                 "_LodMaskMode",
                 0.0f);
+            SetFloatIfPresent(
+                material,
+                "_SurfaceLightingMode",
+                GetSurfaceFloat(
+                    surfaceAppearance,
+                    "LightingMode",
+                    0.0f));
 
             for (var index = 0;
                 index < MaximumLayerCount;
@@ -1477,6 +1490,12 @@ namespace jcan.CelestialSystems.Editor
                         terrainLayers.Length
                         ? terrainLayers[index]
                         : null,
+                    ResolveSurfaceLayer(
+                        surfaceAppearance,
+                        index < terrainLayers.Length
+                            ? terrainLayers[index]
+                            : null,
+                        index),
                     index,
                     planetRadiusMeters);
             }
@@ -1485,6 +1504,7 @@ namespace jcan.CelestialSystems.Editor
         private static void ConfigureTerrainLayer(
             Material material,
             TerrainLayer terrainLayer,
+            object surfaceLayer,
             int layerIndex,
             double planetRadiusMeters)
         {
@@ -1533,13 +1553,26 @@ namespace jcan.CelestialSystems.Editor
                 out var textureScale,
                 out var textureOffset);
             var layerDiffuse =
-                terrainLayer.diffuseTexture != null
-                    ? terrainLayer.diffuseTexture
-                    : Texture2D.whiteTexture;
+                GetSurfaceTexture(
+                    surfaceLayer,
+                    "AlbedoTexture",
+                    terrainLayer.diffuseTexture ??
+                        Texture2D.whiteTexture);
             var layerNormal =
-                terrainLayer.normalMapTexture;
+                GetSurfaceTexture(
+                    surfaceLayer,
+                    "NormalTexture",
+                    terrainLayer.normalMapTexture);
             var layerMask =
-                terrainLayer.maskMapTexture;
+                GetSurfaceTexture(
+                    surfaceLayer,
+                    "MaskTexture",
+                    terrainLayer.maskMapTexture);
+            var layerEmission =
+                GetSurfaceTexture(
+                    surfaceLayer,
+                    "EmissionTexture",
+                    Texture2D.whiteTexture);
             ApplyTexture(
                 material,
                 "_Splat" +
@@ -1561,6 +1594,21 @@ namespace jcan.CelestialSystems.Editor
                 layerMask,
                 textureScale,
                 textureOffset);
+            ApplyTexture(
+                material,
+                "_EmissionMap" +
+                    suffix,
+                layerEmission,
+                textureScale,
+                textureOffset);
+            SetColorIfPresent(
+                material,
+                "_Tint" +
+                    suffix,
+                GetSurfaceColor(
+                    surfaceLayer,
+                    "Tint",
+                    Color.white));
             SetFloatIfPresent(
                 material,
                 "_HasNormal" +
@@ -1579,17 +1627,202 @@ namespace jcan.CelestialSystems.Editor
                 material,
                 "_NormalScale" +
                     suffix,
-                terrainLayer.normalScale);
+                GetSurfaceFloat(
+                    surfaceLayer,
+                    "NormalStrength",
+                    terrainLayer.normalScale));
             SetFloatIfPresent(
                 material,
                 "_Metallic" +
                     suffix,
-                terrainLayer.metallic);
+                GetSurfaceFloat(
+                    surfaceLayer,
+                    "Metallic",
+                    terrainLayer.metallic));
             SetFloatIfPresent(
                 material,
                 "_Smoothness" +
                     suffix,
-                terrainLayer.smoothness);
+                GetSurfaceFloat(
+                    surfaceLayer,
+                    "Smoothness",
+                    terrainLayer.smoothness));
+            SetFloatIfPresent(
+                material,
+                "_OcclusionStrength" +
+                    suffix,
+                GetSurfaceFloat(
+                    surfaceLayer,
+                    "OcclusionStrength",
+                    1.0f));
+            SetColorIfPresent(
+                material,
+                "_EmissionColor" +
+                    suffix,
+                GetSurfaceColor(
+                    surfaceLayer,
+                    "EmissionColor",
+                    Color.white));
+            SetFloatIfPresent(
+                material,
+                "_EmissionIntensity" +
+                    suffix,
+                GetSurfaceFloat(
+                    surfaceLayer,
+                    "EmissionIntensity",
+                    0.0f));
+        }
+
+        private static object ResolveSurfaceLayer(
+            object surfaceAppearance,
+            TerrainLayer terrainLayer,
+            int terrainIndex)
+        {
+            if (surfaceAppearance == null)
+            {
+                return null;
+            }
+
+            var layers =
+                GetPropertyValue(
+                    surfaceAppearance,
+                    "Layers") as
+                    IEnumerable;
+            object orderedCandidate =
+                null;
+            var index =
+                0;
+
+            if (layers == null)
+            {
+                return null;
+            }
+
+            foreach (var candidate in
+                layers)
+            {
+                if (candidate == null)
+                {
+                    index++;
+                    continue;
+                }
+
+                var mappedTerrainLayer =
+                    GetPropertyValue(
+                        candidate,
+                        "MapMagicTerrainLayer") as
+                        TerrainLayer;
+
+                if (mappedTerrainLayer != null &&
+                    mappedTerrainLayer ==
+                        terrainLayer)
+                {
+                    return candidate;
+                }
+
+                if (index == terrainIndex &&
+                    mappedTerrainLayer == null)
+                {
+                    orderedCandidate =
+                        candidate;
+                }
+
+                index++;
+            }
+
+            return orderedCandidate;
+        }
+
+        private static Texture2D GetSurfaceTexture(
+            object surfaceLayer,
+            string propertyName,
+            Texture2D fallback)
+        {
+            return
+                GetPropertyValue(
+                    surfaceLayer,
+                    propertyName) as
+                    Texture2D ??
+                fallback;
+        }
+
+        private static Color GetSurfaceColor(
+            object source,
+            string propertyName,
+            Color fallback)
+        {
+            var value =
+                GetPropertyValue(
+                    source,
+                    propertyName);
+
+            return
+                value is Color color
+                    ? color
+                    : fallback;
+        }
+
+        private static float GetSurfaceFloat(
+            object source,
+            string propertyName,
+            float fallback)
+        {
+            var value =
+                GetPropertyValue(
+                    source,
+                    propertyName);
+
+            if (value == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                return
+                    System.Convert.ToSingle(
+                        value);
+            }
+            catch (System.Exception)
+            {
+                return fallback;
+            }
+        }
+
+        private static object GetPropertyValue(
+            object source,
+            string propertyName)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            var property =
+                source.GetType().GetProperty(
+                    propertyName,
+                    BindingFlags.Instance |
+                    BindingFlags.Public);
+
+            return
+                property != null
+                    ? property.GetValue(
+                        source)
+                    : null;
+        }
+
+        private static void SetColorIfPresent(
+            Material material,
+            string propertyName,
+            Color value)
+        {
+            if (material.HasProperty(
+                    propertyName))
+            {
+                material.SetColor(
+                    propertyName,
+                    value);
+            }
         }
 
         private static void ResolveTextureTransform(
