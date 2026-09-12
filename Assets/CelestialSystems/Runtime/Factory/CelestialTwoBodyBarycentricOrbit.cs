@@ -71,6 +71,8 @@ namespace jcan.CelestialSystems
         public bool TryValidate(
             out string error)
         {
+            error = string.Empty;
+
             if (string.IsNullOrWhiteSpace(
                     pairId) ||
                 string.IsNullOrWhiteSpace(
