@@ -12,6 +12,8 @@ using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
+    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem }
+
     [DisallowMultipleComponent]
     public sealed class CelestialUniverseRuntimeController :
         MonoBehaviour
@@ -42,6 +44,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("Deterministic generation seed. Set to zero to choose a new random nonzero seed for each generation.")]
         private int seed = 1;
+
+        [Header("Debug Arrangement Search")]
+        [SerializeField]
+        private CelestialDebugStarSystemArrangement debugArrangement;
+        [SerializeField, Min(1)]
+        private int maxArrangementSearchIterations = 1000;
 
         [SerializeField]
         private string universeInstanceId =
@@ -136,6 +144,13 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private int generatedBodyCount;
+
+        [SerializeField]
+        private int arrangementSearchAttempts;
+        [SerializeField]
+        private bool arrangementSearchMatched;
+        [SerializeField]
+        private bool arrangementSearchUsedFallback;
 
         [SerializeField]
         private bool hasGeneratedStarSystemBarycenter;
@@ -283,6 +298,11 @@ namespace jcan.CelestialSystems
                 ResolveGenerationSeed(
                     seed);
 
+            if (!TryResolveDebugArrangementSeed())
+            {
+                return false;
+            }
+
             universeFactory ??=
                 new CelestialUniverseFactory(                    bodyFactory);
 
@@ -352,6 +372,57 @@ namespace jcan.CelestialSystems
                 }
             }
 
+            return true;
+        }
+
+        private bool TryResolveDebugArrangementSeed()
+        {
+            arrangementSearchAttempts = 0;
+            arrangementSearchMatched =
+                debugArrangement ==
+                    CelestialDebugStarSystemArrangement.Any;
+            arrangementSearchUsedFallback = false;
+            if (arrangementSearchMatched)
+                return true;
+
+            var random = new System.Random(
+                unchecked(Environment.TickCount ^
+                    Guid.NewGuid().GetHashCode() ^
+                    resolvedSeed));
+            var attempts = Math.Max(1, maxArrangementSearchIterations);
+
+            for (var attempt = 0; attempt < attempts; attempt++)
+            {
+                var candidateSeed =
+                    attempt == 0 && seed != 0
+                        ? resolvedSeed
+                        : random.Next(1, int.MaxValue);
+                arrangementSearchAttempts++;
+                if (!starSystemGuide.TryGenerate(
+                        new CelestialStarSystemGenerationRequest(
+                            candidateSeed,
+                            galacticEnvironment),
+                        out var candidatePlan,
+                        out _))
+                    continue;
+
+                var matches =
+                    CelestialDebugStarSystemArrangementMatcher.Matches(
+                        candidatePlan,
+                        debugArrangement);
+                candidatePlan.ReleaseOwnedRuntimeObjects();
+                if (matches)
+                {
+                    resolvedSeed = candidateSeed;
+                    arrangementSearchMatched = true;
+                    return true;
+                }
+            }
+
+            resolvedSeed = random.Next(1, int.MaxValue);
+            arrangementSearchUsedFallback = true;
+            Debug.LogWarning(
+                $"No generated star system matched debug arrangement '{debugArrangement}' after {arrangementSearchAttempts} attempts. Using random seed {resolvedSeed}.");
             return true;
         }
 
@@ -1155,6 +1226,110 @@ namespace jcan.CelestialSystems
             Debug.LogError(
                 error,
                 this);
+            return false;
+        }
+    }
+
+    internal static class CelestialDebugStarSystemArrangementMatcher
+    {
+        public static bool Matches(CelestialStarSystemPlan plan, CelestialDebugStarSystemArrangement arrangement)
+        {
+            if (arrangement == CelestialDebugStarSystemArrangement.Any) return true;
+            var states = new List<CelestialStellarEvolutionState>();
+            var planets = 0;
+            var moons = 0;
+            foreach (var system in plan.BodySystems)
+            {
+                foreach (var entry in system.Definition.Bodies)
+                {
+                    var body = entry.Definition;
+                    if (body == null) continue;
+                    if (body.HasStellarProperties) states.Add(body.StellarEvolutionState);
+                    else if (body.HasPlanetFormationProperties) planets++;
+                    else if (body.HasMoonFormationProperties) moons++;
+                }
+            }
+
+            switch (arrangement)
+            {
+                case CelestialDebugStarSystemArrangement.SingleAny: return states.Count == 1;
+                case CelestialDebugStarSystemArrangement.SingleMainSequence: return Single(states, CelestialStellarEvolutionState.MainSequence);
+                case CelestialDebugStarSystemArrangement.SingleAtmosphereDominated: return states.Count == 1 && SingleVisual(plan, false, true);
+                case CelestialDebugStarSystemArrangement.SingleConvective: return states.Count == 1 && SingleVisual(plan, true, false);
+                case CelestialDebugStarSystemArrangement.SingleOrdinary: return states.Count == 1 && SingleVisual(plan, false, false);
+                case CelestialDebugStarSystemArrangement.SingleWhiteDwarf: return Single(states, CelestialStellarEvolutionState.WhiteDwarf);
+                case CelestialDebugStarSystemArrangement.SingleNeutronStar: return Single(states, CelestialStellarEvolutionState.NeutronStar);
+                case CelestialDebugStarSystemArrangement.SingleBlackHole: return Single(states, CelestialStellarEvolutionState.BlackHole);
+                case CelestialDebugStarSystemArrangement.BinaryAny: return states.Count == 2;
+                case CelestialDebugStarSystemArrangement.BinaryMainSequencePair: return Pair(states, CelestialStellarEvolutionState.MainSequence, CelestialStellarEvolutionState.MainSequence);
+                case CelestialDebugStarSystemArrangement.BinaryMainSequenceWhiteDwarf: return Pair(states, CelestialStellarEvolutionState.MainSequence, CelestialStellarEvolutionState.WhiteDwarf);
+                case CelestialDebugStarSystemArrangement.BinaryMainSequenceNeutronStar: return Pair(states, CelestialStellarEvolutionState.MainSequence, CelestialStellarEvolutionState.NeutronStar);
+                case CelestialDebugStarSystemArrangement.BinaryMainSequenceBlackHole: return Pair(states, CelestialStellarEvolutionState.MainSequence, CelestialStellarEvolutionState.BlackHole);
+                case CelestialDebugStarSystemArrangement.BinaryWhiteDwarfPair: return Pair(states, CelestialStellarEvolutionState.WhiteDwarf, CelestialStellarEvolutionState.WhiteDwarf);
+                case CelestialDebugStarSystemArrangement.BinaryWhiteDwarfNeutronStar: return Pair(states, CelestialStellarEvolutionState.WhiteDwarf, CelestialStellarEvolutionState.NeutronStar);
+                case CelestialDebugStarSystemArrangement.BinaryWhiteDwarfBlackHole: return Pair(states, CelestialStellarEvolutionState.WhiteDwarf, CelestialStellarEvolutionState.BlackHole);
+                case CelestialDebugStarSystemArrangement.BinaryNeutronStarPair: return Pair(states, CelestialStellarEvolutionState.NeutronStar, CelestialStellarEvolutionState.NeutronStar);
+                case CelestialDebugStarSystemArrangement.BinaryNeutronStarBlackHole: return Pair(states, CelestialStellarEvolutionState.NeutronStar, CelestialStellarEvolutionState.BlackHole);
+                case CelestialDebugStarSystemArrangement.BinaryBlackHolePair: return Pair(states, CelestialStellarEvolutionState.BlackHole, CelestialStellarEvolutionState.BlackHole);
+                case CelestialDebugStarSystemArrangement.SinglePlanetless: return states.Count == 1 && planets == 0;
+                case CelestialDebugStarSystemArrangement.SingleWithPlanets: return states.Count == 1 && planets > 0;
+                case CelestialDebugStarSystemArrangement.BinaryPlanetless: return states.Count == 2 && planets == 0;
+                case CelestialDebugStarSystemArrangement.BinaryWithPlanets: return states.Count == 2 && planets > 0;
+                case CelestialDebugStarSystemArrangement.RemnantWithPlanets: return Remnant(states) && planets > 0;
+                case CelestialDebugStarSystemArrangement.SystemWithMoons: return moons > 0;
+                case CelestialDebugStarSystemArrangement.MoonRichSystem: return moons >= 4;
+                default: return false;
+            }
+        }
+
+        private static bool SingleVisual(
+            CelestialStarSystemPlan plan,
+            bool convective,
+            bool atmosphereDominated)
+        {
+            CelestialBodyDefinition star = null;
+            foreach (var system in plan.BodySystems)
+                foreach (var entry in system.Definition.Bodies)
+                    if (entry.Definition != null &&
+                        entry.Definition.HasStellarProperties)
+                        star = entry.Definition;
+
+            if (star == null ||
+                star.StellarEvolutionState !=
+                    CelestialStellarEvolutionState.MainSequence)
+                return false;
+
+            var isConvective =
+                star.StellarEffectiveTemperatureKelvin < 4500.0 ||
+                star.MassKilograms /
+                    1.98847e30 < 0.7;
+            var isAtmosphereDominated =
+                star.StellarEffectiveTemperatureKelvin > 9000.0 ||
+                star.MassKilograms /
+                    1.98847e30 > 1.5;
+            return
+                convective == isConvective &&
+                atmosphereDominated == isAtmosphereDominated &&
+                !(convective && atmosphereDominated);
+        }
+
+        private static bool Single(IReadOnlyList<CelestialStellarEvolutionState> states, CelestialStellarEvolutionState state)
+        {
+            return states.Count == 1 && states[0] == state;
+        }
+
+        private static bool Pair(IReadOnlyList<CelestialStellarEvolutionState> states, CelestialStellarEvolutionState first, CelestialStellarEvolutionState second)
+        {
+            return states.Count == 2 &&
+                ((states[0] == first && states[1] == second) ||
+                 (states[0] == second && states[1] == first));
+        }
+
+        private static bool Remnant(IReadOnlyList<CelestialStellarEvolutionState> states)
+        {
+            foreach (var state in states)
+                if (state != CelestialStellarEvolutionState.MainSequence)
+                    return true;
             return false;
         }
     }
