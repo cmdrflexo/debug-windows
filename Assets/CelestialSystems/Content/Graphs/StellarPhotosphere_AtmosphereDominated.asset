@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9bc43e142692db4e92eef81e1903ca4, type: 3}
-  m_Name: Sol-Like Graph
+  m_Name: StellarPhotosphere_AtmosphereDominated
   m_EditorClassIdentifier: MapMagic::MapMagic.Nodes.Graph
   serializedVersion: 0
   guiShowDependent: 0
@@ -154,7 +154,7 @@ MonoBehaviour:
       - t: 11
         v: 4835840155447197729
       - t: 11
-        v: 70
+        v: 74
       - t: 255
         v: 5
       - t: 255
@@ -187,9 +187,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1148929716
+        v: 1150369011
       - t: 2
-        v: 3292658151
+        v: 3288643604
       special: 
       uniObj: {fileID: 0}
     - refId: 6
@@ -233,7 +233,7 @@ MonoBehaviour:
       - t: 1
         v: 1047
       - t: 2
-        v: 1232348160
+        v: 1287568416
       - t: 2
         v: 1061158912
       - t: 255
@@ -253,7 +253,7 @@ MonoBehaviour:
       - t: 11
         v: -2082007730565939199
       - t: 11
-        v: 10
+        v: 14
       - t: 255
         v: 10
       - t: 255
@@ -297,9 +297,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 3275388456
+        v: 3271430376
       - t: 2
-        v: 3288590598
+        v: 3287573589
       special: 
       uniObj: {fileID: 0}
     - refId: 11
@@ -345,7 +345,7 @@ MonoBehaviour:
       - t: 11
         v: -2046854144802684926
       - t: 11
-        v: 70
+        v: 81
       - t: 255
         v: 27
       - t: 255
@@ -682,9 +682,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1109393408
+        v: 1120328552
       - t: 2
-        v: 3286346410
+        v: 3285073139
       special: 
       uniObj: {fileID: 0}
     - refId: 31
@@ -728,7 +728,7 @@ MonoBehaviour:
       - t: 1
         v: 1047
       - t: 2
-        v: 1232348160
+        v: 1287568416
       - t: 2
         v: 1061158912
       - t: 255
@@ -748,7 +748,7 @@ MonoBehaviour:
       - t: 11
         v: -174248403746684926
       - t: 11
-        v: 2
+        v: 22
       - t: 255
         v: 34
       - t: 255
@@ -781,9 +781,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 3271766835
+        v: 3264503063
       - t: 2
-        v: 3272404718
+        v: 3268125417
       special: 
       uniObj: {fileID: 0}
     - refId: 35
@@ -947,9 +947,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1132179771
+        v: 1134268280
       - t: 2
-        v: 3278873625
+        v: 3276327084
       special: 
       uniObj: {fileID: 0}
     - refId: 44
@@ -989,7 +989,7 @@ MonoBehaviour:
       - t: 11
         v: 1441736820944535553
       - t: 11
-        v: 28
+        v: 29
       - t: 255
         v: 51
       - t: 255
@@ -1070,7 +1070,7 @@ MonoBehaviour:
       - t: 255
         v: 42
       - t: 2
-        v: 1065353216
+        v: 0
       - t: 3
         v: 1
       special: 
@@ -1105,9 +1105,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1141112832
+        v: 1142086509
       - t: 2
-        v: 3281977343
+        v: 3280704072
       special: 
       uniObj: {fileID: 0}
     - refId: 52
@@ -1199,9 +1199,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1117388800
+        v: 1124625844
       - t: 2
-        v: 1105548640
+        v: 1116146739
       special: 
       uniObj: {fileID: 0}
     - refId: 55
@@ -1278,9 +1278,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1133563085
+        v: 1135510439
       - t: 2
-        v: 3257331432
+        v: 3224900384
       special: 
       uniObj: {fileID: 0}
     - refId: 58
@@ -1354,7 +1354,7 @@ MonoBehaviour:
       - t: 2
         v: 1143242752
       - t: 2
-        v: 1143734272
+        v: 1143767040
       special: 
       uniObj: {fileID: 0}
     - refId: 60
@@ -1387,7 +1387,7 @@ MonoBehaviour:
       - t: 2
         v: 0
       - t: 2
-        v: 1065353216
+        v: 0
       - t: 3
         v: 1
       - t: 3
@@ -1395,7 +1395,7 @@ MonoBehaviour:
       - t: 11
         v: 8835369776575414274
       - t: 11
-        v: 3
+        v: 4
       - t: 255
         v: 61
       - t: 255
@@ -1419,7 +1419,7 @@ MonoBehaviour:
       - t: 2
         v: 1149843944
       - t: 2
-        v: 1149574778
+        v: 1149591162
       special: 
       uniObj: {fileID: 0}
     - refId: 62
@@ -1452,7 +1452,7 @@ MonoBehaviour:
       - t: 2
         v: 0
       - t: 2
-        v: 1065353216
+        v: 0
       - t: 3
         v: 1
       - t: 3
@@ -1460,7 +1460,7 @@ MonoBehaviour:
       - t: 11
         v: 8956572241840046083
       - t: 11
-        v: 3
+        v: 4
       - t: 255
         v: 63
       - t: 255
@@ -1484,7 +1484,7 @@ MonoBehaviour:
       - t: 2
         v: 1149756562
       - t: 2
-        v: 1139724093
+        v: 1139789629
       special: 
       uniObj: {fileID: 0}
     - refId: 64
@@ -1571,7 +1571,7 @@ MonoBehaviour:
       - t: 2
         v: 1142882304
       - t: 2
-        v: 1149583360
+        v: 1149599744
       special: 
       uniObj: {fileID: 0}
     - refId: 68
@@ -1943,7 +1943,7 @@ MonoBehaviour:
       - t: 2
         v: 1146912768
       - t: 2
-        v: 1146322944
+        v: 1146355712
       special: 
       uniObj: {fileID: 0}
     - refId: 83
@@ -2101,7 +2101,7 @@ MonoBehaviour:
       - t: 2
         v: 1151935634
       - t: 2
-        v: 1139767785
+        v: 1139833321
       special: 
       uniObj: {fileID: 0}
     - refId: 91
@@ -2245,7 +2245,7 @@ MonoBehaviour:
       - t: 2
         v: 1151984786
       - t: 2
-        v: 1149509242
+        v: 1149525626
       special: 
       uniObj: {fileID: 0}
     - refId: 98
@@ -2635,7 +2635,7 @@ MonoBehaviour:
       - t: 11
         v: -4892322067766050797
       - t: 11
-        v: 3
+        v: 4
       - t: 255
         v: 121
       - t: 255
@@ -2716,7 +2716,7 @@ MonoBehaviour:
       - t: 255
         v: 39
       - t: 2
-        v: 1065353216
+        v: 0
       - t: 3
         v: 1
       special: 
@@ -2816,9 +2816,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1145783988
+        v: 1148352998
       - t: 2
-        v: 3292658151
+        v: 3288643604
       special: 
       uniObj: {fileID: 0}
     - refId: 124
@@ -3019,7 +3019,7 @@ MonoBehaviour:
       - t: 2
         v: 1149733038
       - t: 2
-        v: 1148801189
+        v: 1148833957
       special: 
       uniObj: {fileID: 0}
     - refId: 131
@@ -3069,7 +3069,7 @@ MonoBehaviour:
       - t: 2
         v: 1149505342
       - t: 2
-        v: 1137845393
+        v: 1137910929
       special: 
       uniObj: {fileID: 0}
     - refId: 134
@@ -3113,7 +3113,7 @@ MonoBehaviour:
       altType: 
       fields: []
       values: []
-      special: Sunspots
+      special: Starspots Source
       uniObj: {fileID: 0}
     - refId: 137
       type: UnityEngine.Vector2, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral,
@@ -3126,7 +3126,7 @@ MonoBehaviour:
       - t: 2
         v: 1141824367
       - t: 2
-        v: 1137080809
+        v: 1137146345
       special: 
       uniObj: {fileID: 0}
     - refId: 138
@@ -3238,9 +3238,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 1145372048
+        v: 1147941058
       - t: 2
-        v: 3293669278
+        v: 3289654730
       special: 
       uniObj: {fileID: 0}
     - refId: 146
@@ -3284,7 +3284,7 @@ MonoBehaviour:
       altType: 
       fields: []
       values: []
-      special: Granules
+      special: Giant Cell Convection
       uniObj: {fileID: 0}
     - refId: 149
       type: UnityEngine.Vector2, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral,
@@ -3295,9 +3295,9 @@ MonoBehaviour:
       - y
       values:
       - t: 2
-        v: 3276668928
+        v: 3272774220
       - t: 2
-        v: 3289732437
+        v: 3289095802
       special: 
       uniObj: {fileID: 0}
     - refId: 150
