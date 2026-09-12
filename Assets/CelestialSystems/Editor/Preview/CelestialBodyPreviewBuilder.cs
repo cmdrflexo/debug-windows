@@ -1552,12 +1552,13 @@ namespace jcan.CelestialSystems.Editor
                 planetRadiusMeters,
                 out var textureScale,
                 out var textureOffset);
+            // MapMagic TerrainLayer diffuse data owns the graph's
+            // authored layer color. Surface appearance augments that
+            // result with material and emission properties.
             var layerDiffuse =
-                GetSurfaceTexture(
-                    surfaceLayer,
-                    "AlbedoTexture",
-                    terrainLayer.diffuseTexture ??
-                        Texture2D.whiteTexture);
+                terrainLayer.diffuseTexture != null
+                    ? terrainLayer.diffuseTexture
+                    : Texture2D.whiteTexture;
             var layerNormal =
                 GetSurfaceTexture(
                     surfaceLayer,
