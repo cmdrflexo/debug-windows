@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6da5c3b3028f45859d7947baff758e59, type: 3}
-  m_Name: Sol-Like Body
+  m_Name: StellarPhotosphere_BodyDefinition TEST
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialBodyDefinition
   definitionId: sol-like-body
   massKilograms: 1.98847e+30
@@ -19,7 +19,7 @@ MonoBehaviour:
   northAxis: {x: 0, y: 1, z: 0}
   poleReferenceAxis: {x: 0, y: 0, z: 1}
   surfaceSystem: 1
-  roundMapMagicSurface: {fileID: 11400000, guid: 445efad00ffa8684f8d077d6833d1412, type: 2}
+  roundMapMagicSurface: {fileID: 11400000, guid: 7cd6b0707156c8747a3a9b769ee28949, type: 2}
   oceanDefinition: {fileID: 0}
   hasStellarProperties: 0
   stellarEvolutionState: 0

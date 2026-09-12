@@ -273,7 +273,8 @@ namespace jcan.CelestialSystems
 
             var visualObject = new GameObject(GeneratedVisualName);
             markerVisual = visualObject.transform;
-            markerVisual.SetParent(transform, false);
+            //markerVisual.SetParent(transform, false);
+            markerVisual.SetParent(transform.parent, false);
             var meshFilter = visualObject.AddComponent<MeshFilter>();
             markerRenderer = visualObject.AddComponent<MeshRenderer>();
             generatedMesh = CreatePlaneMesh();

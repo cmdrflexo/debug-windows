@@ -145,7 +145,7 @@
                     "name": "Lock To Origin",
                     "type": "Button",
                     "id": "f06c1a81-1bae-445c-a11a-a74d6a690bbd",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
