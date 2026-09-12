@@ -155,6 +155,10 @@ namespace jcan.CelestialSystems.Editor
             var planetOrbits =
                 new List<OrbitRange>();
             var stellarBodyCount = 0;
+            var stellarMasses =
+                new List<double>();
+            var stellarTrajectories =
+                new List<CelestialTrajectoryDefinition>();
             var formedSolidMassEarth = 0.0;
             var disk =
                 plan.FormationDisk.Value;
@@ -234,6 +238,10 @@ namespace jcan.CelestialSystems.Editor
                     if (body.HasStellarProperties)
                     {
                         stellarBodyCount++;
+                        stellarMasses.Add(
+                            body.MassKilograms);
+                        stellarTrajectories.Add(
+                            system.Trajectory);
                         isRemnant =
                             isRemnant ||
                             body.StellarEvolutionState !=
@@ -338,6 +346,15 @@ namespace jcan.CelestialSystems.Editor
                 return false;
             }
 
+            if (stellarBodyCount == 2 &&
+                !TryValidateTwoBodyPair(
+                    stellarMasses,
+                    stellarTrajectories,
+                    out error))
+            {
+                return false;
+            }
+
             if (formedSolidMassEarth >
                 disk.InitialSolidMassEarth +
                     1.0e-9)
@@ -361,6 +378,122 @@ namespace jcan.CelestialSystems.Editor
                 {
                     error =
                         $"Planetary trajectories overlap: apoapsis {planetOrbits[index - 1].ApoapsisMeters:0.###e+0} m reaches periapsis {planetOrbits[index].PeriapsisMeters:0.###e+0} m.";
+                    return false;
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateTwoBodyPair(
+            IReadOnlyList<double> masses,
+            IReadOnlyList<CelestialTrajectoryDefinition> trajectories,
+            out string error)
+        {
+            if (trajectories.Count != 2 ||
+                trajectories[0] == null ||
+                trajectories[1] == null ||
+                trajectories[0].Kind !=
+                    CelestialTrajectoryKind.TwoBodyBarycentricComponent ||
+                trajectories[1].Kind !=
+                    CelestialTrajectoryKind.TwoBodyBarycentricComponent ||
+                !ReferenceEquals(
+                    trajectories[0].TwoBodyOrbit,
+                    trajectories[1].TwoBodyOrbit) ||
+                trajectories[0].TwoBodyComponent ==
+                    trajectories[1].TwoBodyComponent)
+            {
+                error =
+                    "A generated two-body system does not share one complementary barycentric orbit.";
+                return false;
+            }
+
+            var pair =
+                trajectories[0].TwoBodyOrbit;
+            var massA =
+                trajectories[0].TwoBodyComponent ==
+                    CelestialTwoBodyComponent.BodyA
+                        ? masses[0]
+                        : masses[1];
+            var massB =
+                trajectories[0].TwoBodyComponent ==
+                    CelestialTwoBodyComponent.BodyB
+                        ? masses[0]
+                        : masses[1];
+
+            if (Math.Abs(massA - pair.BodyAMassKilograms) >
+                    pair.BodyAMassKilograms * 1.0e-12 ||
+                Math.Abs(massB - pair.BodyBMassKilograms) >
+                    pair.BodyBMassKilograms * 1.0e-12 ||
+                !CelestialTrajectoryEvaluator.TryCalculatePeriodSeconds(
+                    trajectories[0],
+                    pair.TotalMassKilograms,
+                    masses[0],
+                    out var period,
+                    out error))
+            {
+                return false;
+            }
+
+            var sampleFractions =
+                new[]
+                {
+                    0.0,
+                    0.071,
+                    0.25,
+                    0.5,
+                    0.913,
+                    1.0
+                };
+
+            foreach (var fraction in sampleFractions)
+            {
+                var time =
+                    pair.RelativeTrajectory.EpochUniversalTimeSeconds +
+                    period *
+                    fraction;
+
+                if (!CelestialTrajectoryEvaluator.TryEvaluateRelativeState(
+                        trajectories[0],
+                        pair.TotalMassKilograms,
+                        masses[0],
+                        time,
+                        out var position0,
+                        out var velocity0,
+                        out error) ||
+                    !CelestialTrajectoryEvaluator.TryEvaluateRelativeState(
+                        trajectories[1],
+                        pair.TotalMassKilograms,
+                        masses[1],
+                        time,
+                        out var position1,
+                        out var velocity1,
+                        out error))
+                {
+                    return false;
+                }
+
+                var weightedPosition =
+                    position0 * masses[0] +
+                    position1 * masses[1];
+                var weightedVelocity =
+                    velocity0 * masses[0] +
+                    velocity1 * masses[1];
+                var positionScale =
+                    (position0 - position1).Magnitude *
+                    pair.TotalMassKilograms;
+                var velocityScale =
+                    (velocity0 - velocity1).Magnitude *
+                    pair.TotalMassKilograms;
+
+                if (weightedPosition.Magnitude >
+                        Math.Max(1.0, positionScale) * 1.0e-12 ||
+                    weightedVelocity.Magnitude >
+                        Math.Max(1.0, velocityScale) * 1.0e-12)
+                {
+                    error =
+                        "A generated two-body trajectory moved its mass-weighted barycenter.";
                     return false;
                 }
             }

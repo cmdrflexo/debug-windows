@@ -364,16 +364,6 @@ namespace jcan.CelestialSystems
                 var totalStellarMassKilograms =
                     star.MassKilograms +
                     companion.MassKilograms;
-                var primaryPeriapsisMeters =
-                    companionFormation.PeriapsisAstronomicalUnits *
-                    AstronomicalUnitMeters *
-                    companion.MassKilograms /
-                    totalStellarMassKilograms;
-                var companionPeriapsisMeters =
-                    companionFormation.PeriapsisAstronomicalUnits *
-                    AstronomicalUnitMeters *
-                    star.MassKilograms /
-                    totalStellarMassKilograms;
                 var phaseRadians =
                     random.Next01() *
                     Math.PI *
@@ -387,6 +377,28 @@ namespace jcan.CelestialSystems
                         new DoubleVector3(),
                         new DoubleVector3()));
 
+                var relativeTrajectory =
+                    new KeplerianConicTrajectory(
+                        barycenterId,
+                        companionFormation.PeriapsisAstronomicalUnits *
+                            AstronomicalUnitMeters,
+                        companionFormation.Eccentricity,
+                        0.0,
+                        phaseRadians *
+                            180.0 /
+                            Math.PI,
+                        companionFormation.InclinationDegrees,
+                        0.0,
+                        0.0,
+                        CelestialOrbitDirection.Prograde);
+                var twoBodyOrbit =
+                    new CelestialTwoBodyBarycentricOrbit(
+                        "stellar-pair",
+                        barycenterId,
+                        star.MassKilograms,
+                        companion.MassKilograms,
+                        relativeTrajectory);
+
                 bodySystems.Add(
                     CreateSingleBodySystem(
                         "stellar",
@@ -396,16 +408,9 @@ namespace jcan.CelestialSystems
                         new DoubleVector3(),
                         new DoubleVector3(),
                         ownedRuntimeObjects,
-                        CreateConicTrajectory(
-                            barycenterId,
-                            primaryPeriapsisMeters,
-                            companionFormation.Eccentricity,
-                            phaseRadians,
-                            companionFormation.InclinationDegrees *
-                                Math.PI / 180.0,
-                            0.0,
-                            1.0,
-                            totalStellarMassKilograms),
+                        new CelestialTrajectoryDefinition(
+                            twoBodyOrbit,
+                            CelestialTwoBodyComponent.BodyA),
                         barycenterId));
                 bodySystems.Add(
                     CreateSingleBodySystem(
@@ -416,16 +421,9 @@ namespace jcan.CelestialSystems
                         new DoubleVector3(),
                         new DoubleVector3(),
                         ownedRuntimeObjects,
-                        CreateConicTrajectory(
-                            barycenterId,
-                            companionPeriapsisMeters,
-                            companionFormation.Eccentricity,
-                            phaseRadians + Math.PI,
-                            companionFormation.InclinationDegrees *
-                                Math.PI / 180.0,
-                            0.0,
-                            1.0,
-                            totalStellarMassKilograms),
+                        new CelestialTrajectoryDefinition(
+                            twoBodyOrbit,
+                            CelestialTwoBodyComponent.BodyB),
                         barycenterId));
             }
             else
@@ -1132,8 +1130,7 @@ namespace jcan.CelestialSystems
             double meanAnomalyRadians,
             double inclinationRadians,
             double argumentOfPeriapsisRadians,
-            double direction,
-            double gravitatingMassKilogramsOverride = 0.0)
+            double direction)
         {
             return
                 new CelestialTrajectoryDefinition(
@@ -1155,8 +1152,7 @@ namespace jcan.CelestialSystems
                             Math.PI,
                         direction < 0.0
                             ? CelestialOrbitDirection.Retrograde
-                            : CelestialOrbitDirection.Prograde),
-                    gravitatingMassKilogramsOverride);
+                            : CelestialOrbitDirection.Prograde));
         }
 
         private static CelestialStellarPopulationSample CreatePopulationSample(

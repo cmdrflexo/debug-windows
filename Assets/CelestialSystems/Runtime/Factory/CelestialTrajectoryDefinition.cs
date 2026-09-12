@@ -10,7 +10,8 @@ namespace jcan.CelestialSystems
     public enum CelestialTrajectoryKind
     {
         CircularOrbit = 0,
-        KeplerianConic = 1
+        KeplerianConic = 1,
+        TwoBodyBarycentricComponent = 2
     }
 
     public enum CelestialOrbitDirection
@@ -57,23 +58,41 @@ namespace jcan.CelestialSystems
         private KeplerianConicTrajectory conic;
 
         [SerializeField]
-        [Tooltip("Optional total gravitating mass for barycentric component trajectories. Zero uses reference plus orbiting mass.")]
-        private double gravitatingMassKilogramsOverride;
+        [Tooltip("Shared relative orbit used by a generic two-body barycentric pair.")]
+        private CelestialTwoBodyBarycentricOrbit twoBodyOrbit;
+
+        [SerializeField]
+        private CelestialTwoBodyComponent twoBodyComponent;
 
         public CelestialTrajectoryDefinition(
-            KeplerianConicTrajectory conic,
-            double gravitatingMassKilogramsOverride = 0.0)
+            KeplerianConicTrajectory conic)
         {
             kind = CelestialTrajectoryKind.KeplerianConic;
             this.conic = conic;
-            this.gravitatingMassKilogramsOverride =
-                gravitatingMassKilogramsOverride;
         }
 
-        public KeplerianConicTrajectory Conic => conic;
+        public CelestialTrajectoryDefinition(
+            CelestialTwoBodyBarycentricOrbit twoBodyOrbit,
+            CelestialTwoBodyComponent twoBodyComponent)
+        {
+            kind =
+                CelestialTrajectoryKind.TwoBodyBarycentricComponent;
+            this.twoBodyOrbit =
+                twoBodyOrbit;
+            this.twoBodyComponent =
+                twoBodyComponent;
+        }
 
-        public double GravitatingMassKilogramsOverride =>
-            gravitatingMassKilogramsOverride;
+        public KeplerianConicTrajectory Conic =>
+            kind == CelestialTrajectoryKind.TwoBodyBarycentricComponent
+                ? twoBodyOrbit?.RelativeTrajectory
+                : conic;
+
+        public CelestialTwoBodyBarycentricOrbit TwoBodyOrbit =>
+            twoBodyOrbit;
+
+        public CelestialTwoBodyComponent TwoBodyComponent =>
+            twoBodyComponent;
 
         public CelestialTrajectoryDefinition(
             string referenceInstanceId,
@@ -108,27 +127,37 @@ namespace jcan.CelestialSystems
         public string ReferenceInstanceId =>
             kind == CelestialTrajectoryKind.KeplerianConic
                 ? conic?.ReferenceInstanceId
-                : referenceInstanceId;
+                : kind == CelestialTrajectoryKind.TwoBodyBarycentricComponent
+                    ? twoBodyOrbit?.BarycenterReferenceInstanceId
+                    : referenceInstanceId;
 
         /// <summary>Legacy circular radius. For conics use Conic.PeriapsisDistanceMeters.</summary>
         public double OrbitalRadiusMeters =>
             orbitalRadiusMeters;
 
         public double EpochUniversalTimeSeconds =>
-            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.EpochUniversalTimeSeconds : epochUniversalTimeSeconds;
+            Conic != null
+                ? Conic.EpochUniversalTimeSeconds
+                : epochUniversalTimeSeconds;
 
         /// <summary>Legacy circular phase. For conics use Conic.MeanAnomalyAtEpochDegrees.</summary>
         public double PhaseAtEpochDegrees =>
             phaseAtEpochDegrees;
 
         public double InclinationDegrees =>
-            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.InclinationDegrees : inclinationDegrees;
+            Conic != null
+                ? Conic.InclinationDegrees
+                : inclinationDegrees;
 
         public double LongitudeOfAscendingNodeDegrees =>
-            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.LongitudeOfAscendingNodeDegrees : longitudeOfAscendingNodeDegrees;
+            Conic != null
+                ? Conic.LongitudeOfAscendingNodeDegrees
+                : longitudeOfAscendingNodeDegrees;
 
         public CelestialOrbitDirection Direction =>
-            kind == CelestialTrajectoryKind.KeplerianConic && conic != null ? conic.Direction : direction;
+            Conic != null
+                ? Conic.Direction
+                : direction;
 
         public bool HasValidSettings =>
             TryValidate(
@@ -145,6 +174,27 @@ namespace jcan.CelestialSystems
                     return false;
                 }
                 return conic.TryValidate(out error);
+            }
+
+            if (kind == CelestialTrajectoryKind.TwoBodyBarycentricComponent)
+            {
+                if (twoBodyOrbit == null)
+                {
+                    error =
+                        "A two-body component trajectory requires a shared barycentric orbit.";
+                    return false;
+                }
+
+                if (twoBodyComponent != CelestialTwoBodyComponent.BodyA &&
+                    twoBodyComponent != CelestialTwoBodyComponent.BodyB)
+                {
+                    error =
+                        "A two-body component trajectory requires a valid component.";
+                    return false;
+                }
+
+                return twoBodyOrbit.TryValidate(
+                    out error);
             }
 
             if (kind !=

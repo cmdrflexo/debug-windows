@@ -50,9 +50,12 @@ namespace jcan.CelestialSystems
 
         public string ProviderName =>
             usesTrajectory
-                ? (trajectory.Kind == CelestialTrajectoryKind.KeplerianConic
-                    ? "Prescribed Keplerian Conic Trajectory"
-                    : "Prescribed Circular Trajectory")
+                ? (trajectory.Kind ==
+                        CelestialTrajectoryKind.TwoBodyBarycentricComponent
+                    ? "Prescribed Two-Body Barycentric Trajectory"
+                    : trajectory.Kind == CelestialTrajectoryKind.KeplerianConic
+                        ? "Prescribed Keplerian Conic Trajectory"
+                        : "Prescribed Circular Trajectory")
                 : "Prescribed Inertial State";
 
         public bool IsReady =>
@@ -124,17 +127,24 @@ namespace jcan.CelestialSystems
 
             if (!isReady ||
                 !usesTrajectory ||
-                trajectory?.Kind != CelestialTrajectoryKind.KeplerianConic ||
+                (trajectory?.Kind != CelestialTrajectoryKind.KeplerianConic &&
+                    trajectory?.Kind != CelestialTrajectoryKind.TwoBodyBarycentricComponent) ||
                 trajectory.Conic == null)
             {
                 return false;
             }
 
             var conic = trajectory.Conic;
+            var gravitatingMassKilograms =
+                trajectory.Kind ==
+                    CelestialTrajectoryKind.TwoBodyBarycentricComponent
+                        ? trajectory.TwoBodyOrbit.TotalMassKilograms
+                        : referenceMassKilograms +
+                            orbitingMassKilograms;
             var meanMotion =
                 System.Math.Sqrt(
                     CelestialTrajectoryEvaluator.GravitationalConstant *
-                    (referenceMassKilograms + orbitingMassKilograms) /
+                    gravitatingMassKilograms /
                     System.Math.Pow(System.Math.Abs(conic.SemiMajorAxisMeters), 3.0));
             var direction = (double)conic.Direction;
             var meanAtEpochRadians =
@@ -316,20 +326,10 @@ namespace jcan.CelestialSystems
                 newTrajectory;
             referenceSource =
                 newReferenceSource;
+            referenceMassKilograms =
+                referenceSource.ConfiguredMassKilograms;
             orbitingMassKilograms =
                 newOrbitingMassKilograms;
-            referenceMassKilograms =
-                trajectory.GravitatingMassKilogramsOverride > 0.0
-                    ? trajectory.GravitatingMassKilogramsOverride -
-                        orbitingMassKilograms
-                    : referenceSource.ConfiguredMassKilograms;
-
-            if (!IsFinitePositive(
-                    referenceMassKilograms))
-            {
-                return Fail(
-                    "A trajectory's total gravitating-mass override must exceed the orbiting-body mass.");
-            }
             rotation =
                 initialRotation;
             angularVelocityRadiansPerSecond =

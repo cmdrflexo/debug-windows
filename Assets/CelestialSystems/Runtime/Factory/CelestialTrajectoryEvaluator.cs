@@ -45,6 +45,36 @@ namespace jcan.CelestialSystems
                     universalTimeSeconds, out positionMeters, out velocityMetersPerSecond, out error);
             }
 
+            if (definition.Kind ==
+                CelestialTrajectoryKind.TwoBodyBarycentricComponent)
+            {
+                var pair =
+                    definition.TwoBodyOrbit;
+
+                if (!KeplerianConicTrajectoryEvaluator.TryEvaluateRelativeState(
+                        pair.RelativeTrajectory,
+                        pair.BodyAMassKilograms,
+                        pair.BodyBMassKilograms,
+                        universalTimeSeconds,
+                        out var relativePosition,
+                        out var relativeVelocity,
+                        out error))
+                {
+                    return false;
+                }
+
+                var scale =
+                    pair.GetPositionScale(
+                        definition.TwoBodyComponent);
+                positionMeters =
+                    relativePosition *
+                    scale;
+                velocityMetersPerSecond =
+                    relativeVelocity *
+                    scale;
+                return true;
+            }
+
             if (!IsFinite(
                     referenceMassKilograms) ||
                 referenceMassKilograms <= 0.0 ||
@@ -179,6 +209,20 @@ namespace jcan.CelestialSystems
                 return KeplerianConicTrajectoryEvaluator.TryCalculatePeriodSeconds(
                     definition.Conic, referenceMassKilograms, orbitingMassKilograms,
                     out periodSeconds, out error);
+            }
+
+            if (definition.Kind ==
+                CelestialTrajectoryKind.TwoBodyBarycentricComponent)
+            {
+                var pair =
+                    definition.TwoBodyOrbit;
+                return
+                    KeplerianConicTrajectoryEvaluator.TryCalculatePeriodSeconds(
+                        pair.RelativeTrajectory,
+                        pair.BodyAMassKilograms,
+                        pair.BodyBMassKilograms,
+                        out periodSeconds,
+                        out error);
             }
 
             if (!IsFinite(
