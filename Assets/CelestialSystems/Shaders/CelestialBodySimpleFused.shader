@@ -10,6 +10,9 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
         [HideInInspector] _PlanetCenterScenePosition ("Planet Center", Vector) = (0,0,0,1)
         [HideInInspector] _PlanetRadiusMeters ("Planet Radius", Float) = 1
         [HideInInspector] _SurfaceLightingMode ("Lighting Mode", Float) = 0
+        [HideInInspector] _LimbDarkeningStrength ("Limb Darkening Strength", Range(0, 1)) = 0
+        [HideInInspector] _LimbDarkeningFalloff ("Limb Darkening Falloff", Range(0.1, 8)) = 1.5
+        [HideInInspector] _LimbMinimumBrightness ("Minimum Limb Brightness", Range(0, 1)) = 0.15
 
         [HideInInspector] _ControlFaces ("Control Faces", 2DArray) = "" {}
         [HideInInspector] _OceanFaces ("Ocean Faces", 2DArray) = "" {}
@@ -97,6 +100,9 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
                 float4 _PlanetCenterScenePosition;
                 float _PlanetRadiusMeters;
                 float _SurfaceLightingMode;
+                half _LimbDarkeningStrength;
+                half _LimbDarkeningFalloff;
+                half _LimbMinimumBrightness;
                 half4 _LayerTint0;
                 half4 _LayerTint1;
                 half4 _LayerTint2;
@@ -432,6 +438,23 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
                     z * weights.z;
             }
 
+            half ResolveLimbDarkening(
+                half3 radialNormalWS,
+                half3 viewDirectionWS)
+            {
+                half centerToLimb = pow(
+                    saturate(dot(radialNormalWS, viewDirectionWS)),
+                    max(_LimbDarkeningFalloff, 0.001h));
+                half limbBrightness = lerp(
+                    _LimbMinimumBrightness,
+                    1.0h,
+                    centerToLimb);
+                return lerp(
+                    1.0h,
+                    limbBrightness,
+                    saturate(_LimbDarkeningStrength));
+            }
+
             half4 SimpleFragment(Varyings input) : SV_Target
             {
                 float3 direction =
@@ -549,6 +572,14 @@ Shader "jcan/Celestial Systems/Celestial Body Simple Fused"
                     SafeNormalize(
                         GetWorldSpaceViewDir(
                             input.positionWS));
+                half3 radialNormalWS =
+                    SafeNormalize(
+                        TransformObjectToWorldDir(
+                            direction));
+                emission *=
+                    ResolveLimbDarkening(
+                        radialNormalWS,
+                        viewDirectionWS);
                 half fresnel =
                     pow(
                         1.0 -

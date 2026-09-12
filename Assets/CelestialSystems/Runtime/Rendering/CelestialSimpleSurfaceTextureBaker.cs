@@ -221,6 +221,8 @@ namespace jcan.CelestialSystems
                 patches[0].SurfaceLayerCount);
             BindOcean(
                 definition.OceanDefinition);
+            BindStellarAppearance(
+                surfaceDefinition.Material);
             runtimeMaterial.SetFloat(
                 "_SurfaceLightingMode",
                 (float)appearance.LightingMode);
@@ -530,6 +532,29 @@ namespace jcan.CelestialSystems
                             surfaceLayer.EmissionIntensity
                         : Color.black);
             }
+        }
+
+        private void BindStellarAppearance(
+            Material sourceMaterial)
+        {
+            runtimeMaterial.SetFloat(
+                "_LimbDarkeningStrength",
+                GetMaterialFloat(
+                    sourceMaterial,
+                    "_LimbDarkeningStrength",
+                    0.0f));
+            runtimeMaterial.SetFloat(
+                "_LimbDarkeningFalloff",
+                GetMaterialFloat(
+                    sourceMaterial,
+                    "_LimbDarkeningFalloff",
+                    1.5f));
+            runtimeMaterial.SetFloat(
+                "_LimbMinimumBrightness",
+                GetMaterialFloat(
+                    sourceMaterial,
+                    "_LimbMinimumBrightness",
+                    0.15f));
         }
 
         private void BindOcean(
