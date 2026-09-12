@@ -19,6 +19,10 @@ MonoBehaviour:
   planetQualityProfile: {fileID: 11400000, guid: ba1d5f5d943f2d54abcd356978ea4d8d, type: 2}
   moonDefinition: {fileID: 11400000, guid: 30166974707195e48aa21a3be19273e0, type: 2}
   moonQualityProfile: {fileID: 11400000, guid: 413ccd4ae702bde4ca8ee7ce58140798, type: 2}
+  stellarPhotosphereOrdinarySurface: {fileID: 11400000, guid: f597eacc9f1008a4e83050675604bf59, type: 2}
+  stellarPhotosphereConvectiveSurface: {fileID: 11400000, guid: 7cd6b0707156c8747a3a9b769ee28949, type: 2}
+  stellarPhotosphereAtmosphereDominatedSurface: {fileID: 11400000, guid: 6ada7000fc418db43b7061081f6be245, type: 2}
+  stellarCompactEmitterSurface: {fileID: 11400000, guid: e10beeb0d48a95047a51a0344d20d2f4, type: 2}
   minimumStarRadiusScale: 0.9
   maximumStarRadiusScale: 1.1
   minimumPlanetRadiusScale: 0.5

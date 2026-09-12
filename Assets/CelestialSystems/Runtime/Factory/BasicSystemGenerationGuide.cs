@@ -56,6 +56,19 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private RoundMapMagicSurfaceQualityProfile moonQualityProfile;
 
+        [Header("Generated Stellar Visuals")]
+        [SerializeField]
+        private RoundMapMagicSurfaceDefinition stellarPhotosphereOrdinarySurface;
+
+        [SerializeField]
+        private RoundMapMagicSurfaceDefinition stellarPhotosphereConvectiveSurface;
+
+        [SerializeField]
+        private RoundMapMagicSurfaceDefinition stellarPhotosphereAtmosphereDominatedSurface;
+
+        [SerializeField]
+        private RoundMapMagicSurfaceDefinition stellarCompactEmitterSurface;
+
         [Header("Prototype Orbits")]
         [SerializeField]
         [Range(0.0f, 45.0f)]
@@ -333,7 +346,9 @@ namespace jcan.CelestialSystems
                     "generated-star",
                     random.NextInt(),
                     stellarProperties,
-                    starDescription);
+                    starDescription,
+                    SelectStellarSurfaceDefinition(
+                        stellarProperties));
             ownedRuntimeObjects.Add(
                 star);
 
@@ -357,7 +372,9 @@ namespace jcan.CelestialSystems
                         random.NextInt(),
                         companionProperties,
                         companionDescription +
-                        " It is the secondary member of a binary stellar system.");
+                        " It is the secondary member of a binary stellar system.",
+                        SelectStellarSurfaceDefinition(
+                            companionProperties));
                 ownedRuntimeObjects.Add(
                     companion);
 
@@ -739,7 +756,8 @@ namespace jcan.CelestialSystems
             string definitionId,
             int generationSeed,
             CelestialStellarEvolutionResult properties,
-            string description)
+            string description,
+            RoundMapMagicSurfaceDefinition stellarSurface)
         {
             var definition =
                 CreateInstance<CelestialBodyDefinition>();
@@ -757,13 +775,39 @@ namespace jcan.CelestialSystems
                 prototype.NorthAxis,
                 prototype.PoleReferenceAxis,
                 prototype.SurfaceSystem,
-                prototype.RoundMapMagicSurface,
+                stellarSurface != null
+                    ? stellarSurface
+                    : prototype.RoundMapMagicSurface,
                 prototype.OceanDefinition);
             definition.ConfigureRuntimeStellarProperties(
                 properties);
             definition.ConfigureRuntimeDescription(
                 description);
             return definition;
+        }
+
+        private RoundMapMagicSurfaceDefinition SelectStellarSurfaceDefinition(
+            CelestialStellarEvolutionResult properties)
+        {
+            if (properties.EvolutionState !=
+                    CelestialStellarEvolutionState.MainSequence)
+            {
+                return stellarCompactEmitterSurface;
+            }
+
+            if (properties.EffectiveTemperatureKelvin < 4500.0 ||
+                properties.CurrentMassSolar < 0.7)
+            {
+                return stellarPhotosphereConvectiveSurface;
+            }
+
+            if (properties.EffectiveTemperatureKelvin > 9000.0 ||
+                properties.CurrentMassSolar > 1.5)
+            {
+                return stellarPhotosphereAtmosphereDominatedSurface;
+            }
+
+            return stellarPhotosphereOrdinarySurface;
         }
 
         private static void ReleaseOwnedRuntimeObjects(
