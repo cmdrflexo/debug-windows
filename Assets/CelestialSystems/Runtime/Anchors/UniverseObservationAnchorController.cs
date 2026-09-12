@@ -31,6 +31,30 @@ namespace jcan.CelestialSystems
         [Min(1.0f)]
         private double initialOriginDistanceMeters = 1.0e11;
 
+        [Header("Session View")]
+        [SerializeField] private bool rememberViewOnStop = true;
+        [SerializeField] private CelestialUniverseRuntimeController generationController;
+
+        [Serializable]
+        private sealed class SavedView
+        {
+            public int version = 1;
+            public int seed;
+            public UniversePosition pivot;
+            public double distance;
+            public float yaw;
+            public float pitch;
+            public Vector3 planeNormal;
+            public Vector3 planeForward;
+        }
+
+        private SavedView lastRenderedView;
+        private bool checkedSavedView;
+        private bool hasRenderedPivot;
+        private UniversePosition renderedPivot;
+        private string ViewPreferenceKey =>
+            "CelestialSystems.Observation.LastView.v1." + gameObject.scene.path;
+
         private bool originLocked = true;
         public bool IsOriginLocked => originLocked;
 
@@ -337,6 +361,7 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
+            SaveSessionView();
             UnsubscribeFromDebugMenu();
             DisableAction(pointerDeltaAction, enabledPointerDeltaAction);
             DisableAction(orbitAction, enabledOrbitAction);
@@ -421,6 +446,7 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            TryRestoreSessionView();
             if ((!originLocked && target == null) || anchorBridge == null)
             {
                 hasTargetMotion = false;
@@ -533,6 +559,20 @@ namespace jcan.CelestialSystems
             }
 
             lastError = string.Empty;
+            renderedPivot = pivotPosition;
+            hasRenderedPivot = true;
+            if (rememberViewOnStop && generationController != null &&
+                generationController.GenerationSucceeded)
+            {
+                lastRenderedView ??= new SavedView();
+                lastRenderedView.seed = generationController.ResolvedSeed;
+                lastRenderedView.pivot = pivotPosition;
+                lastRenderedView.distance = distanceMeters;
+                lastRenderedView.yaw = yawDegrees;
+                lastRenderedView.pitch = pitchDegrees;
+                lastRenderedView.planeNormal = referencePlaneNormal;
+                lastRenderedView.planeForward = referencePlaneForward;
+            }
         }
 
         public void SelectTarget(CelestialBodyRuntimeContext newTarget)
@@ -1164,18 +1204,126 @@ namespace jcan.CelestialSystems
         {
             var hasPivot = TryGetObservationPlane(
                 out var previousPivot, out _, out _, out _);
+            // Use the last displayed pivot, not the tracked body's next time step.
+            if (hasRenderedPivot)
+            {
+                previousPivot = renderedPivot;
+                hasPivot = true;
+            }
             originLocked = true;
             selectionController?.LockToOrigin();
             RecenterOnTarget();
             ClearOrbitVelocity();
-            if (hasPivot && TryGetPivotMotion(out var originMotion) &&
-                previousPivot.TryGetOffsetMetersFrom(originMotion.Position, out var offset))
+            targetDistanceMeters = distanceMeters;
+            if (hasPivot)
             {
-                targetTransitionOffsetXMeters = offset.x;
-                targetTransitionOffsetYMeters = offset.y;
-                targetTransitionOffsetZMeters = offset.z;
+                SetOriginPivot(previousPivot);
             }
             recenterZoomArmed = false;
+        }
+
+        private void SetOriginPivot(UniversePosition position)
+        {
+            if (!TryGetPivotMotion(out var originMotion) ||
+                !position.TryGetOffsetMetersFrom(originMotion.Position, out var offset))
+            {
+                return;
+            }
+
+            GetReferencePlaneAxes(out var right, out var forward, out var up);
+            plateOffsetRightMeters = Dot(offset, right);
+            plateOffsetForwardMeters = Dot(offset, forward);
+            planeElevationMeters = Dot(offset, up);
+            targetPlaneElevationMeters = planeElevationMeters;
+            ClearTargetTransition();
+        }
+
+        private void OnApplicationQuit()
+        {
+            SaveSessionView();
+        }
+
+        private void SaveSessionView()
+        {
+            // Cache after rendering so destruction order cannot erase the seed or pose.
+            if (!rememberViewOnStop || lastRenderedView == null)
+            {
+                return;
+            }
+            PlayerPrefs.SetString(ViewPreferenceKey, JsonUtility.ToJson(lastRenderedView));
+            PlayerPrefs.Save();
+        }
+
+        private void TryRestoreSessionView()
+        {
+            if (!rememberViewOnStop || checkedSavedView)
+            {
+                return;
+            }
+            if (generationController == null)
+            {
+                generationController = FindFirstObjectByType<CelestialUniverseRuntimeController>();
+            }
+            if (generationController == null || !generationController.GenerationSucceeded)
+            {
+                return;
+            }
+
+            checkedSavedView = true;
+            var json = PlayerPrefs.GetString(ViewPreferenceKey, string.Empty);
+            if (string.IsNullOrEmpty(json))
+            {
+                return;
+            }
+
+            SavedView saved;
+            try
+            {
+                saved = JsonUtility.FromJson<SavedView>(json);
+            }
+            catch (ArgumentException)
+            {
+                return;
+            }
+            if (saved == null || saved.version != 1 ||
+                saved.seed != generationController.ResolvedSeed ||
+                !IsFiniteViewValue(saved.distance) || saved.distance < 1.0 ||
+                !IsFiniteViewValue(saved.yaw) || !IsFiniteViewValue(saved.pitch) ||
+                !IsFiniteViewVector(saved.planeNormal) ||
+                !IsFiniteViewVector(saved.planeForward) ||
+                !saved.pivot.TryGetOffsetMetersFrom(default(UniversePosition), out var offset) ||
+                !IsFiniteViewValue(offset.x) || !IsFiniteViewValue(offset.y) ||
+                !IsFiniteViewValue(offset.z))
+            {
+                return;
+            }
+
+            // Restore a spatial view, not a body-relative offset: simulation time restarts.
+            originLocked = true;
+            selectionController?.LockToOrigin();
+            referencePlaneNormal = saved.planeNormal;
+            referencePlaneForward = saved.planeForward;
+            NormalizeReferencePlane();
+            yawDegrees = saved.yaw;
+            pitchDegrees = Mathf.Clamp(saved.pitch, -80.0f, 80.0f);
+            distanceMeters = Math.Min(saved.distance, maximumDistanceMeters);
+            targetDistanceMeters = distanceMeters;
+            SetOriginPivot(saved.pivot);
+            ClearPanVelocity();
+            ClearOrbitVelocity();
+            viewInitialized = true;
+            recenterZoomArmed = false;
+        }
+
+        private static bool IsFiniteViewValue(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static bool IsFiniteViewVector(Vector3 value)
+        {
+            return IsFiniteViewValue(value.x) && IsFiniteViewValue(value.y) &&
+                IsFiniteViewValue(value.z) && value.sqrMagnitude > Mathf.Epsilon;
         }
 
         private void ResolveReferences()
