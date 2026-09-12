@@ -1683,54 +1683,127 @@ namespace jcan.CelestialSystems.Editor
                 return null;
             }
 
+            object orderedCandidate =
+                null;
+            var index =
+                0;
             var layers =
                 GetPropertyValue(
                     surfaceAppearance,
                     "Layers") as
                     IEnumerable;
-            object orderedCandidate =
-                null;
-            var index =
-                0;
 
-            if (layers == null)
+            if (layers != null)
+            {
+                foreach (var candidate in
+                    layers)
+                {
+                    var resolved =
+                        ResolveMatchingSurfaceLayer(
+                            candidate,
+                            terrainLayer,
+                            terrainIndex,
+                            index,
+                            ref orderedCandidate);
+
+                    if (resolved != null)
+                    {
+                        return resolved;
+                    }
+
+                    index++;
+                }
+
+                return orderedCandidate;
+            }
+
+            var getLayer =
+                surfaceAppearance.GetType().GetMethod(
+                    "GetLayer",
+                    BindingFlags.Instance |
+                    BindingFlags.Public,
+                    null,
+                    new[]
+                    {
+                        typeof(
+                            int)
+                    },
+                    null);
+            var layerCount =
+                Mathf.Max(
+                    0,
+                    Mathf.RoundToInt(
+                        GetSurfaceFloat(
+                            surfaceAppearance,
+                            "LayerCount",
+                            0.0f)));
+
+            if (getLayer == null)
             {
                 return null;
             }
 
-            foreach (var candidate in
-                layers)
+            for (index = 0;
+                index < layerCount;
+                index++)
             {
-                if (candidate == null)
-                {
-                    index++;
-                    continue;
-                }
-
-                var mappedTerrainLayer =
-                    GetPropertyValue(
+                var candidate =
+                    getLayer.Invoke(
+                        surfaceAppearance,
+                        new object[]
+                        {
+                            index
+                        });
+                var resolved =
+                    ResolveMatchingSurfaceLayer(
                         candidate,
-                        "MapMagicTerrainLayer") as
-                        TerrainLayer;
+                        terrainLayer,
+                        terrainIndex,
+                        index,
+                        ref orderedCandidate);
 
-                if (mappedTerrainLayer != null &&
-                    mappedTerrainLayer ==
-                        terrainLayer)
+                if (resolved != null)
                 {
-                    return candidate;
+                    return resolved;
                 }
-
-                if (index == terrainIndex &&
-                    mappedTerrainLayer == null)
-                {
-                    orderedCandidate =
-                        candidate;
-                }
-
-                index++;
             }
 
             return orderedCandidate;
+        }
+
+        private static object ResolveMatchingSurfaceLayer(
+            object candidate,
+            TerrainLayer terrainLayer,
+            int terrainIndex,
+            int index,
+            ref object orderedCandidate)
+        {
+            if (candidate == null)
+            {
+                return null;
+            }
+
+            var mappedTerrainLayer =
+                GetPropertyValue(
+                    candidate,
+                    "MapMagicTerrainLayer") as
+                    TerrainLayer;
+
+            if (mappedTerrainLayer != null &&
+                mappedTerrainLayer ==
+                    terrainLayer)
+            {
+                return candidate;
+            }
+
+            if (index == terrainIndex &&
+                mappedTerrainLayer == null)
+            {
+                orderedCandidate =
+                    candidate;
+            }
+
+            return null;
         }
 
         private static Texture2D GetSurfaceTexture(
