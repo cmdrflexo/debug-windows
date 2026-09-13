@@ -688,21 +688,60 @@ namespace jcan.CelestialSystems
             CelestialBodyRuntimeContext body,
             CelestialBodyDefinition definition)
         {
-            if (body == null ||
-                definition == null ||
-                !definition.GravitationalLensing.HasValidSettings)
+            if (body == null)
             {
                 return;
             }
 
+            var lenses =
+                body.GetComponentsInChildren<
+                    CelestialGravitationalLens>(
+                        true);
             var lens =
-                body.GetComponent<CelestialGravitationalLens>();
+                body.GetComponent<
+                    CelestialGravitationalLens>();
+
+            if (definition == null ||
+                !definition.GravitationalLensing.HasValidSettings)
+            {
+                for (var index = 0;
+                    index < lenses.Length;
+                    index++)
+                {
+                    if (lenses[index] != null)
+                    {
+                        lenses[index].enabled = false;
+                    }
+                }
+
+                return;
+            }
+
+            if (lens == null &&
+                lenses.Length > 0)
+            {
+                lens = lenses[0];
+            }
+
             if (lens == null)
             {
                 lens =
-                    body.gameObject.AddComponent<CelestialGravitationalLens>();
+                    body.gameObject.AddComponent<
+                        CelestialGravitationalLens>();
             }
 
+            for (var index = 0;
+                index < lenses.Length;
+                index++)
+            {
+                if (lenses[index] != null &&
+                    lenses[index] != lens)
+                {
+                    lenses[index].enabled = false;
+                }
+            }
+
+            lens.enabled = true;
             lens.Initialize(body);
         }
 
