@@ -20,8 +20,9 @@ namespace jcan.CelestialSystems
             "Universal Render Pipeline/Lit";
         private const int DefaultAngularSegments =
             256;
+        // Retains narrow generated divisions until the dedicated shader takes over.
         private const int GradientTextureWidth =
-            256;
+            1024;
 
         [SerializeField]
         [Min(16)]
@@ -149,9 +150,21 @@ namespace jcan.CelestialSystems
                         Mathf.Max(
                             16,
                             angularSegments));
+                var density =
+                    index <
+                        definition.RingDensityGradients.Count
+                        ? definition.RingDensityGradients[index]
+                        : null;
+                var population =
+                    index <
+                        definition.RingPopulationGradients.Count
+                        ? definition.RingPopulationGradients[index]
+                        : null;
                 var texture =
                     BakeGradient(
-                        gradient);
+                        gradient,
+                        density,
+                        population);
                 var material =
                     BuildMaterial(
                         shader,
@@ -324,7 +337,9 @@ namespace jcan.CelestialSystems
         }
 
         private static Texture2D BakeGradient(
-            Gradient gradient)
+            Gradient albedo,
+            AnimationCurve density,
+            AnimationCurve population)
         {
             var texture =
                 new Texture2D(
@@ -351,11 +366,40 @@ namespace jcan.CelestialSystems
                 var fraction =
                     (float)index /
                     (colors.Length - 1);
-                colors[index] =
-                    gradient != null
-                        ? gradient.Evaluate(
+                var color =
+                    albedo != null
+                        ? albedo.Evaluate(
                             fraction)
                         : Color.white;
+                var densityValue =
+                    density != null
+                        ? Mathf.Clamp01(
+                            density.Evaluate(
+                                fraction))
+                        : 1.0f;
+                var populationValue =
+                    population != null
+                        ? Mathf.Clamp01(
+                            population.Evaluate(
+                                fraction))
+                        : densityValue;
+
+                // Both curves contain the generated divisions. Combining their
+                // coverage keeps a division dark even when just one curve drops,
+                // while sqrt avoids making the whole baseline ring too dim.
+                var coverage =
+                    Mathf.Sqrt(
+                        densityValue *
+                        populationValue);
+                color.rgb *=
+                    Mathf.Lerp(
+                        0.18f,
+                        1.0f,
+                        coverage);
+                color.a *=
+                    coverage;
+                colors[index] =
+                    color;
             }
 
             texture.SetPixels(
