@@ -391,11 +391,17 @@ namespace jcan.CelestialSystems
                     Mathf.Sqrt(
                         densityValue *
                         populationValue);
-                color.rgb *=
+                var brightness =
                     Mathf.Lerp(
                         0.18f,
                         1.0f,
                         coverage);
+                color.r *=
+                    brightness;
+                color.g *=
+                    brightness;
+                color.b *=
+                    brightness;
                 color.a *=
                     coverage;
                 colors[index] =
