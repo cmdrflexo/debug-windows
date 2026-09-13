@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace jcan.CelestialSystems
 {
@@ -75,8 +76,10 @@ namespace jcan.CelestialSystems
             VisibleLenses.Clear();
             Camera.onPreCull -=
                 BindVisibleLenses;
-            Camera.onPreCull +=
-                BindVisibleLenses;
+            RenderPipelineManager.beginCameraRendering -=
+                HandleBeginCameraRendering;
+            RenderPipelineManager.beginCameraRendering +=
+                HandleBeginCameraRendering;
         }
 
         private void Reset()
@@ -124,6 +127,14 @@ namespace jcan.CelestialSystems
                     GetComponentInParent<
                         CelestialBodyRuntimeContext>();
             }
+        }
+
+        private static void HandleBeginCameraRendering(
+            ScriptableRenderContext context,
+            Camera camera)
+        {
+            BindVisibleLenses(
+                camera);
         }
 
         private static void BindVisibleLenses(
