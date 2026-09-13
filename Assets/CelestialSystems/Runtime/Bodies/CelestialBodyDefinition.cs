@@ -69,6 +69,22 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private double stellarEffectiveTemperatureKelvin;
 
+        [Header("Generated Stellar Magnetic Activity")]
+        [SerializeField]
+        private bool hasStellarMagneticActivityProperties;
+
+        [SerializeField]
+        private CelestialStellarMagneticActivity stellarMagneticActivity;
+
+        [SerializeField]
+        private bool stellarMagneticBeamVisible;
+
+        [SerializeField]
+        private double stellarMagneticAxisTiltDegrees;
+
+        [SerializeField]
+        private double stellarMagneticBeamStrength;
+
         [Header("Generated Planet Formation Properties")]
         [SerializeField]
         private bool hasPlanetFormationProperties;
@@ -292,6 +308,21 @@ namespace jcan.CelestialSystems
         public double StellarEffectiveTemperatureKelvin =>
             stellarEffectiveTemperatureKelvin;
 
+        public bool HasStellarMagneticActivityProperties =>
+            hasStellarMagneticActivityProperties;
+
+        public CelestialStellarMagneticActivity StellarMagneticActivity =>
+            stellarMagneticActivity;
+
+        public bool StellarMagneticBeamVisible =>
+            stellarMagneticBeamVisible;
+
+        public double StellarMagneticAxisTiltDegrees =>
+            stellarMagneticAxisTiltDegrees;
+
+        public double StellarMagneticBeamStrength =>
+            stellarMagneticBeamStrength;
+
         public bool HasPlanetFormationProperties =>
             hasPlanetFormationProperties;
 
@@ -503,6 +534,11 @@ namespace jcan.CelestialSystems
             stellarInitialMassSolar = 0.0;
             stellarLuminositySolar = 0.0;
             stellarEffectiveTemperatureKelvin = 0.0;
+            hasStellarMagneticActivityProperties = false;
+            stellarMagneticActivity = CelestialStellarMagneticActivity.None;
+            stellarMagneticBeamVisible = false;
+            stellarMagneticAxisTiltDegrees = 0.0;
+            stellarMagneticBeamStrength = 0.0;
             hasPlanetFormationProperties = false;
             planetFormationClass =
                 CelestialPlanetFormationClass.Rocky;
@@ -594,6 +630,16 @@ namespace jcan.CelestialSystems
                 properties.LuminositySolar;
             stellarEffectiveTemperatureKelvin =
                 properties.EffectiveTemperatureKelvin;
+        }
+
+        internal void ConfigureRuntimeStellarMagneticActivityProperties(
+            CelestialStellarMagneticActivityResult properties)
+        {
+            hasStellarMagneticActivityProperties = true;
+            stellarMagneticActivity = properties.Activity;
+            stellarMagneticBeamVisible = properties.HasVisibleBeam;
+            stellarMagneticAxisTiltDegrees = properties.MagneticAxisTiltDegrees;
+            stellarMagneticBeamStrength = properties.BeamStrength;
         }
 
         internal void ConfigureRuntimePlanetFormationProperties(

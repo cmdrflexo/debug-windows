@@ -354,6 +354,8 @@ namespace jcan.CelestialSystems
 
             if (!CelestialBodyRotationModel.TryEvaluateStar(random.NextInt(), stellarProperties, out var starRotation, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
             star.ConfigureRuntimeRotationProperties(starRotation);
+            if (!CelestialStellarMagneticActivityModel.TryEvaluate(random.NextInt(), stellarProperties, starRotation, out var starMagneticActivity, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
+            star.ConfigureRuntimeStellarMagneticActivityProperties(starMagneticActivity);
 
             var referencePoints =
                 new List<CelestialStarSystemPlan.ReferencePointPlan>();
@@ -383,6 +385,8 @@ namespace jcan.CelestialSystems
 
                 if (!CelestialBodyRotationModel.TryEvaluateStar(random.NextInt(), companionProperties, out var companionRotation, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
                 companion.ConfigureRuntimeRotationProperties(companionRotation);
+                if (!CelestialStellarMagneticActivityModel.TryEvaluate(random.NextInt(), companionProperties, companionRotation, out var companionMagneticActivity, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
+                companion.ConfigureRuntimeStellarMagneticActivityProperties(companionMagneticActivity);
 
                 var totalStellarMassKilograms =
                     star.MassKilograms +
