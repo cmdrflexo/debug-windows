@@ -48,6 +48,11 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private OceanDefinition oceanDefinition;
 
+        [Header("Gravitational Lensing")]
+        [SerializeField]
+        private CelestialGravitationalLensingSettings gravitationalLensing =
+            CelestialGravitationalLensingSettings.Default;
+
         [Header("Generated Stellar Properties")]
         [SerializeField]
         private bool hasStellarProperties;
@@ -269,6 +274,9 @@ namespace jcan.CelestialSystems
         public OceanDefinition OceanDefinition =>
             oceanDefinition;
 
+        public CelestialGravitationalLensingSettings GravitationalLensing =>
+            gravitationalLensing;
+
         public bool HasStellarProperties =>
             hasStellarProperties;
 
@@ -487,6 +495,8 @@ namespace jcan.CelestialSystems
             surfaceSystem = newSurfaceSystem;
             roundMapMagicSurface = newRoundMapMagicSurface;
             oceanDefinition = newOceanDefinition;
+            gravitationalLensing =
+                CelestialGravitationalLensingSettings.Default;
             hasStellarProperties = false;
             stellarEvolutionState =
                 CelestialStellarEvolutionState.MainSequence;

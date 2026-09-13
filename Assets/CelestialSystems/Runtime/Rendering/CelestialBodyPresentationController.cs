@@ -217,6 +217,19 @@ namespace jcan.CelestialSystems
                     CelestialBodyShaderController>();
             }
 
+            var gravitationalLens =
+                body.VisualRoot.GetComponent<
+                    CelestialGravitationalLens>();
+            if (gravitationalLens == null)
+            {
+                gravitationalLens =
+                    body.VisualRoot.gameObject.AddComponent<
+                        CelestialGravitationalLens>();
+            }
+
+            gravitationalLens.Initialize(
+                body);
+
             initialized = true;
             ApplyRequestedMode();
             return true;
