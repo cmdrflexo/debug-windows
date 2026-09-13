@@ -176,23 +176,25 @@ namespace jcan.CelestialSystems
             int index,
             int count)
         {
-            if (count <= 1)
-            {
-                return new Color(
-                    0.1f,
-                    0.9f,
-                    1.0f,
-                    0.9f);
-            }
+            var fraction =
+                count <= 1
+                    ? 0.0f
+                    : Mathf.Clamp01(
+                        (float)index /
+                        (count - 1));
 
-            var hue =
-                Mathf.Repeat(
-                    index * 0.61803398875f,
-                    1.0f);
-            return Color.HSVToRGB(
-                hue,
-                0.8f,
-                1.0f);
+            return Color.Lerp(
+                new Color(
+                    0.84f,
+                    0.68f,
+                    1.0f,
+                    0.90f),
+                new Color(
+                    0.30f,
+                    0.08f,
+                    0.58f,
+                    0.95f),
+                fraction);
         }
     }
 }
