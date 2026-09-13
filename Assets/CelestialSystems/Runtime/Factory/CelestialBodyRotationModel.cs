@@ -48,6 +48,17 @@ namespace jcan.CelestialSystems
         private const double SolarMassKilograms = 1.98847e30;
         private const double AstronomicalUnitMeters = 149597870700.0;
 
+        public static bool TryEvaluateStar(int seed, CelestialStellarEvolutionResult stellar, out CelestialBodyRotationResult result, out string error)
+        {
+            result = default; error = string.Empty;
+            if (!IsFinitePositive(stellar.CurrentMassSolar)) { error = "Stellar rotation requires a valid present-day stellar mass."; return false; }
+            var random = new DeterministicRandom(seed);
+            var remnant = stellar.EvolutionState != CelestialStellarEvolutionState.MainSequence;
+            result = new CelestialBodyRotationResult(RandomLogRange(ref random, remnant ? 0.1 : 8.0, remnant ? 240.0 : 720.0), random.NextRange(0.0, remnant ? 60.0 : 45.0), random.Next01() < (remnant ? 0.02 : 0.05) ? CelestialSpinDirection.Retrograde : CelestialSpinDirection.Prograde, CelestialSpinState.FreeRotating);
+            if (!HasValidResult(result)) { result = default; error = "The rotation model produced an invalid stellar rotation state."; return false; }
+            return true;
+        }
+
         public static bool TryEvaluatePlanet(
             int seed,
             CelestialPlanetFormationResult planet,

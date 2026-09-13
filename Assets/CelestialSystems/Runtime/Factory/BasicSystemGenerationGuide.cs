@@ -352,6 +352,9 @@ namespace jcan.CelestialSystems
             ownedRuntimeObjects.Add(
                 star);
 
+            if (!CelestialBodyRotationModel.TryEvaluateStar(random.NextInt(), stellarProperties, out var starRotation, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
+            star.ConfigureRuntimeRotationProperties(starRotation);
+
             var referencePoints =
                 new List<CelestialStarSystemPlan.ReferencePointPlan>();
 
@@ -377,6 +380,9 @@ namespace jcan.CelestialSystems
                             companionProperties));
                 ownedRuntimeObjects.Add(
                     companion);
+
+                if (!CelestialBodyRotationModel.TryEvaluateStar(random.NextInt(), companionProperties, out var companionRotation, out error)) { ReleaseOwnedRuntimeObjects(ownedRuntimeObjects); return false; }
+                companion.ConfigureRuntimeRotationProperties(companionRotation);
 
                 var totalStellarMassKilograms =
                     star.MassKilograms +
