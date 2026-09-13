@@ -140,7 +140,7 @@ namespace jcan.CelestialSystems
 
             var origin = SelectOrigin(planet, firstMoonPeriapsisMeters, rocheLimitMeters, ref random);
             var bandCount =
-                outerRadiusMeters > innerRadiusMeters * 2.25 &&
+                outerRadiusMeters > innerRadiusMeters * 1.45 &&
                 random.Next01() < 0.48
                     ? 2
                     : 1;
