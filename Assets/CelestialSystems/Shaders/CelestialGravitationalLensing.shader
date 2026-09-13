@@ -24,6 +24,7 @@ Shader "jcan/Celestial Systems/Gravitational Lensing Full Screen"
             #pragma vertex Vert
             #pragma fragment Fragment
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             #define JCAN_CELESTIAL_MAXIMUM_LENSES 8
