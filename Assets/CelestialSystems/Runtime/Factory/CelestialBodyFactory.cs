@@ -665,6 +665,9 @@ namespace jcan.CelestialSystems
                 instance,
                 request.Definition,
                 hierarchy.VisualRoot);
+            AttachRingSystemDebugGizmos(
+                instance,
+                request.Definition);
 
             spawnedBodies.Add(
                 request.InstanceId,
@@ -682,6 +685,38 @@ namespace jcan.CelestialSystems
             BodySpawned?.Invoke(
                 instance);
             return true;
+        }
+
+        private static void AttachRingSystemDebugGizmos(
+            CelestialBodyRuntimeContext body,
+            CelestialBodyDefinition definition)
+        {
+            var gizmo =
+                body != null
+                    ? body.GetComponent<CelestialRingSystemDebugGizmos>()
+                    : null;
+
+            if (definition == null ||
+                !definition.HasRingSystemProperties)
+            {
+                if (gizmo != null)
+                {
+                    gizmo.enabled = false;
+                }
+
+                return;
+            }
+
+            if (gizmo == null)
+            {
+                gizmo =
+                    body.gameObject.AddComponent<
+                        CelestialRingSystemDebugGizmos>();
+            }
+
+            gizmo.Initialize(
+                body);
+            gizmo.enabled = true;
         }
 
         private static void AttachGravitationalLensing(

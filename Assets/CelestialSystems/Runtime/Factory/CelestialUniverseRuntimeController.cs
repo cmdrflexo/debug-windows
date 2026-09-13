@@ -12,7 +12,7 @@ using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
-    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem }
+    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem, RingRichSystem }
 
     [DisallowMultipleComponent]
     public sealed class CelestialUniverseRuntimeController :
@@ -1238,6 +1238,8 @@ namespace jcan.CelestialSystems
             var states = new List<CelestialStellarEvolutionState>();
             var planets = 0;
             var moons = 0;
+            var ringedPlanets = 0;
+            var complexRingSystems = 0;
             foreach (var system in plan.BodySystems)
             {
                 foreach (var entry in system.Definition.Bodies)
@@ -1245,7 +1247,21 @@ namespace jcan.CelestialSystems
                     var body = entry.Definition;
                     if (body == null) continue;
                     if (body.HasStellarProperties) states.Add(body.StellarEvolutionState);
-                    else if (body.HasPlanetFormationProperties) planets++;
+                    else if (body.HasPlanetFormationProperties)
+                    {
+                        planets++;
+
+                        if (body.HasRingSystemProperties)
+                        {
+                            ringedPlanets++;
+
+                            if (body.RingBandInnerRadiiMeters != null &&
+                                body.RingBandInnerRadiiMeters.Count > 1)
+                            {
+                                complexRingSystems++;
+                            }
+                        }
+                    }
                     else if (body.HasMoonFormationProperties) moons++;
                 }
             }
@@ -1278,6 +1294,8 @@ namespace jcan.CelestialSystems
                 case CelestialDebugStarSystemArrangement.RemnantWithPlanets: return Remnant(states) && planets > 0;
                 case CelestialDebugStarSystemArrangement.SystemWithMoons: return moons > 0;
                 case CelestialDebugStarSystemArrangement.MoonRichSystem: return moons >= 4;
+                case CelestialDebugStarSystemArrangement.RingRichSystem:
+                    return ringedPlanets >= 2 || complexRingSystems >= 1;
                 default: return false;
             }
         }
