@@ -14,19 +14,42 @@ namespace jcan.CelestialSystems
         ImpactDebris = 2
     }
 
+    public readonly struct CelestialRingDivision
+    {
+        public CelestialRingDivision(
+            double centerFraction,
+            double halfWidthFraction,
+            double densityMultiplier)
+        {
+            CenterFraction = centerFraction;
+            HalfWidthFraction = halfWidthFraction;
+            DensityMultiplier = densityMultiplier;
+        }
+
+        public double CenterFraction { get; }
+
+        public double HalfWidthFraction { get; }
+
+        public double DensityMultiplier { get; }
+    }
+
     public readonly struct CelestialRingBand
     {
         public CelestialRingBand(
             double innerRadiusMeters,
-            double outerRadiusMeters)
+            double outerRadiusMeters,
+            CelestialRingDivision[] divisions = null)
         {
             InnerRadiusMeters = innerRadiusMeters;
             OuterRadiusMeters = outerRadiusMeters;
+            Divisions = divisions ?? Array.Empty<CelestialRingDivision>();
         }
 
         public double InnerRadiusMeters { get; }
 
         public double OuterRadiusMeters { get; }
+
+        public CelestialRingDivision[] Divisions { get; }
     }
 
     public readonly struct CelestialRingSystemResult
@@ -149,6 +172,17 @@ namespace jcan.CelestialSystems
                 SelectOpticalDepth(planet, origin, ref random);
             var iceMassFraction =
                 SelectIceMassFraction(planet, origin, ref random);
+            for (var index = 0; index < bands.Length; index++)
+            {
+                bands[index] = new CelestialRingBand(
+                    bands[index].InnerRadiusMeters,
+                    bands[index].OuterRadiusMeters,
+                    CreateDivisions(
+                        origin,
+                        bands[index],
+                        ref random));
+            }
+
             var shepherdCount =
                 CountOuterShepherds(
                     moonSystem.Moons,
@@ -262,6 +296,30 @@ namespace jcan.CelestialSystems
                     gapCenter + gapWidth * 0.5,
                     outerRadiusMeters)
             };
+        }
+
+        private static CelestialRingDivision[] CreateDivisions(
+            CelestialRingFormationOrigin origin,
+            CelestialRingBand band,
+            ref RingDeterministicRandom random)
+        {
+            var count =
+                origin == CelestialRingFormationOrigin.DisruptedSatellite
+                    ? random.NextInclusive(1, 4)
+                    : origin == CelestialRingFormationOrigin.PrimordialDebris
+                        ? random.NextInclusive(0, 3)
+                        : random.NextInclusive(0, 2);
+            var result = new CelestialRingDivision[count];
+
+            for (var index = 0; index < count; index++)
+            {
+                result[index] = new CelestialRingDivision(
+                    random.NextRange(0.08, 0.92),
+                    random.NextRange(0.006, 0.035),
+                    random.NextRange(0.0, 0.12));
+            }
+
+            return result;
         }
 
         private static double SelectOpticalDepth(
@@ -451,6 +509,15 @@ namespace jcan.CelestialSystems
                 {
                     state = 0x6D2B79F5u;
                 }
+            }
+
+            public int NextInclusive(
+                int minimum,
+                int maximum)
+            {
+                return minimum +
+                    (int)(NextUInt() %
+                        (uint)(maximum - minimum + 1));
             }
 
             public double Next01()

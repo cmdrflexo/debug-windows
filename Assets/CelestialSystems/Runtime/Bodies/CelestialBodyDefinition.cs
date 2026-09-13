@@ -973,6 +973,33 @@ namespace jcan.CelestialSystems
             ringParticleScaleGradients[index] = CreateCurve(0.08f + ice * 0.45f, 0.18f + ice * 1.8f, 0.05f + ice * 0.7f);
             ringPopulationGradients[index] = CreateCurve(density * 0.85f, density, density * 0.62f);
             ringVerticalThicknessGradients[index] = CreateCurve(8.0f + (1.0f - ice) * 18.0f, 14.0f + (1.0f - ice) * 35.0f, 10.0f + (1.0f - ice) * 25.0f);
+
+            foreach (var division in properties.Bands[index].Divisions)
+            {
+                StampDivision(
+                    ringDensityGradients[index],
+                    division);
+                StampDivision(
+                    ringPopulationGradients[index],
+                    division);
+            }
+        }
+
+        private static void StampDivision(
+            AnimationCurve curve,
+            CelestialRingDivision division)
+        {
+            var center = Mathf.Clamp01((float)division.CenterFraction);
+            var halfWidth = Mathf.Max(0.0001f, (float)division.HalfWidthFraction);
+            var left = Mathf.Clamp01(center - halfWidth);
+            var right = Mathf.Clamp01(center + halfWidth);
+            var baseline = curve.Evaluate(center);
+            var divisionValue = baseline *
+                Mathf.Clamp01((float)division.DensityMultiplier);
+
+            curve.AddKey(new Keyframe(left, baseline));
+            curve.AddKey(new Keyframe(center, divisionValue));
+            curve.AddKey(new Keyframe(right, baseline));
         }
 
         private static Gradient CreateGradient(
