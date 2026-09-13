@@ -1,7 +1,7 @@
 /*
  * Builds a simple runtime annulus for every generated planetary-ring band.
- * This is the baseline presentation pass; a dedicated ring shader can replace
- * the temporary URP/Lit material without changing the generated mesh data.
+ * A dedicated two-sided ring shader uses the baked density channel for both
+ * visible transparency and shadow-map coverage.
  */
 
 using System.Collections.Generic;
@@ -16,8 +16,8 @@ namespace jcan.CelestialSystems
     {
         private const string GeneratedRootName =
             "Generated Rings";
-        private const string LitShaderName =
-            "Universal Render Pipeline/Lit";
+        private const string RingShaderName =
+            "jcan/Celestial Systems/Celestial Ring";
         private const int DefaultAngularSegments =
             256;
         // Retains narrow generated divisions until the dedicated shader takes over.
@@ -96,12 +96,12 @@ namespace jcan.CelestialSystems
 
             var shader =
                 Shader.Find(
-                    LitShaderName);
+                    RingShaderName);
 
             if (shader == null)
             {
                 return Fail(
-                    $"Ring mesh presentation could not resolve shader '{LitShaderName}'.");
+                    $"Ring mesh presentation could not resolve shader '{RingShaderName}'.");
             }
 
             generatedRoot =
@@ -350,7 +350,7 @@ namespace jcan.CelestialSystems
                     true)
                 {
                     name =
-                        "Celestial Ring Albedo (Runtime)",
+                        "Celestial Ring Data (Runtime)",
                     wrapMode =
                         TextureWrapMode.Clamp,
                     filterMode =
@@ -402,8 +402,11 @@ namespace jcan.CelestialSystems
                     brightness;
                 color.b *=
                     brightness;
-                color.a *=
-                    coverage;
+                // Alpha is the authored density curve itself. The ring shader
+                // uses it for opacity and dithered shadow coverage, so a
+                // generated division removes both visible material and shadow.
+                color.a =
+                    densityValue;
                 colors[index] =
                     color;
             }
@@ -433,36 +436,17 @@ namespace jcan.CelestialSystems
                 };
 
             material.SetTexture(
-                "_BaseMap",
+                "_RingData",
                 texture);
-            material.SetColor(
-                "_BaseColor",
-                Color.white);
             material.SetFloat(
-                "_Surface",
+                "_Opacity",
                 1.0f);
             material.SetFloat(
-                "_Blend",
-                0.0f);
+                "_DensityCutoff",
+                0.005f);
             material.SetFloat(
-                "_ZWrite",
-                0.0f);
-            material.SetFloat(
-                "_Cull",
-                0.0f);
-            material.SetFloat(
-                "_AlphaClip",
-                1.0f);
-            material.SetFloat(
-                "_Cutoff",
-                0.01f);
-            material.EnableKeyword(
-                "_SURFACE_TYPE_TRANSPARENT");
-            material.EnableKeyword(
-                "_ALPHATEST_ON");
-            material.SetOverrideTag(
-                "RenderType",
-                "Transparent");
+                "_AmbientStrength",
+                0.2f);
             return material;
         }
 
