@@ -221,6 +221,37 @@ namespace jcan.CelestialSystems
         private CelestialMoonTidalMigrationSensitivity moonTidalMigrationSensitivity;
 
         [Header("Generated Rotation Properties")]
+        [Header("Generated Ring System Properties")]
+        [SerializeField]
+        private bool hasRingSystemProperties;
+
+        [SerializeField]
+        private CelestialRingFormationOrigin ringFormationOrigin =
+            CelestialRingFormationOrigin.PrimordialDebris;
+
+        [SerializeField]
+        private double ringInnerRadiusMeters;
+
+        [SerializeField]
+        private double ringOuterRadiusMeters;
+
+        [SerializeField]
+        private double ringOpticalDepth;
+
+        [SerializeField]
+        private double ringIceMassFraction;
+
+        [SerializeField]
+        private double[] ringBandInnerRadiiMeters =
+            Array.Empty<double>();
+
+        [SerializeField]
+        private double[] ringBandOuterRadiiMeters =
+            Array.Empty<double>();
+
+        [SerializeField]
+        private int ringOuterShepherdMoonCount;
+
         [SerializeField]
         private bool hasRotationProperties;
 
@@ -452,6 +483,33 @@ namespace jcan.CelestialSystems
         public CelestialMoonTidalMigrationSensitivity MoonTidalMigrationSensitivity =>
             moonTidalMigrationSensitivity;
 
+        public bool HasRingSystemProperties =>
+            hasRingSystemProperties;
+
+        public CelestialRingFormationOrigin RingFormationOrigin =>
+            ringFormationOrigin;
+
+        public double RingInnerRadiusMeters =>
+            ringInnerRadiusMeters;
+
+        public double RingOuterRadiusMeters =>
+            ringOuterRadiusMeters;
+
+        public double RingOpticalDepth =>
+            ringOpticalDepth;
+
+        public double RingIceMassFraction =>
+            ringIceMassFraction;
+
+        public IReadOnlyList<double> RingBandInnerRadiiMeters =>
+            ringBandInnerRadiiMeters;
+
+        public IReadOnlyList<double> RingBandOuterRadiiMeters =>
+            ringBandOuterRadiiMeters;
+
+        public int RingOuterShepherdMoonCount =>
+            ringOuterShepherdMoonCount;
+
         public bool HasRotationProperties =>
             hasRotationProperties;
 
@@ -594,6 +652,18 @@ namespace jcan.CelestialSystems
                 CelestialMoonTidalHeating.Negligible;
             moonTidalMigrationSensitivity =
                 CelestialMoonTidalMigrationSensitivity.Low;
+            hasRingSystemProperties = false;
+            ringFormationOrigin =
+                CelestialRingFormationOrigin.PrimordialDebris;
+            ringInnerRadiusMeters = 0.0;
+            ringOuterRadiusMeters = 0.0;
+            ringOpticalDepth = 0.0;
+            ringIceMassFraction = 0.0;
+            ringBandInnerRadiiMeters =
+                Array.Empty<double>();
+            ringBandOuterRadiiMeters =
+                Array.Empty<double>();
+            ringOuterShepherdMoonCount = 0;
             hasRotationProperties = false;
             rotationPeriodHours = 0.0;
             axialTiltDegrees = 0.0;
@@ -747,6 +817,56 @@ namespace jcan.CelestialSystems
                 properties.TidalHeating;
             moonTidalMigrationSensitivity =
                 properties.MigrationSensitivity;
+        }
+
+        internal void ConfigureRuntimeRingSystemProperties(
+            CelestialRingSystemResult properties)
+        {
+            hasRingSystemProperties =
+                properties.HasRings;
+
+            if (!properties.HasRings)
+            {
+                ringFormationOrigin =
+                    CelestialRingFormationOrigin.PrimordialDebris;
+                ringInnerRadiusMeters = 0.0;
+                ringOuterRadiusMeters = 0.0;
+                ringOpticalDepth = 0.0;
+                ringIceMassFraction = 0.0;
+                ringBandInnerRadiiMeters =
+                    Array.Empty<double>();
+                ringBandOuterRadiiMeters =
+                    Array.Empty<double>();
+                ringOuterShepherdMoonCount = 0;
+                return;
+            }
+
+            ringFormationOrigin =
+                properties.Origin;
+            ringInnerRadiusMeters =
+                properties.InnerRadiusMeters;
+            ringOuterRadiusMeters =
+                properties.OuterRadiusMeters;
+            ringOpticalDepth =
+                properties.OpticalDepth;
+            ringIceMassFraction =
+                properties.IceMassFraction;
+            ringOuterShepherdMoonCount =
+                properties.OuterShepherdMoonCount;
+            ringBandInnerRadiiMeters =
+                new double[properties.Bands.Length];
+            ringBandOuterRadiiMeters =
+                new double[properties.Bands.Length];
+
+            for (var index = 0;
+                index < properties.Bands.Length;
+                index++)
+            {
+                ringBandInnerRadiiMeters[index] =
+                    properties.Bands[index].InnerRadiusMeters;
+                ringBandOuterRadiiMeters[index] =
+                    properties.Bands[index].OuterRadiusMeters;
+            }
         }
 
         internal void ConfigureRuntimeRotationProperties(

@@ -599,6 +599,21 @@ namespace jcan.CelestialSystems
                     return false;
                 }
 
+                if (!CelestialRingSystemModel.TryGenerate(
+                        planetSeed,
+                        formation,
+                        moonSystem,
+                        out var ringSystem,
+                        out error))
+                {
+                    ReleaseOwnedRuntimeObjects(
+                        ownedRuntimeObjects);
+                    return false;
+                }
+
+                planet.ConfigureRuntimeRingSystemProperties(
+                    ringSystem);
+
                 var generatedMoons =
                     new List<GeneratedMoon>(
                         moonSystem.Moons.Length);
