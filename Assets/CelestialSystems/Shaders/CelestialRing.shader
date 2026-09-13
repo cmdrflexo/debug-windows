@@ -161,6 +161,9 @@ Shader "jcan/Celestial Systems/Celestial Ring"
             TEXTURE2D(_RingData);
             SAMPLER(sampler_RingData);
 
+            float3 _LightDirection;
+            float3 _LightPosition;
+
             CBUFFER_START(UnityPerMaterial)
                 half _Opacity;
                 half _DensityCutoff;
