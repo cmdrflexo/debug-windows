@@ -20,6 +20,7 @@ namespace jcan.CelestialSystems.Editor
                 25.0,
                 85.0,
                 7.5,
+                0.62,
                 0.80,
                 0.08);
             var moons = new CelestialMoonSystemFormationResult(
