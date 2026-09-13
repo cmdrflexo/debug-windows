@@ -17,9 +17,9 @@ namespace jcan.CelestialSystems.Editor
                 CelestialPlanetFormationClass.Giant,
                 5.2,
                 5.2,
+                25.0,
                 85.0,
                 7.5,
-                0.62,
                 0.80,
                 0.08);
             var moons = new CelestialMoonSystemFormationResult(
@@ -32,11 +32,11 @@ namespace jcan.CelestialSystems.Editor
                         0.0001,
                         0.03,
                         0.55,
-                        2.6e8,
+                        1.22e8,
                         0.01,
                         1.0,
                         CelestialOrbitDirection.Prograde,
-                        2.0e8,
+                        9.0e7,
                         2.0e9)
                 });
 
