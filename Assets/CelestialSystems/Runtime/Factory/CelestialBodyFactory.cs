@@ -658,6 +658,9 @@ namespace jcan.CelestialSystems
                         : presentationError);
             }
 
+            AttachGravitationalLensing(
+                instance,
+                request.Definition);
             AttachStellarBeam(
                 instance,
                 request.Definition,
@@ -679,6 +682,28 @@ namespace jcan.CelestialSystems
             BodySpawned?.Invoke(
                 instance);
             return true;
+        }
+
+        private static void AttachGravitationalLensing(
+            CelestialBodyRuntimeContext body,
+            CelestialBodyDefinition definition)
+        {
+            if (body == null ||
+                definition == null ||
+                !definition.GravitationalLensing.HasValidSettings)
+            {
+                return;
+            }
+
+            var lens =
+                body.GetComponent<CelestialGravitationalLens>();
+            if (lens == null)
+            {
+                lens =
+                    body.gameObject.AddComponent<CelestialGravitationalLens>();
+            }
+
+            lens.Initialize(body);
         }
 
         private void AttachStellarBeam(

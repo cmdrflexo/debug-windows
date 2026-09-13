@@ -787,9 +787,32 @@ namespace jcan.CelestialSystems
                 prototype.OceanDefinition);
             definition.ConfigureRuntimeStellarProperties(
                 properties);
+            definition.ConfigureRuntimeGravitationalLensing(
+                SelectStellarGravitationalLensingSettings(
+                    properties));
             definition.ConfigureRuntimeDescription(
                 description);
             return definition;
+        }
+
+        private static CelestialGravitationalLensingSettings
+            SelectStellarGravitationalLensingSettings(
+                CelestialStellarEvolutionResult properties)
+        {
+            if (properties.EvolutionState !=
+                CelestialStellarEvolutionState.BlackHole)
+            {
+                return CelestialGravitationalLensingSettings.Default;
+            }
+
+            // A stylized v1 visual influence region. This is intentionally broader
+            // than the physical event horizon so the effect is visible at system scale.
+            return new CelestialGravitationalLensingSettings(
+                true,
+                1000000.0f,
+                0.18f,
+                1.5f,
+                0.45f);
         }
 
         private RoundMapMagicSurfaceDefinition SelectStellarSurfaceDefinition(

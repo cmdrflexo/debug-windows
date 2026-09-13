@@ -568,6 +568,12 @@ namespace jcan.CelestialSystems
             description = string.Empty;
         }
 
+        internal void ConfigureRuntimeGravitationalLensing(
+            CelestialGravitationalLensingSettings settings)
+        {
+            gravitationalLensing = settings;
+        }
+
         internal void ConfigureRuntimeDescription(
             string newDescription)
         {
