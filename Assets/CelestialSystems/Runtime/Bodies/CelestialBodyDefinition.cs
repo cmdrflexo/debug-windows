@@ -943,13 +943,15 @@ namespace jcan.CelestialSystems
                             (properties.Bands.Length - 1);
                 ConfigureRuntimeRingGradients(
                     index,
-                    variation);
+                    variation,
+                    properties.Bands[index]);
             }
         }
 
         private void ConfigureRuntimeRingGradients(
             int index,
-            float variation)
+            float variation,
+            CelestialRingBand band)
         {
             var ice = Mathf.Clamp01(
                 (float)ringIceMassFraction +
@@ -974,7 +976,7 @@ namespace jcan.CelestialSystems
             ringPopulationGradients[index] = CreateCurve(density * 0.85f, density, density * 0.62f);
             ringVerticalThicknessGradients[index] = CreateCurve(8.0f + (1.0f - ice) * 18.0f, 14.0f + (1.0f - ice) * 35.0f, 10.0f + (1.0f - ice) * 25.0f);
 
-            foreach (var division in properties.Bands[index].Divisions)
+            foreach (var division in band.Divisions)
             {
                 StampDivision(
                     ringDensityGradients[index],
