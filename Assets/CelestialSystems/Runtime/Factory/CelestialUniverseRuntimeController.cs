@@ -12,7 +12,7 @@ using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
-    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem, RingRichSystem, SystemWithMultiBandRings }
+    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem, RingRichSystem, SystemWithMultiBandRings, SystemWithHighObliquityPlanet, SystemWithNarrowDarkRings }
 
     [DisallowMultipleComponent]
     public sealed class CelestialUniverseRuntimeController :
@@ -1240,6 +1240,8 @@ namespace jcan.CelestialSystems
             var moons = 0;
             var ringedPlanets = 0;
             var complexRingSystems = 0;
+            var highObliquityPlanets = 0;
+            var narrowDarkRingSystems = 0;
             foreach (var system in plan.BodySystems)
             {
                 foreach (var entry in system.Definition.Bodies)
@@ -1251,9 +1253,22 @@ namespace jcan.CelestialSystems
                     {
                         planets++;
 
+                        if (body.HasRotationProperties &&
+                            body.AxialTiltDegrees >= 70.0 &&
+                            body.AxialTiltDegrees <= 120.0)
+                        {
+                            highObliquityPlanets++;
+                        }
+
                         if (body.HasRingSystemProperties)
                         {
                             ringedPlanets++;
+
+                            if (body.RingSystemMorphology ==
+                                CelestialRingSystemMorphology.NarrowDark)
+                            {
+                                narrowDarkRingSystems++;
+                            }
 
                             if (body.RingBandInnerRadiiMeters != null &&
                                 body.RingBandInnerRadiiMeters.Count > 1)
@@ -1298,6 +1313,10 @@ namespace jcan.CelestialSystems
                     return ringedPlanets >= 2 || complexRingSystems >= 1;
                 case CelestialDebugStarSystemArrangement.SystemWithMultiBandRings:
                     return complexRingSystems >= 1;
+                case CelestialDebugStarSystemArrangement.SystemWithHighObliquityPlanet:
+                    return highObliquityPlanets >= 1;
+                case CelestialDebugStarSystemArrangement.SystemWithNarrowDarkRings:
+                    return narrowDarkRingSystems >= 1;
                 default: return false;
             }
         }

@@ -289,6 +289,8 @@ namespace jcan.CelestialSystems
             CelestialRingFormationOrigin origin,
             ref RingDeterministicRandom random)
         {
+            // Prototype calibration: sparse dark-ring occurrence by broad
+            // formation class until disruption history is modeled directly.
             var chance =
                 planet.FormationClass == CelestialPlanetFormationClass.VolatileRich
                     ? 0.12
@@ -372,6 +374,8 @@ namespace jcan.CelestialSystems
             CelestialRingBand band,
             ref RingDeterministicRandom random)
         {
+            // Prototype division counts and widths; later moon resonances will
+            // supply specific gap locations instead of this stochastic detail.
             var count =
                 origin == CelestialRingFormationOrigin.DisruptedSatellite
                     ? random.NextInclusive(1, 4)

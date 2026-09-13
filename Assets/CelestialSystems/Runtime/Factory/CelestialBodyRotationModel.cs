@@ -229,6 +229,8 @@ namespace jcan.CelestialSystems
                 ref random,
                 minimumHours,
                 maximumHours);
+            // Prototype calibration: rare high-obliquity outcomes, pending a
+            // future impact-history and secular-dynamics model.
             var highObliquityChance =
                 formationClass == CelestialPlanetFormationClass.Giant ||
                 formationClass == CelestialPlanetFormationClass.GasRich
