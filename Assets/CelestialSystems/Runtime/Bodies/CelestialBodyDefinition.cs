@@ -2,6 +2,8 @@
  * Stores reusable physical, generation, and surface-system settings for a celestial body.
  */
 
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
