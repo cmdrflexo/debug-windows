@@ -93,7 +93,7 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            var random = new DeterministicRandom(seed ^ 0x4A17C3D);
+            var random = new RingDeterministicRandom(seed ^ 0x4A17C3D);
             var chance = SelectRingChance(planet);
 
             if (chance <= 0.0 || random.Next01() >= chance)
@@ -210,7 +210,7 @@ namespace jcan.CelestialSystems
             CelestialPlanetFormationResult planet,
             double firstMoonPeriapsisMeters,
             double rocheLimitMeters,
-            ref DeterministicRandom random)
+            ref RingDeterministicRandom random)
         {
             if (firstMoonPeriapsisMeters > 0.0 &&
                 firstMoonPeriapsisMeters < rocheLimitMeters * 1.45 &&
@@ -233,7 +233,7 @@ namespace jcan.CelestialSystems
             double innerRadiusMeters,
             double outerRadiusMeters,
             int bandCount,
-            ref DeterministicRandom random)
+            ref RingDeterministicRandom random)
         {
             if (bandCount == 1)
             {
@@ -267,7 +267,7 @@ namespace jcan.CelestialSystems
         private static double SelectOpticalDepth(
             CelestialPlanetFormationResult planet,
             CelestialRingFormationOrigin origin,
-            ref DeterministicRandom random)
+            ref RingDeterministicRandom random)
         {
             var baseDepth =
                 origin == CelestialRingFormationOrigin.DisruptedSatellite
@@ -287,7 +287,7 @@ namespace jcan.CelestialSystems
         private static double SelectIceMassFraction(
             CelestialPlanetFormationResult planet,
             CelestialRingFormationOrigin origin,
-            ref DeterministicRandom random)
+            ref RingDeterministicRandom random)
         {
             var baseFraction =
                 planet.FormationClass == CelestialPlanetFormationClass.Giant
@@ -435,6 +435,47 @@ namespace jcan.CelestialSystems
         private static double Clamp01(double value)
         {
             return Math.Max(0.0, Math.Min(1.0, value));
+        }
+
+        // Kept local so this model has no dependency on the guide's private
+        // generation stream or its draw order.
+        private struct RingDeterministicRandom
+        {
+            private uint state;
+
+            public RingDeterministicRandom(int seed)
+            {
+                state = unchecked((uint)seed);
+
+                if (state == 0)
+                {
+                    state = 0x6D2B79F5u;
+                }
+            }
+
+            public double Next01()
+            {
+                return (NextUInt() >> 8) *
+                    (1.0 / 16777216.0);
+            }
+
+            public double NextRange(
+                double minimum,
+                double maximum)
+            {
+                return minimum +
+                    (maximum - minimum) * Next01();
+            }
+
+            private uint NextUInt()
+            {
+                var value = state;
+                value ^= value << 13;
+                value ^= value >> 17;
+                value ^= value << 5;
+                state = value;
+                return value;
+            }
         }
     }
 }
