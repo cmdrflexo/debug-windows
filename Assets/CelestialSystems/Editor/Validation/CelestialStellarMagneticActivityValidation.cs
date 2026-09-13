@@ -15,7 +15,7 @@ namespace jcan.CelestialSystems.Editor
             var slowDwarf = Star(CelestialStellarEvolutionState.MainSequence, 0.25, 3200.0);
             var neutronStar = Star(CelestialStellarEvolutionState.NeutronStar, 1.4, 1000000.0);
             var blackHole = Star(CelestialStellarEvolutionState.BlackHole, 8.0, 0.0);
-            var slowRotation = new CelestialBodyRotationResult(400.0, 12.0, CelestialSpinDirection.Prograde, CelestialSpinState.FreeRotating);
+            var slowRotation = new CelestialBodyRotationResult(2400.0, 12.0, CelestialSpinDirection.Prograde, CelestialSpinState.FreeRotating);
             var fastRotation = new CelestialBodyRotationResult(8.0, 12.0, CelestialSpinDirection.Prograde, CelestialSpinState.FreeRotating);
 
             if (!CelestialStellarMagneticActivityModel.TryEvaluate(31, slowDwarf, slowRotation, out var quiet, out var error) ||
