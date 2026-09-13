@@ -665,6 +665,9 @@ namespace jcan.CelestialSystems
                 instance,
                 request.Definition,
                 hierarchy.VisualRoot);
+            AttachRingMeshPresentation(
+                instance,
+                request.Definition);
             AttachRingSystemDebugGizmos(
                 instance,
                 request.Definition);
@@ -685,6 +688,38 @@ namespace jcan.CelestialSystems
             BodySpawned?.Invoke(
                 instance);
             return true;
+        }
+
+        private static void AttachRingMeshPresentation(
+            CelestialBodyRuntimeContext body,
+            CelestialBodyDefinition definition)
+        {
+            var presentation =
+                body != null
+                    ? body.VisualRoot.GetComponent<
+                        CelestialRingMeshPresentation>()
+                    : null;
+
+            if (definition == null ||
+                !definition.HasRingSystemProperties)
+            {
+                if (presentation != null)
+                {
+                    presentation.enabled = false;
+                }
+
+                return;
+            }
+
+            if (presentation == null)
+            {
+                presentation =
+                    body.VisualRoot.gameObject.AddComponent<
+                        CelestialRingMeshPresentation>();
+            }
+
+            presentation.Initialize(
+                body);
         }
 
         private static void AttachRingSystemDebugGizmos(
