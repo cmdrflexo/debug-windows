@@ -229,6 +229,23 @@ namespace jcan.CelestialSystems
                 ref random,
                 minimumHours,
                 maximumHours);
+            var highObliquityChance =
+                formationClass == CelestialPlanetFormationClass.Giant ||
+                formationClass == CelestialPlanetFormationClass.GasRich
+                    ? 0.025
+                    : 0.012;
+
+            if (random.Next01() < highObliquityChance)
+            {
+                // Rare large impacts or secular evolution can leave a planet
+                // rotating nearly sideways, Uranus-style.
+                axialTiltDegrees = random.NextRange(70.0, 120.0);
+                direction = axialTiltDegrees > 90.0
+                    ? CelestialSpinDirection.Retrograde
+                    : CelestialSpinDirection.Prograde;
+                return;
+            }
+
             var retrograde = random.Next01() < 0.08;
             direction = retrograde
                 ? CelestialSpinDirection.Retrograde

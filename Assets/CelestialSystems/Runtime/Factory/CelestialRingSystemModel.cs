@@ -14,6 +14,12 @@ namespace jcan.CelestialSystems
         ImpactDebris = 2
     }
 
+    public enum CelestialRingSystemMorphology
+    {
+        Broad = 0,
+        NarrowDark = 1
+    }
+
     public readonly struct CelestialRingDivision
     {
         public CelestialRingDivision(
@@ -57,6 +63,7 @@ namespace jcan.CelestialSystems
         public CelestialRingSystemResult(
             bool hasRings,
             CelestialRingFormationOrigin origin,
+            CelestialRingSystemMorphology morphology,
             double innerRadiusMeters,
             double outerRadiusMeters,
             double opticalDepth,
@@ -66,6 +73,7 @@ namespace jcan.CelestialSystems
         {
             HasRings = hasRings;
             Origin = origin;
+            Morphology = morphology;
             InnerRadiusMeters = innerRadiusMeters;
             OuterRadiusMeters = outerRadiusMeters;
             OpticalDepth = opticalDepth;
@@ -77,6 +85,8 @@ namespace jcan.CelestialSystems
         public bool HasRings { get; }
 
         public CelestialRingFormationOrigin Origin { get; }
+
+        public CelestialRingSystemMorphology Morphology { get; }
 
         public double InnerRadiusMeters { get; }
 
@@ -162,16 +172,25 @@ namespace jcan.CelestialSystems
             }
 
             var origin = SelectOrigin(planet, firstMoonPeriapsisMeters, rocheLimitMeters, ref random);
+            var morphology = SelectMorphology(planet, origin, ref random);
             var bandCount =
-                outerRadiusMeters > innerRadiusMeters * 1.45 &&
-                random.Next01() < 0.48
-                    ? 2
-                    : 1;
-            var bands = BuildBands(innerRadiusMeters, outerRadiusMeters, bandCount, ref random);
+                morphology == CelestialRingSystemMorphology.NarrowDark
+                    ? random.NextInclusive(2, 5)
+                    : outerRadiusMeters > innerRadiusMeters * 1.45 &&
+                        random.Next01() < 0.48
+                        ? 2
+                        : 1;
+            var bands = morphology == CelestialRingSystemMorphology.NarrowDark
+                ? BuildNarrowBands(innerRadiusMeters, outerRadiusMeters, bandCount, ref random)
+                : BuildBands(innerRadiusMeters, outerRadiusMeters, bandCount, ref random);
             var opticalDepth =
-                SelectOpticalDepth(planet, origin, ref random);
+                morphology == CelestialRingSystemMorphology.NarrowDark
+                    ? random.NextRange(0.04, 0.22)
+                    : SelectOpticalDepth(planet, origin, ref random);
             var iceMassFraction =
-                SelectIceMassFraction(planet, origin, ref random);
+                morphology == CelestialRingSystemMorphology.NarrowDark
+                    ? random.NextRange(0.02, 0.24)
+                    : SelectIceMassFraction(planet, origin, ref random);
             for (var index = 0; index < bands.Length; index++)
             {
                 bands[index] = new CelestialRingBand(
@@ -191,6 +210,7 @@ namespace jcan.CelestialSystems
             result = new CelestialRingSystemResult(
                 true,
                 origin,
+                morphology,
                 innerRadiusMeters,
                 outerRadiusMeters,
                 opticalDepth,
@@ -214,6 +234,7 @@ namespace jcan.CelestialSystems
             return new CelestialRingSystemResult(
                 false,
                 CelestialRingFormationOrigin.PrimordialDebris,
+                CelestialRingSystemMorphology.Broad,
                 0.0,
                 0.0,
                 0.0,
@@ -261,6 +282,54 @@ namespace jcan.CelestialSystems
             return random.Next01() < 0.18
                 ? CelestialRingFormationOrigin.ImpactDebris
                 : CelestialRingFormationOrigin.PrimordialDebris;
+        }
+
+        private static CelestialRingSystemMorphology SelectMorphology(
+            CelestialPlanetFormationResult planet,
+            CelestialRingFormationOrigin origin,
+            ref RingDeterministicRandom random)
+        {
+            var chance =
+                planet.FormationClass == CelestialPlanetFormationClass.VolatileRich
+                    ? 0.12
+                    : planet.FormationClass == CelestialPlanetFormationClass.GasRich
+                        ? 0.05
+                        : planet.FormationClass == CelestialPlanetFormationClass.Giant
+                            ? 0.025
+                            : 0.04;
+
+            if (origin == CelestialRingFormationOrigin.ImpactDebris)
+            {
+                chance *= 1.5;
+            }
+
+            return random.Next01() < chance
+                ? CelestialRingSystemMorphology.NarrowDark
+                : CelestialRingSystemMorphology.Broad;
+        }
+
+        private static CelestialRingBand[] BuildNarrowBands(
+            double innerRadiusMeters,
+            double outerRadiusMeters,
+            int bandCount,
+            ref RingDeterministicRandom random)
+        {
+            var result = new CelestialRingBand[bandCount];
+            var span = outerRadiusMeters - innerRadiusMeters;
+
+            for (var index = 0; index < bandCount; index++)
+            {
+                var center = innerRadiusMeters +
+                    span * ((index + 0.5) / bandCount);
+                var width = span *
+                    random.NextRange(0.025, 0.075) /
+                    bandCount;
+                result[index] = new CelestialRingBand(
+                    center - width * 0.5,
+                    center + width * 0.5);
+            }
+
+            return result;
         }
 
         private static CelestialRingBand[] BuildBands(

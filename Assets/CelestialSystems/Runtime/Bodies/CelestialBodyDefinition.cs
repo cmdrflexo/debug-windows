@@ -232,6 +232,10 @@ namespace jcan.CelestialSystems
             CelestialRingFormationOrigin.PrimordialDebris;
 
         [SerializeField]
+        private CelestialRingSystemMorphology ringSystemMorphology =
+            CelestialRingSystemMorphology.Broad;
+
+        [SerializeField]
         private double ringInnerRadiusMeters;
 
         [SerializeField]
@@ -515,6 +519,9 @@ namespace jcan.CelestialSystems
         public CelestialRingFormationOrigin RingFormationOrigin =>
             ringFormationOrigin;
 
+        public CelestialRingSystemMorphology RingSystemMorphology =>
+            ringSystemMorphology;
+
         public double RingInnerRadiusMeters =>
             ringInnerRadiusMeters;
 
@@ -700,6 +707,8 @@ namespace jcan.CelestialSystems
             hasRingSystemProperties = false;
             ringFormationOrigin =
                 CelestialRingFormationOrigin.PrimordialDebris;
+            ringSystemMorphology =
+                CelestialRingSystemMorphology.Broad;
             ringInnerRadiusMeters = 0.0;
             ringOuterRadiusMeters = 0.0;
             ringOpticalDepth = 0.0;
@@ -880,6 +889,8 @@ namespace jcan.CelestialSystems
             {
                 ringFormationOrigin =
                     CelestialRingFormationOrigin.PrimordialDebris;
+                ringSystemMorphology =
+                    CelestialRingSystemMorphology.Broad;
                 ringInnerRadiusMeters = 0.0;
                 ringOuterRadiusMeters = 0.0;
                 ringOpticalDepth = 0.0;
@@ -900,6 +911,8 @@ namespace jcan.CelestialSystems
 
             ringFormationOrigin =
                 properties.Origin;
+            ringSystemMorphology =
+                properties.Morphology;
             ringInnerRadiusMeters =
                 properties.InnerRadiusMeters;
             ringOuterRadiusMeters =
