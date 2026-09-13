@@ -12,7 +12,7 @@ using UnityEngine.Serialization;
 
 namespace jcan.CelestialSystems
 {
-    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem, RingRichSystem }
+    public enum CelestialDebugStarSystemArrangement { Any, SingleAny, SingleMainSequence, SingleAtmosphereDominated, SingleConvective, SingleOrdinary, SingleWhiteDwarf, SingleNeutronStar, SingleBlackHole, BinaryAny, BinaryMainSequencePair, BinaryMainSequenceWhiteDwarf, BinaryMainSequenceNeutronStar, BinaryMainSequenceBlackHole, BinaryWhiteDwarfPair, BinaryWhiteDwarfNeutronStar, BinaryWhiteDwarfBlackHole, BinaryNeutronStarPair, BinaryNeutronStarBlackHole, BinaryBlackHolePair, SinglePlanetless, SingleWithPlanets, BinaryPlanetless, BinaryWithPlanets, RemnantWithPlanets, SystemWithMoons, MoonRichSystem, RingRichSystem, SystemWithMultiBandRings }
 
     [DisallowMultipleComponent]
     public sealed class CelestialUniverseRuntimeController :
@@ -1296,6 +1296,8 @@ namespace jcan.CelestialSystems
                 case CelestialDebugStarSystemArrangement.MoonRichSystem: return moons >= 4;
                 case CelestialDebugStarSystemArrangement.RingRichSystem:
                     return ringedPlanets >= 2 || complexRingSystems >= 1;
+                case CelestialDebugStarSystemArrangement.SystemWithMultiBandRings:
+                    return complexRingSystems >= 1;
                 default: return false;
             }
         }
