@@ -66,6 +66,14 @@ namespace jcan.CelestialSystems
         [Tooltip("Optional camera used by generated adaptive surfaces. Camera.main is used when this is empty.")]
         private Camera adaptiveSurfaceObserver;
 
+        [Header("Optional Stellar Beam")]
+        [SerializeField]
+        [Tooltip("Optional 1-meter stellar beam prefab. It is added only to generated stellar bodies and scaled to their diameter.")]
+        private GameObject stellarBeamPrefab;
+
+        [SerializeField]
+        private bool generateStellarBeams = true;
+
         [Header("Optional Startup Body")]
         [SerializeField]
         private bool spawnOnStart;
@@ -650,6 +658,11 @@ namespace jcan.CelestialSystems
                         : presentationError);
             }
 
+            AttachStellarBeam(
+                instance,
+                request.Definition,
+                hierarchy.VisualRoot);
+
             spawnedBodies.Add(
                 request.InstanceId,
                 instance);
@@ -666,6 +679,20 @@ namespace jcan.CelestialSystems
             BodySpawned?.Invoke(
                 instance);
             return true;
+        }
+
+        private void AttachStellarBeam(
+            CelestialBodyRuntimeContext body,
+            CelestialBodyDefinition definition,
+            Transform visualRoot)
+        {
+            if (!generateStellarBeams || stellarBeamPrefab == null || body == null || definition == null || !definition.HasStellarProperties || visualRoot == null) return;
+            var beam = Instantiate(stellarBeamPrefab, visualRoot);
+            if (beam == null) return;
+            beam.name = "Stellar Beam";
+            beam.transform.localPosition = Vector3.zero;
+            beam.transform.localRotation = Quaternion.Euler((float)definition.AxialTiltDegrees, 0.0f, 0.0f);
+            beam.transform.localScale = Vector3.one * (float)Math.Max(0.000001, definition.DiameterMeters);
         }
 
         public bool TryGetSpawnedBody(
