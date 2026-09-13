@@ -255,6 +255,30 @@ namespace jcan.CelestialSystems
         private int ringOuterShepherdMoonCount;
 
         [SerializeField]
+        private Gradient[] ringAlbedoGradients =
+            Array.Empty<Gradient>();
+
+        [SerializeField]
+        private AnimationCurve[] ringDensityGradients =
+            Array.Empty<AnimationCurve>();
+
+        [SerializeField]
+        private Gradient[] ringMaterialGradients =
+            Array.Empty<Gradient>();
+
+        [SerializeField]
+        private AnimationCurve[] ringParticleScaleGradients =
+            Array.Empty<AnimationCurve>();
+
+        [SerializeField]
+        private AnimationCurve[] ringPopulationGradients =
+            Array.Empty<AnimationCurve>();
+
+        [SerializeField]
+        private AnimationCurve[] ringVerticalThicknessGradients =
+            Array.Empty<AnimationCurve>();
+
+        [SerializeField]
         private bool hasRotationProperties;
 
         [SerializeField]
@@ -512,6 +536,25 @@ namespace jcan.CelestialSystems
         public int RingOuterShepherdMoonCount =>
             ringOuterShepherdMoonCount;
 
+        public IReadOnlyList<Gradient> RingAlbedoGradients =>
+            ringAlbedoGradients;
+
+        public IReadOnlyList<AnimationCurve> RingDensityGradients =>
+            ringDensityGradients;
+
+        // RGB stores normalized ice, rock, and dust weights respectively.
+        public IReadOnlyList<Gradient> RingMaterialGradients =>
+            ringMaterialGradients;
+
+        public IReadOnlyList<AnimationCurve> RingParticleScaleGradients =>
+            ringParticleScaleGradients;
+
+        public IReadOnlyList<AnimationCurve> RingPopulationGradients =>
+            ringPopulationGradients;
+
+        public IReadOnlyList<AnimationCurve> RingVerticalThicknessGradients =>
+            ringVerticalThicknessGradients;
+
         public bool HasRotationProperties =>
             hasRotationProperties;
 
@@ -666,6 +709,12 @@ namespace jcan.CelestialSystems
             ringBandOuterRadiiMeters =
                 Array.Empty<double>();
             ringOuterShepherdMoonCount = 0;
+            ringAlbedoGradients = Array.Empty<Gradient>();
+            ringDensityGradients = Array.Empty<AnimationCurve>();
+            ringMaterialGradients = Array.Empty<Gradient>();
+            ringParticleScaleGradients = Array.Empty<AnimationCurve>();
+            ringPopulationGradients = Array.Empty<AnimationCurve>();
+            ringVerticalThicknessGradients = Array.Empty<AnimationCurve>();
             hasRotationProperties = false;
             rotationPeriodHours = 0.0;
             axialTiltDegrees = 0.0;
@@ -840,6 +889,12 @@ namespace jcan.CelestialSystems
                 ringBandOuterRadiiMeters =
                     Array.Empty<double>();
                 ringOuterShepherdMoonCount = 0;
+                ringAlbedoGradients = Array.Empty<Gradient>();
+                ringDensityGradients = Array.Empty<AnimationCurve>();
+                ringMaterialGradients = Array.Empty<Gradient>();
+                ringParticleScaleGradients = Array.Empty<AnimationCurve>();
+                ringPopulationGradients = Array.Empty<AnimationCurve>();
+                ringVerticalThicknessGradients = Array.Empty<AnimationCurve>();
                 return;
             }
 
@@ -859,6 +914,18 @@ namespace jcan.CelestialSystems
                 new double[properties.Bands.Length];
             ringBandOuterRadiiMeters =
                 new double[properties.Bands.Length];
+            ringAlbedoGradients =
+                new Gradient[properties.Bands.Length];
+            ringDensityGradients =
+                new AnimationCurve[properties.Bands.Length];
+            ringMaterialGradients =
+                new Gradient[properties.Bands.Length];
+            ringParticleScaleGradients =
+                new AnimationCurve[properties.Bands.Length];
+            ringPopulationGradients =
+                new AnimationCurve[properties.Bands.Length];
+            ringVerticalThicknessGradients =
+                new AnimationCurve[properties.Bands.Length];
 
             for (var index = 0;
                 index < properties.Bands.Length;
@@ -868,7 +935,76 @@ namespace jcan.CelestialSystems
                     properties.Bands[index].InnerRadiusMeters;
                 ringBandOuterRadiiMeters[index] =
                     properties.Bands[index].OuterRadiusMeters;
+
+                var variation =
+                    properties.Bands.Length <= 1
+                        ? 0.5f
+                        : (float)index /
+                            (properties.Bands.Length - 1);
+                ConfigureRuntimeRingGradients(
+                    index,
+                    variation);
             }
+        }
+
+        private void ConfigureRuntimeRingGradients(
+            int index,
+            float variation)
+        {
+            var ice = Mathf.Clamp01(
+                (float)ringIceMassFraction +
+                (variation - 0.5f) * 0.18f);
+            var rock = Mathf.Clamp01(
+                0.72f - ice * 0.55f);
+            var dust = Mathf.Clamp01(
+                1.0f - ice - rock);
+            ringAlbedoGradients[index] =
+                CreateGradient(
+                    new Color(0.22f + ice * 0.42f, 0.19f + ice * 0.45f, 0.16f + ice * 0.52f),
+                    new Color(0.34f + ice * 0.46f, 0.30f + ice * 0.48f, 0.26f + ice * 0.54f),
+                    new Color(0.18f + ice * 0.36f, 0.15f + ice * 0.38f, 0.12f + ice * 0.43f));
+            ringMaterialGradients[index] =
+                CreateGradient(
+                    new Color(ice, rock, dust),
+                    new Color(Mathf.Clamp01(ice + 0.08f), rock, Mathf.Clamp01(dust - 0.08f)),
+                    new Color(Mathf.Clamp01(ice - 0.06f), Mathf.Clamp01(rock + 0.03f), Mathf.Clamp01(dust + 0.03f)));
+            var density = Mathf.Clamp01((float)ringOpticalDepth);
+            ringDensityGradients[index] = CreateCurve(density * 0.75f, density, density * 0.55f);
+            ringParticleScaleGradients[index] = CreateCurve(0.08f + ice * 0.45f, 0.18f + ice * 1.8f, 0.05f + ice * 0.7f);
+            ringPopulationGradients[index] = CreateCurve(density * 0.85f, density, density * 0.62f);
+            ringVerticalThicknessGradients[index] = CreateCurve(8.0f + (1.0f - ice) * 18.0f, 14.0f + (1.0f - ice) * 35.0f, 10.0f + (1.0f - ice) * 25.0f);
+        }
+
+        private static Gradient CreateGradient(
+            Color inner,
+            Color middle,
+            Color outer)
+        {
+            var result = new Gradient();
+            result.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(inner, 0.0f),
+                    new GradientColorKey(middle, 0.5f),
+                    new GradientColorKey(outer, 1.0f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(1.0f, 0.0f),
+                    new GradientAlphaKey(1.0f, 1.0f)
+                });
+            return result;
+        }
+
+        private static AnimationCurve CreateCurve(
+            float inner,
+            float middle,
+            float outer)
+        {
+            return new AnimationCurve(
+                new Keyframe(0.0f, inner),
+                new Keyframe(0.5f, middle),
+                new Keyframe(1.0f, outer));
         }
 
         internal void ConfigureRuntimeRotationProperties(
