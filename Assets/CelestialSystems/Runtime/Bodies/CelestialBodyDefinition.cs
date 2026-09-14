@@ -282,6 +282,11 @@ namespace jcan.CelestialSystems
         private AnimationCurve[] ringVerticalThicknessGradients =
             Array.Empty<AnimationCurve>();
 
+        // Fine, seeded radial ringlets layered over editable macro curves.
+        [SerializeField]
+        private CelestialRingMicrostructure[] ringMicrostructures =
+            Array.Empty<CelestialRingMicrostructure>();
+
         [SerializeField]
         private bool hasRotationProperties;
 
@@ -561,6 +566,9 @@ namespace jcan.CelestialSystems
 
         public IReadOnlyList<AnimationCurve> RingVerticalThicknessGradients =>
             ringVerticalThicknessGradients;
+
+        public IReadOnlyList<CelestialRingMicrostructure> RingMicrostructures =>
+            ringMicrostructures;
 
         public bool HasRotationProperties =>
             hasRotationProperties;
@@ -906,6 +914,7 @@ namespace jcan.CelestialSystems
                 ringParticleScaleGradients = Array.Empty<AnimationCurve>();
                 ringPopulationGradients = Array.Empty<AnimationCurve>();
                 ringVerticalThicknessGradients = Array.Empty<AnimationCurve>();
+                ringMicrostructures = Array.Empty<CelestialRingMicrostructure>();
                 return;
             }
 
@@ -939,6 +948,8 @@ namespace jcan.CelestialSystems
                 new AnimationCurve[properties.Bands.Length];
             ringVerticalThicknessGradients =
                 new AnimationCurve[properties.Bands.Length];
+            ringMicrostructures =
+                new CelestialRingMicrostructure[properties.Bands.Length];
 
             for (var index = 0;
                 index < properties.Bands.Length;
@@ -948,6 +959,8 @@ namespace jcan.CelestialSystems
                     properties.Bands[index].InnerRadiusMeters;
                 ringBandOuterRadiiMeters[index] =
                     properties.Bands[index].OuterRadiusMeters;
+                ringMicrostructures[index] =
+                    properties.Bands[index].Microstructure;
 
                 var variation =
                     properties.Bands.Length <= 1
