@@ -39,16 +39,45 @@ namespace jcan.CelestialSystems
         public double DensityMultiplier { get; }
     }
 
+    public readonly struct CelestialRingMicrostructure
+    {
+        public CelestialRingMicrostructure(
+            double primarySpacingMeters,
+            double secondarySpacingRatio,
+            double tertiarySpacingRatio,
+            double contrast,
+            double phase)
+        {
+            PrimarySpacingMeters = primarySpacingMeters;
+            SecondarySpacingRatio = secondarySpacingRatio;
+            TertiarySpacingRatio = tertiarySpacingRatio;
+            Contrast = contrast;
+            Phase = phase;
+        }
+
+        public double PrimarySpacingMeters { get; }
+
+        public double SecondarySpacingRatio { get; }
+
+        public double TertiarySpacingRatio { get; }
+
+        public double Contrast { get; }
+
+        public double Phase { get; }
+    }
+
     public readonly struct CelestialRingBand
     {
         public CelestialRingBand(
             double innerRadiusMeters,
             double outerRadiusMeters,
-            CelestialRingDivision[] divisions = null)
+            CelestialRingDivision[] divisions = null,
+            CelestialRingMicrostructure microstructure = default)
         {
             InnerRadiusMeters = innerRadiusMeters;
             OuterRadiusMeters = outerRadiusMeters;
             Divisions = divisions ?? Array.Empty<CelestialRingDivision>();
+            Microstructure = microstructure;
         }
 
         public double InnerRadiusMeters { get; }
@@ -56,6 +85,8 @@ namespace jcan.CelestialSystems
         public double OuterRadiusMeters { get; }
 
         public CelestialRingDivision[] Divisions { get; }
+
+        public CelestialRingMicrostructure Microstructure { get; }
     }
 
     public readonly struct CelestialRingSystemResult
@@ -103,7 +134,7 @@ namespace jcan.CelestialSystems
 
     public static class CelestialRingSystemModel
     {
-        public const int ModelVersion = 1;
+        public const int ModelVersion = 2;
 
         private const double EarthRadiusMeters = 6371000.0;
         private const double EarthMeanDensityKilogramsPerCubicMeter = 5514.0;
@@ -198,6 +229,11 @@ namespace jcan.CelestialSystems
                     bands[index].OuterRadiusMeters,
                     CreateDivisions(
                         origin,
+                        bands[index],
+                        ref random),
+                    CreateMicrostructure(
+                        origin,
+                        morphology,
                         bands[index],
                         ref random));
             }
@@ -393,6 +429,35 @@ namespace jcan.CelestialSystems
             }
 
             return result;
+        }
+
+
+        private static CelestialRingMicrostructure CreateMicrostructure(
+            CelestialRingFormationOrigin origin,
+            CelestialRingSystemMorphology morphology,
+            CelestialRingBand band,
+            ref RingDeterministicRandom random)
+        {
+            // Prototype calibration: several incommensurate radial wavelengths
+            // create fine, axisymmetric ringlets without curve-key explosion.
+            var narrow = morphology ==
+                CelestialRingSystemMorphology.NarrowDark;
+            var primarySpacing = narrow
+                ? random.NextRange(150.0, 1100.0)
+                : random.NextRange(350.0, 4200.0);
+            var contrast = origin ==
+                CelestialRingFormationOrigin.DisruptedSatellite
+                    ? random.NextRange(0.42, 0.72)
+                    : origin == CelestialRingFormationOrigin.ImpactDebris
+                        ? random.NextRange(0.20, 0.48)
+                        : random.NextRange(0.30, 0.62);
+
+            return new CelestialRingMicrostructure(
+                primarySpacing,
+                random.NextRange(0.23, 0.49),
+                random.NextRange(0.08, 0.19),
+                contrast,
+                random.NextRange(0.0, Math.PI * 2.0));
         }
 
         private static double SelectOpticalDepth(
