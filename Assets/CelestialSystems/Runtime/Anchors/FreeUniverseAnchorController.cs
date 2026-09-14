@@ -94,16 +94,13 @@ namespace jcan.CelestialSystems
         private float speedMultiplierStep = 2.0f;
 
         [SerializeField]
-        [Min(0.0001f)]
-        private float minimumSpeedMultiplier = 0.0625f;
-
-        [SerializeField]
-        [Min(0.0001f)]
-        private float maximumSpeedMultiplier = 64.0f;
-
-        [SerializeField]
-        [Min(0.0001f)]
+        [Min(0.000001f)]
         private float moveSpeedMultiplier = 1.0f;
+
+        [SerializeField]
+        [Tooltip("Initial travel time to the nearest body or ring after entering Free mode.")]
+        [Min(0.01f)]
+        private float initialFeatureTravelSeconds = 10.0f;
 
         [Header("Boost")]
         [SerializeField]
@@ -264,6 +261,31 @@ namespace jcan.CelestialSystems
             moveSpeedMultiplier *
             currentBoostMultiplier;
 
+        // Called by the shared mode owner after it has handed the displayed
+        // camera pose to Free mode. It deliberately sets the multiplier, so
+        // wheel adjustments continue from this practical starting speed.
+        public void SetInitialSpeedFromNearestFeature()
+        {
+            UpdateSpeedState();
+
+            if (!hasNearestNavigationFeature ||
+                nearestNavigationFeatureDistanceMeters <= 0.0 ||
+                resolvedSpeed <= 0.0f)
+            {
+                moveSpeedMultiplier = 1.0f;
+                return;
+            }
+
+            var desiredSpeed = Math.Max(
+                minimumAutomaticSpeedMetersPerSecond,
+                nearestNavigationFeatureDistanceMeters /
+                Math.Max(0.01f, initialFeatureTravelSeconds));
+            var multiplier = desiredSpeed / resolvedSpeed;
+            moveSpeedMultiplier = IsFinite(multiplier)
+                ? Mathf.Max(0.000001f, (float)Math.Min(multiplier, float.MaxValue))
+                : 1.0f;
+        }
+
         private void Awake()
         {
             ResolveUniverseFrame();
@@ -364,10 +386,13 @@ namespace jcan.CelestialSystems
                     minimumSpeedMultiplier,
                     maximumSpeedMultiplier);
             moveSpeedMultiplier =
-                Mathf.Clamp(
-                    moveSpeedMultiplier,
-                    minimumSpeedMultiplier,
-                    maximumSpeedMultiplier);
+                Mathf.Max(
+                    0.000001f,
+                    moveSpeedMultiplier);
+            initialFeatureTravelSeconds =
+                Mathf.Max(
+                    0.01f,
+                    initialFeatureTravelSeconds);
             maximumBoostMultiplier =
                 Mathf.Max(
                     1.0f,
@@ -537,11 +562,10 @@ namespace jcan.CelestialSystems
             }
 
             moveSpeedMultiplier =
-                Mathf.Clamp(
+                Mathf.Max(
+                    0.000001f,
                     moveSpeedMultiplier *
-                        multiplierChange,
-                    minimumSpeedMultiplier,
-                    maximumSpeedMultiplier);
+                        multiplierChange);
         }
 
         private static bool EnableAction(
