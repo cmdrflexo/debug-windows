@@ -17,6 +17,7 @@ namespace jcan.CelestialSystems
             "Generated Observation Decorations";
 
         public static bool GlobalVisibility { get; private set; } = true;
+        public static bool NavigationVisible { get; private set; } = true;
 
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
@@ -63,6 +64,11 @@ namespace jcan.CelestialSystems
         private Bounds orbitGeometryBounds;
         private Camera observationCamera;
         private bool enabledToggleVisibilityAction;
+
+        public static void SetNavigationVisible(bool value)
+        {
+            NavigationVisible = value;
+        }
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedOrbit => hasResolvedOrbit;
@@ -176,7 +182,7 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisual();
 
-            if (!visible || !GlobalVisibility)
+            if (!visible || !GlobalVisibility || !NavigationVisible)
             {
                 SetRendererVisible(false);
                 return;
