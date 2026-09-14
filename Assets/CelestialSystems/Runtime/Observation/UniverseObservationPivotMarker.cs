@@ -14,6 +14,8 @@ namespace jcan.CelestialSystems
     {
         private const string GeneratedVisualName = "Generated Observation Pivot Marker";
 
+        public static bool NavigationVisible { get; private set; } = true;
+
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField]
@@ -50,6 +52,11 @@ namespace jcan.CelestialSystems
         private MeshRenderer markerRenderer;
         private Mesh generatedMesh;
         private MaterialPropertyBlock markerPropertyBlock;
+
+        public static void SetNavigationVisible(bool value)
+        {
+            NavigationVisible = value;
+        }
 
         public UniverseObservationAnchorController ObservationController => observationController;
         public CelestialBodyRuntimeContext DirectionReferenceContext => directionReferenceContext;
@@ -117,7 +124,7 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisual();
 
-            if (!visible || observationController == null || markerVisual == null ||
+            if (!visible || !NavigationVisible || observationController == null || markerVisual == null ||
                 !observationController.TryGetObservationPlane(
                     out var currentPivotPosition,
                     out var planeRight,
