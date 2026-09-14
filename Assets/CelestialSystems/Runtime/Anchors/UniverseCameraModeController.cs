@@ -13,6 +13,11 @@ namespace jcan.CelestialSystems
     [DisallowMultipleComponent]
     public sealed class UniverseCameraModeController : MonoBehaviour
     {
+        private const string GeneratedDecorationsName =
+            "Generated Observation Decorations";
+        private const string GeneratedPivotMarkerName =
+            "Generated Observation Pivot Marker";
+
         public enum NavigationMode { Observer, Free }
 
         [Header("Shared Rig")]
@@ -45,11 +50,19 @@ namespace jcan.CelestialSystems
         [SerializeField] private InputActionReference speedAction;
         [SerializeField] private InputActionReference boostAction;
 
+        [Header("Free Cursor")]
+        [SerializeField] private bool hideCursorInFreeMode = true;
+        [SerializeField] private CursorLockMode freeCursorLockMode =
+            CursorLockMode.Locked;
+
         private readonly List<InputActionReference> ownedReferences = new List<InputActionReference>();
         private readonly List<InputAction> enabledActions = new List<InputAction>();
         private InputActionAsset runtimeInputAsset;
         private InputActionMap runtimeInputMap;
         private bool initialized;
+        private bool cursorStateCaptured;
+        private bool capturedCursorVisible;
+        private CursorLockMode capturedCursorLockMode;
         public NavigationMode Mode => mode;
 
         private void Awake()
@@ -143,6 +156,7 @@ namespace jcan.CelestialSystems
             freeFlight.enabled = false;
             observer.SetNavigationActive(false);
             if (selection != null) selection.NavigationEnabled = false;
+            RestoreCursorState();
             foreach (var action in enabledActions) action.Disable();
             enabledActions.Clear();
         }
@@ -168,16 +182,78 @@ namespace jcan.CelestialSystems
             observer.SetNavigationActive(observerActive);
             freeFlight.enabled = mode == NavigationMode.Free;
             if (selection != null) selection.NavigationEnabled = observerActive;
+
+            // Set the shared flags before disabling the authored grid object.
+            // Its decorators generate render objects outside that hierarchy, so
+            // those generated roots must also be toggled directly.
+            UniverseObservationBodyMarkerDecorator.SetNavigationVisible(observerActive);
+            UniverseObservationPivotMarker.SetNavigationVisible(observerActive);
+            UniverseObservationOrbitDecorator.SetNavigationVisible(observerActive);
+            UniverseObservationTrailDecorator.SetNavigationVisible(observerActive);
+
             if (observerInterfaceRoot != null &&
                 observerInterfaceRoot.activeSelf != observerActive)
             {
                 observerInterfaceRoot.SetActive(observerActive);
             }
 
-            UniverseObservationBodyMarkerDecorator.SetNavigationVisible(observerActive);
-            UniverseObservationPivotMarker.SetNavigationVisible(observerActive);
-            UniverseObservationOrbitDecorator.SetNavigationVisible(observerActive);
-            UniverseObservationTrailDecorator.SetNavigationVisible(observerActive);
+            SetGeneratedObservationObjectsActive(observerActive);
+            SetFreeCursorActive(!observerActive);
+        }
+
+        private static void SetGeneratedObservationObjectsActive(bool active)
+        {
+            var transforms = FindObjectsByType<Transform>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+
+            for (var index = 0; index < transforms.Length; index++)
+            {
+                var candidate = transforms[index];
+                if (candidate == null ||
+                    !candidate.gameObject.scene.IsValid() ||
+                    (candidate.name != GeneratedDecorationsName &&
+                        candidate.name != GeneratedPivotMarkerName))
+                {
+                    continue;
+                }
+
+                if (candidate.gameObject.activeSelf != active)
+                {
+                    candidate.gameObject.SetActive(active);
+                }
+            }
+        }
+
+        private void SetFreeCursorActive(bool active)
+        {
+            if (!active)
+            {
+                RestoreCursorState();
+                return;
+            }
+
+            if (!cursorStateCaptured)
+            {
+                capturedCursorVisible = Cursor.visible;
+                capturedCursorLockMode = Cursor.lockState;
+                cursorStateCaptured = true;
+            }
+
+            Cursor.lockState = freeCursorLockMode;
+            Cursor.visible = !hideCursorInFreeMode;
+        }
+
+        private void RestoreCursorState()
+        {
+            if (!cursorStateCaptured)
+            {
+                return;
+            }
+
+            Cursor.lockState = capturedCursorLockMode;
+            Cursor.visible = capturedCursorVisible;
+            cursorStateCaptured = false;
         }
 
         public bool SetMode(NavigationMode requested)
@@ -215,7 +291,11 @@ namespace jcan.CelestialSystems
         {
             if (!initialized || !anchorBridge.IsActiveSource) return;
             var debug = DebugWindowManager.Instance;
-            if (debug != null && debug.MenuVisible) return;
+            var debugMenuVisible = debug != null && debug.MenuVisible;
+            SetFreeCursorActive(
+                mode == NavigationMode.Free &&
+                !debugMenuVisible);
+            if (debugMenuVisible) return;
             if (observerModeAction.action.WasPressedThisFrame())
             {
                 SetMode(NavigationMode.Observer);
