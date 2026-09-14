@@ -1,7 +1,7 @@
 /*
  * Builds a simple runtime annulus for every generated planetary-ring band.
- * A dedicated two-sided ring shader uses the baked density channel for both
- * visible transparency and shadow-map coverage.
+ * A dedicated two-sided ring shader evaluates the authored radial gradient and
+ * curve keys from GPU buffers for both visible transparency and shadow coverage.
  */
 
 using System;
@@ -21,9 +21,6 @@ namespace jcan.CelestialSystems
             "jcan/Celestial Systems/Celestial Ring";
         private const int DefaultAngularSegments =
             256;
-        // Retains narrow generated divisions until the dedicated shader takes over.
-        private const int GradientTextureWidth =
-            1024;
 
         private static readonly HashSet<CelestialRingMeshPresentation>
             activePresentations =
@@ -47,8 +44,8 @@ namespace jcan.CelestialSystems
             new List<Mesh>();
         private readonly List<Material> runtimeMaterials =
             new List<Material>();
-        private readonly List<Texture2D> runtimeTextures =
-            new List<Texture2D>();
+        private readonly List<GraphicsBuffer> runtimeDataBuffers =
+            new List<GraphicsBuffer>();
         private CelestialBodyRuntimeContext body;
 
         public static IReadOnlyCollection<CelestialRingMeshPresentation>
@@ -172,17 +169,15 @@ namespace jcan.CelestialSystems
                         definition.RingPopulationGradients.Count
                         ? definition.RingPopulationGradients[index]
                         : null;
-                var texture =
-                    BakeGradient(
-                        gradient,
-                        density,
-                        population);
                 var material =
                     BuildMaterial(
                         shader,
-                        texture,
+                        gradient,
+                        density,
+                        population,
                         definition.DefinitionId,
-                        index);
+                        index,
+                        out var dataBuffers);
 
                 var ringObject =
                     new GameObject(
@@ -207,8 +202,8 @@ namespace jcan.CelestialSystems
 
                 runtimeMeshes.Add(
                     mesh);
-                runtimeTextures.Add(
-                    texture);
+                runtimeDataBuffers.AddRange(
+                    dataBuffers);
                 runtimeMaterials.Add(
                     material);
             }
@@ -419,94 +414,14 @@ namespace jcan.CelestialSystems
             return mesh;
         }
 
-        private static Texture2D BakeGradient(
-            Gradient albedo,
-            AnimationCurve density,
-            AnimationCurve population)
-        {
-            var texture =
-                new Texture2D(
-                    GradientTextureWidth,
-                    1,
-                    TextureFormat.RGBA32,
-                    false,
-                    true)
-                {
-                    name =
-                        "Celestial Ring Data (Runtime)",
-                    wrapMode =
-                        TextureWrapMode.Clamp,
-                    filterMode =
-                        FilterMode.Bilinear
-                };
-            var colors =
-                new Color[GradientTextureWidth];
-
-            for (var index = 0;
-                index < colors.Length;
-                index++)
-            {
-                var fraction =
-                    (float)index /
-                    (colors.Length - 1);
-                var color =
-                    albedo != null
-                        ? albedo.Evaluate(
-                            fraction)
-                        : Color.white;
-                var densityValue =
-                    density != null
-                        ? Mathf.Clamp01(
-                            density.Evaluate(
-                                fraction))
-                        : 1.0f;
-                var populationValue =
-                    population != null
-                        ? Mathf.Clamp01(
-                            population.Evaluate(
-                                fraction))
-                        : densityValue;
-
-                // Both curves contain the generated divisions. Combining their
-                // coverage keeps a division dark even when just one curve drops,
-                // while sqrt avoids making the whole baseline ring too dim.
-                var coverage =
-                    Mathf.Sqrt(
-                        densityValue *
-                        populationValue);
-                var brightness =
-                    Mathf.Lerp(
-                        0.18f,
-                        1.0f,
-                        coverage);
-                color.r *=
-                    brightness;
-                color.g *=
-                    brightness;
-                color.b *=
-                    brightness;
-                // Alpha is the authored density curve itself. The ring shader
-                // uses it for opacity and dithered shadow coverage, so a
-                // generated division removes both visible material and shadow.
-                color.a =
-                    densityValue;
-                colors[index] =
-                    color;
-            }
-
-            texture.SetPixels(
-                colors);
-            texture.Apply(
-                false,
-                true);
-            return texture;
-        }
-
         private static Material BuildMaterial(
             Shader shader,
-            Texture2D texture,
+            Gradient albedo,
+            AnimationCurve density,
+            AnimationCurve population,
             string definitionId,
-            int bandIndex)
+            int bandIndex,
+            out GraphicsBuffer[] dataBuffers)
         {
             var material =
                 new Material(
@@ -518,9 +433,46 @@ namespace jcan.CelestialSystems
                         (int)RenderQueue.Transparent
                 };
 
-            material.SetTexture(
-                "_RingData",
-                texture);
+            var albedoBuffer =
+                CreateAlbedoBuffer(
+                    albedo,
+                    out var albedoKeyCount);
+            var densityBuffer =
+                CreateCurveBuffer(
+                    density,
+                    1.0f,
+                    out var densityKeyCount);
+            var populationBuffer =
+                CreateCurveBuffer(
+                    population,
+                    1.0f,
+                    out var populationKeyCount);
+            dataBuffers =
+                new[]
+                {
+                    albedoBuffer,
+                    densityBuffer,
+                    populationBuffer
+                };
+
+            material.SetBuffer(
+                "_RingAlbedoKeys",
+                albedoBuffer);
+            material.SetInt(
+                "_RingAlbedoKeyCount",
+                albedoKeyCount);
+            material.SetBuffer(
+                "_RingDensityKeys",
+                densityBuffer);
+            material.SetInt(
+                "_RingDensityKeyCount",
+                densityKeyCount);
+            material.SetBuffer(
+                "_RingPopulationKeys",
+                populationBuffer);
+            material.SetInt(
+                "_RingPopulationKeyCount",
+                populationKeyCount);
             material.SetFloat(
                 "_Opacity",
                 1.0f);
@@ -531,6 +483,99 @@ namespace jcan.CelestialSystems
                 "_AmbientStrength",
                 0.2f);
             return material;
+        }
+
+        private static GraphicsBuffer CreateAlbedoBuffer(
+            Gradient gradient,
+            out int keyCount)
+        {
+            var keys =
+                gradient != null &&
+                gradient.colorKeys != null &&
+                gradient.colorKeys.Length > 0
+                    ? gradient.colorKeys
+                    : new[]
+                    {
+                        new GradientColorKey(
+                            Color.white,
+                            0.0f),
+                        new GradientColorKey(
+                            Color.white,
+                            1.0f)
+                    };
+            var data =
+                new Vector4[keys.Length];
+
+            for (var index = 0;
+                index < keys.Length;
+                index++)
+            {
+                data[index] =
+                    new Vector4(
+                        keys[index].time,
+                        keys[index].color.r,
+                        keys[index].color.g,
+                        keys[index].color.b);
+            }
+
+            keyCount =
+                data.Length;
+            return CreateDataBuffer(
+                data);
+        }
+
+        private static GraphicsBuffer CreateCurveBuffer(
+            AnimationCurve curve,
+            float fallback,
+            out int keyCount)
+        {
+            var keys =
+                curve != null &&
+                curve.length > 0
+                    ? curve.keys
+                    : new[]
+                    {
+                        new Keyframe(
+                            0.0f,
+                            fallback),
+                        new Keyframe(
+                            1.0f,
+                            fallback)
+                    };
+            var data =
+                new Vector4[keys.Length];
+
+            for (var index = 0;
+                index < keys.Length;
+                index++)
+            {
+                data[index] =
+                    new Vector4(
+                        keys[index].time,
+                        keys[index].value,
+                        keys[index].inTangent,
+                        keys[index].outTangent);
+            }
+
+            keyCount =
+                data.Length;
+            return CreateDataBuffer(
+                data);
+        }
+
+        private static GraphicsBuffer CreateDataBuffer(
+            Vector4[] data)
+        {
+            var buffer =
+                new GraphicsBuffer(
+                    GraphicsBuffer.Target.Structured,
+                    Mathf.Max(
+                        1,
+                        data.Length),
+                    sizeof(float) * 4);
+            buffer.SetData(
+                data);
+            return buffer;
         }
 
         private void ClearGeneratedChildren()
@@ -575,14 +620,10 @@ namespace jcan.CelestialSystems
             }
 
             for (var index = 0;
-                index < runtimeTextures.Count;
+                index < runtimeDataBuffers.Count;
                 index++)
             {
-                if (runtimeTextures[index] != null)
-                {
-                    Destroy(
-                        runtimeTextures[index]);
-                }
+                runtimeDataBuffers[index]?.Release();
             }
 
             for (var index = 0;
@@ -597,7 +638,7 @@ namespace jcan.CelestialSystems
             }
 
             runtimeMaterials.Clear();
-            runtimeTextures.Clear();
+            runtimeDataBuffers.Clear();
             runtimeMeshes.Clear();
             generatedRingCount = 0;
         }
