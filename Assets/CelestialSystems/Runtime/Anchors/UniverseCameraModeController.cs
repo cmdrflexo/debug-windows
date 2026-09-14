@@ -30,13 +30,11 @@ namespace jcan.CelestialSystems
         [SerializeField] private InputActionReference freeModeAction;
         [SerializeField] private InputActionReference toggleModeAction;
 
-        [Header("Free Look (defaults: pointer delta, right mouse)")]
+        [Header("Free Look (defaults: pointer delta; always active in Free mode)")]
+        [Tooltip("Pointer delta for FreeUniverseAnchorController. No hold action is used.")]
         [SerializeField] private InputActionReference lookDeltaAction;
-        [SerializeField] private InputActionReference lookHoldAction;
+        [Tooltip("Signed axis for FreeUniverseAnchorController roll (default: Q/E).")]
         [SerializeField] private InputActionReference rollAction;
-        [SerializeField, Min(0.0f)] private float lookDegreesPerPixel = 0.2f;
-        [SerializeField, Min(0.0f)] private float rollDegreesPerSecond = 45.0f;
-        [SerializeField] private bool invertPitch;
 
         [Header("Free Movement Defaults")]
         [Tooltip("Existing input references on FreeUniverseAnchorController take precedence.")]
@@ -77,7 +75,6 @@ namespace jcan.CelestialSystems
             freeModeAction = Resolve(freeModeAction, "Free Mode", InputActionType.Button, "<Keyboard>/f2");
             toggleModeAction = Resolve(toggleModeAction, "Toggle Camera Mode", InputActionType.Button, "<Keyboard>/v");
             lookDeltaAction = Resolve(lookDeltaAction, "Free Look Delta", InputActionType.Value, "<Pointer>/delta");
-            lookHoldAction = Resolve(lookHoldAction, "Free Look Hold", InputActionType.Button, "<Mouse>/rightButton");
             rollAction = Resolve(rollAction, "Free Roll", InputActionType.Value);
             if (ownedReferences.Contains(rollAction))
                 rollAction.action.AddCompositeBinding("1DAxis")
@@ -94,7 +91,8 @@ namespace jcan.CelestialSystems
             speedAction = Resolve(speedAction, "Free Speed", InputActionType.Value, "<Mouse>/scroll/y");
             boostAction = Resolve(boostAction, "Free Boost", InputActionType.Button, "<Keyboard>/leftShift");
             freeFlight.ConfigureSharedRig(anchorBridge, viewCamera.transform,
-                moveAction, verticalAction, speedAction, boostAction);
+                moveAction, verticalAction, speedAction, boostAction,
+                lookDeltaAction, rollAction);
             initialized = true;
         }
 
@@ -121,9 +119,6 @@ namespace jcan.CelestialSystems
             Enable(observerModeAction);
             Enable(freeModeAction);
             Enable(toggleModeAction);
-            Enable(lookDeltaAction);
-            Enable(lookHoldAction);
-            Enable(rollAction);
             ApplyMode();
         }
 
@@ -210,19 +205,7 @@ namespace jcan.CelestialSystems
             if (toggleModeAction.action.WasPressedThisFrame())
             {
                 SetMode(mode == NavigationMode.Observer ? NavigationMode.Free : NavigationMode.Observer);
-                return;
             }
-            if (mode != NavigationMode.Free) return;
-            var rotation = viewCamera.transform.rotation;
-            if (lookHoldAction.action.IsPressed())
-            {
-                var delta = lookDeltaAction.action.ReadValue<Vector2>() * lookDegreesPerPixel;
-                rotation *= Quaternion.Euler(invertPitch ? delta.y : -delta.y, delta.x, 0.0f);
-            }
-            rotation *= Quaternion.AngleAxis(
-                -rollAction.action.ReadValue<float>() * rollDegreesPerSecond * Time.unscaledDeltaTime,
-                Vector3.forward);
-            viewCamera.transform.rotation = rotation;
         }
 
         private void LateUpdate()
