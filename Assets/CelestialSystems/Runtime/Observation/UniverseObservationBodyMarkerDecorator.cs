@@ -15,6 +15,8 @@ namespace jcan.CelestialSystems
         private const string DecorationsContainerName =
             "Generated Observation Decorations";
 
+        public static bool NavigationVisible { get; private set; } = true;
+
         [Header("References")]
         [SerializeField] private UniverseObservationAnchorController observationController;
         [SerializeField] private CelestialBodyRuntimeContext targetContext;
@@ -52,6 +54,11 @@ namespace jcan.CelestialSystems
         private Material elevationLineMaterial;
         private MaterialPropertyBlock markerPropertyBlock;
         private Camera observationCamera;
+
+        public static void SetNavigationVisible(bool value)
+        {
+            NavigationVisible = value;
+        }
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public bool HasResolvedTarget => hasResolvedTarget;
@@ -133,7 +140,7 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisuals();
 
-            if (!visible || observationController == null ||
+            if (!visible || !NavigationVisible || observationController == null ||
                 floatingObject == null ||
                 !TryResolveTarget(out var bodyPosition) ||
                 !observationController.TryGetObservationPlane(
