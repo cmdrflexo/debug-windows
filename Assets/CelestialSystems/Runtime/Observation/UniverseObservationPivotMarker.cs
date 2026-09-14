@@ -124,7 +124,13 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisual();
 
-            if (!visible || !NavigationVisible || observationController == null || markerVisual == null ||
+            if (!visible || !NavigationVisible)
+            {
+                SetRendererVisible(false);
+                return;
+            }
+
+            if (observationController == null || markerVisual == null ||
                 !observationController.TryGetObservationPlane(
                     out var currentPivotPosition,
                     out var planeRight,
