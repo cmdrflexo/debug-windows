@@ -42,6 +42,8 @@ namespace jcan.CelestialSystems
         [SerializeField] private InputActionReference lookDeltaAction;
         [Tooltip("Signed axis for FreeUniverseAnchorController roll (default: Q/E).")]
         [SerializeField] private InputActionReference rollAction;
+        [Tooltip("Free-mode nearest feature lock (default: L).")]
+        [SerializeField] private InputActionReference lockNearestFeatureAction;
 
         [Header("Free Movement Defaults")]
         [Tooltip("Existing input references on FreeUniverseAnchorController take precedence.")]
@@ -97,6 +99,11 @@ namespace jcan.CelestialSystems
             toggleModeAction = Resolve(toggleModeAction, "Toggle Camera Mode", InputActionType.Button, "<Keyboard>/v");
             lookDeltaAction = Resolve(lookDeltaAction, "Free Look Delta", InputActionType.Value, "<Pointer>/delta");
             rollAction = Resolve(rollAction, "Free Roll", InputActionType.Value);
+            lockNearestFeatureAction = Resolve(
+                lockNearestFeatureAction,
+                "Lock Nearest Feature",
+                InputActionType.Button,
+                "<Keyboard>/l");
             if (ownedReferences.Contains(rollAction))
                 rollAction.action.AddCompositeBinding("1DAxis")
                     .With("Negative", "<Keyboard>/q").With("Positive", "<Keyboard>/e");
@@ -113,7 +120,7 @@ namespace jcan.CelestialSystems
             boostAction = Resolve(boostAction, "Free Boost", InputActionType.Button, "<Keyboard>/leftShift");
             freeFlight.ConfigureSharedRig(anchorBridge, viewCamera.transform,
                 moveAction, verticalAction, speedAction, boostAction,
-                lookDeltaAction, rollAction);
+                lookDeltaAction, rollAction, lockNearestFeatureAction);
             initialized = true;
         }
 
