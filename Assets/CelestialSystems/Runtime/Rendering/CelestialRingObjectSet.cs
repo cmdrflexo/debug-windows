@@ -202,6 +202,77 @@ namespace jcan.CelestialSystems
             }
         }
 
+        public bool TrySelectFamily(
+            CelestialRingSample sample,
+            float selector,
+            out CelestialRingObjectFamily family)
+        {
+            family = null;
+
+            if (families == null ||
+                families.Length == 0)
+            {
+                return false;
+            }
+
+            var totalWeight = 0.0f;
+
+            for (var index = 0;
+                index < families.Length;
+                index++)
+            {
+                if (families[index] != null)
+                {
+                    totalWeight +=
+                        families[index]
+                            .EvaluateSelectionWeight(
+                                sample.IceWeight,
+                                sample.RockWeight,
+                                sample.DustWeight);
+                }
+            }
+
+            if (totalWeight <=
+                0.000001f)
+            {
+                return false;
+            }
+
+            var threshold =
+                Mathf.Clamp01(
+                    selector) *
+                totalWeight;
+            var accumulated = 0.0f;
+
+            for (var index = 0;
+                index < families.Length;
+                index++)
+            {
+                var candidate =
+                    families[index];
+
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                accumulated +=
+                    candidate.EvaluateSelectionWeight(
+                        sample.IceWeight,
+                        sample.RockWeight,
+                        sample.DustWeight);
+
+                if (threshold <=
+                    accumulated)
+                {
+                    family = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void OnValidate()
         {
             if (families == null)
