@@ -78,6 +78,24 @@ namespace jcan.CelestialSystems
         [Tooltip("Button action that temporarily ramps the boost multiplier while held.")]
         private InputActionReference boostAction;
 
+        [Header("Camera Look")]
+        [SerializeField]
+        [Tooltip("Pointer-delta action used for always-on free-camera rotation.")]
+        private InputActionReference lookDeltaAction;
+
+        [SerializeField]
+        [Tooltip("Signed axis action used to roll the free camera.")]
+        private InputActionReference rollAction;
+
+        [SerializeField, Min(0.0f)]
+        private float lookDegreesPerPixel = 0.2f;
+
+        [SerializeField, Min(0.0f)]
+        private float rollDegreesPerSecond = 45.0f;
+
+        [SerializeField]
+        private bool invertPitch;
+
         [Header("Manual Speed Multiplier")]
         [SerializeField]
         [Min(1.0001f)]
@@ -191,7 +209,8 @@ namespace jcan.CelestialSystems
         public void ConfigureSharedRig(
             SgtUniverseOriginBridge bridge, Transform cameraTransform,
             InputActionReference move, InputActionReference vertical,
-            InputActionReference speed, InputActionReference boost)
+            InputActionReference speed, InputActionReference boost,
+            InputActionReference lookDelta, InputActionReference roll)
         {
             poseBridge = bridge;
             universeFrame = bridge.UniverseFrame;
@@ -200,12 +219,16 @@ namespace jcan.CelestialSystems
             if (verticalAction == null) verticalAction = vertical;
             if (speedMultiplierAction == null) speedMultiplierAction = speed;
             if (boostAction == null) boostAction = boost;
+            if (lookDeltaAction == null) lookDeltaAction = lookDelta;
+            if (rollAction == null) rollAction = roll;
             ClearActiveInput();
         }
         private bool enabledMoveAction;
         private bool enabledVerticalAction;
         private bool enabledSpeedMultiplierAction;
         private bool enabledBoostAction;
+        private bool enabledLookDeltaAction;
+        private bool enabledRollAction;
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
 
@@ -261,6 +284,12 @@ namespace jcan.CelestialSystems
             enabledBoostAction =
                 EnableAction(
                     boostAction);
+            enabledLookDeltaAction =
+                EnableAction(
+                    lookDeltaAction);
+            enabledRollAction =
+                EnableAction(
+                    rollAction);
 
             if (speedMultiplierAction != null &&
                 speedMultiplierAction.action != null)
@@ -301,11 +330,19 @@ namespace jcan.CelestialSystems
             DisableAction(
                 boostAction,
                 enabledBoostAction);
+            DisableAction(
+                lookDeltaAction,
+                enabledLookDeltaAction);
+            DisableAction(
+                rollAction,
+                enabledRollAction);
 
             enabledMoveAction = false;
             enabledVerticalAction = false;
             enabledSpeedMultiplierAction = false;
             enabledBoostAction = false;
+            enabledLookDeltaAction = false;
+            enabledRollAction = false;
             currentBoostMultiplier = 1.0f;
         }
 
@@ -345,6 +382,8 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            UpdateCameraLook();
+
             if (poseBridge != null) return;
             UpdateBoostMultiplier(
                 Time.deltaTime);
@@ -357,6 +396,38 @@ namespace jcan.CelestialSystems
                     GetDelta(
                         Time.deltaTime));
             }
+        }
+
+        // Free mode owns camera rotation. Pointer look deliberately has no hold
+        // binding: any configured pointer delta rotates while this controller is enabled.
+        private void UpdateCameraLook()
+        {
+            if (!listen || debugMenuVisible || movementReference == null)
+            {
+                return;
+            }
+
+            var rotation = movementReference.rotation;
+            if (lookDeltaAction != null && lookDeltaAction.action != null)
+            {
+                var delta = lookDeltaAction.action.ReadValue<Vector2>() *
+                    lookDegreesPerPixel;
+                rotation *= Quaternion.Euler(
+                    invertPitch ? delta.y : -delta.y,
+                    delta.x,
+                    0.0f);
+            }
+
+            if (rollAction != null && rollAction.action != null)
+            {
+                rotation *= Quaternion.AngleAxis(
+                    -rollAction.action.ReadValue<float>() *
+                    rollDegreesPerSecond *
+                    Time.unscaledDeltaTime,
+                    Vector3.forward);
+            }
+
+            movementReference.rotation = rotation;
         }
 
         private void LateUpdate()
