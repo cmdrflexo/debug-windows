@@ -879,48 +879,50 @@ namespace jcan.CelestialSystems
             characteristicScaleMeters = default;
             ResolveUniverseFrame();
 
-            var anchorPosition = movementReference != null
+            if (!TryGetCameraUniversePosition(out var cameraPosition))
+            {
+                return false;
+            }
+
+            var sceneCameraPosition = movementReference != null
                 ? movementReference.position
                 : transform.position;
             var nearestSurfaceDistanceMeters = double.PositiveInfinity;
 
-            gravityEngine ??= GravityEngine.Instance();
-            if (gravityEngine != null && gravityEngine.IsSetup())
+            // Use the same global motion contract as the observer and orbit
+            // systems. Bodies generated on trajectories deliberately have no
+            // Gravity Engine NBody, so GE positions cannot be this selector's
+            // eligibility boundary.
+            foreach (var bodyContext in CelestialBodyRuntimeContext.ActiveContexts)
             {
-                var physicalScale = gravityEngine.GetPhysicalScale();
-                if (IsFinite(physicalScale) && physicalScale > 0.0f)
+                if (!IsEligibleBody(bodyContext) ||
+                    !bodyContext.TryGetMotionState(out var bodyMotion) ||
+                    !cameraPosition.TryGetOffsetMetersFrom(
+                        bodyMotion.Position,
+                        out var offsetMeters))
                 {
-                    foreach (var bodyContext in CelestialBodyRuntimeContext.ActiveContexts)
-                    {
-                        if (!IsEligibleBody(bodyContext))
-                        {
-                            continue;
-                        }
-
-                        var physicsPosition = gravityEngine.GetPositionDoubleV3(
-                            bodyContext.GravityBody);
-                        var deltaX = anchorPosition.x - physicsPosition.x * physicalScale;
-                        var deltaY = anchorPosition.y - physicsPosition.y * physicalScale;
-                        var deltaZ = anchorPosition.z - physicsPosition.z * physicalScale;
-                        var radialDistanceMeters = Math.Sqrt(
-                            deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-                        var candidateDistance = Math.Abs(
-                            radialDistanceMeters -
-                            bodyContext.ConfiguredReferenceRadiusMeters);
-                        if (!IsFinite(candidateDistance) ||
-                            candidateDistance >= nearestSurfaceDistanceMeters)
-                        {
-                            continue;
-                        }
-
-                        selectedBody = bodyContext;
-                        selectedRing = null;
-                        surfaceDistanceMeters = candidateDistance;
-                        characteristicScaleMeters =
-                            bodyContext.ConfiguredReferenceRadiusMeters;
-                        nearestSurfaceDistanceMeters = candidateDistance;
-                    }
+                    continue;
                 }
+
+                var radialDistanceMeters = Math.Sqrt(
+                    offsetMeters.x * offsetMeters.x +
+                    offsetMeters.y * offsetMeters.y +
+                    offsetMeters.z * offsetMeters.z);
+                var candidateDistance = Math.Abs(
+                    radialDistanceMeters -
+                    bodyContext.ConfiguredReferenceRadiusMeters);
+                if (!IsFinite(candidateDistance) ||
+                    candidateDistance >= nearestSurfaceDistanceMeters)
+                {
+                    continue;
+                }
+
+                selectedBody = bodyContext;
+                selectedRing = null;
+                surfaceDistanceMeters = candidateDistance;
+                characteristicScaleMeters =
+                    bodyContext.ConfiguredReferenceRadiusMeters;
+                nearestSurfaceDistanceMeters = candidateDistance;
             }
 
             foreach (var ringPresentation in
@@ -929,7 +931,7 @@ namespace jcan.CelestialSystems
                 if (ringPresentation == null || ringPresentation.Body == null ||
                     !IsEligibleBody(ringPresentation.Body) ||
                     !ringPresentation.TryGetNearestSurfaceDistance(
-                        anchorPosition,
+                        sceneCameraPosition,
                         out var candidateDistance,
                         out var candidateScale) ||
                     candidateDistance >= nearestSurfaceDistanceMeters)
@@ -947,12 +949,39 @@ namespace jcan.CelestialSystems
             return selectedBody != null;
         }
 
+        private bool TryGetCameraUniversePosition(
+            out UniversePosition cameraPosition)
+        {
+            if (poseBridge != null &&
+                poseBridge.TryGetUniversePose(out var cameraPose))
+            {
+                cameraPosition = cameraPose.Position;
+                return true;
+            }
+
+            if (universeFrame == null ||
+                !universeFrame.FrameOriginInitialized)
+            {
+                cameraPosition = default;
+                return false;
+            }
+
+            var scenePosition = movementReference != null
+                ? movementReference.position
+                : transform.position;
+            cameraPosition = universeFrame.FrameOrigin;
+            cameraPosition.AddLocalMeters(
+                scenePosition.x,
+                scenePosition.y,
+                scenePosition.z);
+            return true;
+        }
+
         private bool IsEligibleBody(
             CelestialBodyRuntimeContext bodyContext)
         {
             return bodyContext != null &&
                 bodyContext.HasValidConfiguration &&
-                bodyContext.GravityBody != null &&
                 IsFinite(bodyContext.ConfiguredReferenceRadiusMeters) &&
                 bodyContext.ConfiguredReferenceRadiusMeters > 0.0 &&
                 (universeFrame == null ||
