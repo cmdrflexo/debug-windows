@@ -24,6 +24,10 @@ namespace jcan.CelestialSystems
         private const int GradientTextureWidth =
             1024;
 
+        private static readonly HashSet<CelestialRingMeshPresentation>
+            activePresentations =
+                new HashSet<CelestialRingMeshPresentation>();
+
         [SerializeField]
         [Min(16)]
         private int angularSegments =
@@ -45,6 +49,13 @@ namespace jcan.CelestialSystems
         private readonly List<Texture2D> runtimeTextures =
             new List<Texture2D>();
         private CelestialBodyRuntimeContext body;
+
+        public static IReadOnlyCollection<CelestialRingMeshPresentation>
+            ActivePresentations =>
+                activePresentations;
+
+        public CelestialBodyRuntimeContext Body =>
+            body;
 
         public int GeneratedRingCount =>
             generatedRingCount;
@@ -204,6 +215,75 @@ namespace jcan.CelestialSystems
             generatedRingCount =
                 bandCount;
             enabled = true;
+            return true;
+        }
+
+        private void OnEnable()
+        {
+            activePresentations.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            activePresentations.Remove(this);
+        }
+
+        // Reports distance to the actual annulus geometry in scene metres. This
+        // intentionally does not use renderer bounds, whose square footprint
+        // makes navigation speed jump outside a ring's circular edge.
+        public bool TryGetNearestSurfaceDistance(
+            Vector3 scenePosition,
+            out double distanceMeters,
+            out double characteristicScaleMeters)
+        {
+            distanceMeters = default;
+            characteristicScaleMeters = default;
+
+            if (generatedRoot == null || body == null || body.Definition == null ||
+                generatedRingCount < 1)
+            {
+                return false;
+            }
+
+            var local = generatedRoot.InverseTransformPoint(scenePosition);
+            var radialDistance = Math.Sqrt(
+                local.x * local.x + local.z * local.z);
+            var verticalDistance = Math.Abs(local.y);
+            var nearestDistance = double.PositiveInfinity;
+            var largestOuterRadius = 0.0;
+            var innerRadii = body.Definition.RingBandInnerRadiiMeters;
+            var outerRadii = body.Definition.RingBandOuterRadiiMeters;
+            var bandCount = Mathf.Min(innerRadii.Count, outerRadii.Count);
+
+            for (var index = 0; index < bandCount; index++)
+            {
+                var innerRadius = innerRadii[index];
+                var outerRadius = outerRadii[index];
+                if (!IsFinitePositive(innerRadius) || !IsFinitePositive(outerRadius) ||
+                    outerRadius < innerRadius)
+                {
+                    continue;
+                }
+
+                largestOuterRadius = Math.Max(largestOuterRadius, outerRadius);
+                var radialOffset = radialDistance < innerRadius
+                    ? innerRadius - radialDistance
+                    : radialDistance > outerRadius
+                        ? radialDistance - outerRadius
+                        : 0.0;
+                var candidateDistance = Math.Sqrt(
+                    radialOffset * radialOffset +
+                    verticalDistance * verticalDistance);
+                nearestDistance = Math.Min(nearestDistance, candidateDistance);
+            }
+
+            if (!double.IsFinite(nearestDistance) || largestOuterRadius <= 0.0)
+            {
+                return false;
+            }
+
+            distanceMeters = nearestDistance;
+            characteristicScaleMeters = largestOuterRadius;
             return true;
         }
 
