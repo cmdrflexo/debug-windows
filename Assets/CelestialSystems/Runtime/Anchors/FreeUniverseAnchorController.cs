@@ -33,18 +33,10 @@ namespace jcan.CelestialSystems
         private float damping = 10.0f;
 
         [SerializeField]
-        [Min(0.0f)]
-        private float speedMin = 1.0f;
-
-        [SerializeField]
-        [Min(0.0f)]
-        private float speedMax = 10.0f;
-
-        [SerializeField]
-        [Tooltip("Height above the nearest planet, measured as a fraction of its radius, where maximum speed is reached.")]
+        [Tooltip("Positive floor used only when touching a feature or no navigation feature is available.")]
         [Min(0.0001f)]
-        private float maxSpeedAltitudeRadiusFraction =
-            0.2f;
+        private float minimumAutomaticSpeedMetersPerSecond =
+            0.1f;
 
         [Header("Collision")]
         [SerializeField]
@@ -169,20 +161,22 @@ namespace jcan.CelestialSystems
 
         [Header("Runtime Speed")]
         [SerializeField]
-        private bool hasNearestPlanet;
+        private bool hasNearestNavigationFeature;
 
         [SerializeField]
-        private CelestialBodyRuntimeContext nearestPlanet;
+        private CelestialBodyRuntimeContext nearestBody;
 
         [SerializeField]
-        private double nearestPlanetAltitudeMeters;
+        private CelestialRingMeshPresentation nearestRing;
 
         [SerializeField]
-        private double nearestPlanetRadiusMeters;
+        private string nearestNavigationFeatureName;
 
         [SerializeField]
-        [Range(0.0f, 1.0f)]
-        private float resolvedSpeedBlend = 1.0f;
+        private double nearestNavigationFeatureDistanceMeters;
+
+        [SerializeField]
+        private double nearestNavigationFeatureScaleMeters;
 
         [SerializeField]
         private float resolvedSpeed;
@@ -232,11 +226,20 @@ namespace jcan.CelestialSystems
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
 
-        public bool HasNearestPlanet =>
-            hasNearestPlanet;
+        public bool HasNearestNavigationFeature =>
+            hasNearestNavigationFeature;
 
-        public double NearestPlanetAltitudeMeters =>
-            nearestPlanetAltitudeMeters;
+        public CelestialBodyRuntimeContext NearestBody =>
+            nearestBody;
+
+        public CelestialRingMeshPresentation NearestRing =>
+            nearestRing;
+
+        public double NearestNavigationFeatureDistanceMeters =>
+            nearestNavigationFeatureDistanceMeters;
+
+        public double NearestNavigationFeatureScaleMeters =>
+            nearestNavigationFeatureScaleMeters;
 
         public float MoveSpeedMultiplier =>
             moveSpeedMultiplier;
@@ -795,182 +798,149 @@ namespace jcan.CelestialSystems
 
         private void UpdateSpeedState()
         {
-            var minimumSpeed =
-                Mathf.Max(
-                    0.0f,
-                    speedMin);
-            var maximumSpeed =
-                Mathf.Max(
-                    minimumSpeed,
-                    speedMax);
-
-            if (!TryFindNearestPlanet(
-                    out var selectedPlanet,
-                    out var altitudeMeters,
-                    out var radiusMeters))
+            if (!TryFindNearestNavigationFeature(
+                    out var body,
+                    out var ring,
+                    out var surfaceDistanceMeters,
+                    out var characteristicScaleMeters))
             {
-                hasNearestPlanet = false;
-                nearestPlanet = null;
-                nearestPlanetAltitudeMeters =
-                    default;
-                nearestPlanetRadiusMeters =
-                    default;
-                resolvedSpeedBlend = 1.0f;
-                resolvedSpeed =
-                    maximumSpeed;
+                hasNearestNavigationFeature = false;
+                nearestBody = null;
+                nearestRing = null;
+                nearestNavigationFeatureName = string.Empty;
+                nearestNavigationFeatureDistanceMeters = default;
+                nearestNavigationFeatureScaleMeters = default;
+                resolvedSpeed = minimumAutomaticSpeedMetersPerSecond;
                 return;
             }
 
-            hasNearestPlanet = true;
-            nearestPlanet =
-                selectedPlanet;
-            nearestPlanetAltitudeMeters =
-                altitudeMeters;
-            nearestPlanetRadiusMeters =
-                radiusMeters;
-
-            var maximumSpeedAltitudeMeters =
-                radiusMeters *
-                Math.Max(
-                    0.0001,
-                    maxSpeedAltitudeRadiusFraction);
-            var speedBlend =
-                maximumSpeedAltitudeMeters >
-                    double.Epsilon
-                    ? altitudeMeters /
-                        maximumSpeedAltitudeMeters
-                    : 1.0;
-
-            resolvedSpeedBlend =
-                Mathf.Clamp01(
-                    (float)speedBlend);
-            resolvedSpeed =
-                Mathf.Lerp(
-                    minimumSpeed,
-                    maximumSpeed,
-                    resolvedSpeedBlend);
+            hasNearestNavigationFeature = true;
+            nearestBody = body;
+            nearestRing = ring;
+            nearestNavigationFeatureName = ring != null
+                ? $"{ring.Body.InstanceId} ring"
+                : body.InstanceId;
+            nearestNavigationFeatureDistanceMeters = surfaceDistanceMeters;
+            nearestNavigationFeatureScaleMeters = characteristicScaleMeters;
+            resolvedSpeed = CalculateAutomaticSpeed(
+                surfaceDistanceMeters,
+                characteristicScaleMeters);
         }
 
-        private bool TryFindNearestPlanet(
-            out CelestialBodyRuntimeContext selectedPlanet,
-            out double altitudeMeters,
-            out double radiusMeters)
+        // The speed response is derived from distance to the nearest physical
+        // feature, scaled by that feature's size. There is deliberately no
+        // manual maximum: astronomical separation produces astronomical travel
+        // speed, while the positive floor prevents a stationary camera on a
+        // surface or when no generated feature exists.
+        private float CalculateAutomaticSpeed(
+            double surfaceDistanceMeters,
+            double characteristicScaleMeters)
         {
-            selectedPlanet = null;
-            altitudeMeters = default;
-            radiusMeters = default;
-
-            gravityEngine ??=
-                GravityEngine.Instance();
-
-            if (gravityEngine == null ||
-                !gravityEngine.IsSetup())
+            var distance = Math.Max(0.0, surfaceDistanceMeters);
+            var scaleFactor = Math.Max(
+                1.0,
+                characteristicScaleMeters / 1000000.0);
+            var speed = Math.Sqrt(distance * scaleFactor);
+            if (!IsFinite(speed))
             {
-                return false;
+                speed = minimumAutomaticSpeedMetersPerSecond;
             }
 
-            var physicalScale =
-                gravityEngine.GetPhysicalScale();
+            return Mathf.Max(
+                minimumAutomaticSpeedMetersPerSecond,
+                (float)Math.Min(speed, float.MaxValue));
+        }
 
-            if (!IsFinite(
-                    physicalScale) ||
-                physicalScale <= 0.0f)
-            {
-                return false;
-            }
-
+        private bool TryFindNearestNavigationFeature(
+            out CelestialBodyRuntimeContext selectedBody,
+            out CelestialRingMeshPresentation selectedRing,
+            out double surfaceDistanceMeters,
+            out double characteristicScaleMeters)
+        {
+            selectedBody = null;
+            selectedRing = null;
+            surfaceDistanceMeters = default;
+            characteristicScaleMeters = default;
             ResolveUniverseFrame();
 
-            var anchorPosition =
-                transform.position;
-            var nearestSurfaceDistanceMeters =
-                double.PositiveInfinity;
+            var anchorPosition = movementReference != null
+                ? movementReference.position
+                : transform.position;
+            var nearestSurfaceDistanceMeters = double.PositiveInfinity;
 
-            foreach (var bodyContext in
-                CelestialBodyRuntimeContext.ActiveContexts)
+            gravityEngine ??= GravityEngine.Instance();
+            if (gravityEngine != null && gravityEngine.IsSetup())
             {
-                if (!IsEligiblePlanet(
-                        bodyContext))
+                var physicalScale = gravityEngine.GetPhysicalScale();
+                if (IsFinite(physicalScale) && physicalScale > 0.0f)
                 {
-                    continue;
+                    foreach (var bodyContext in CelestialBodyRuntimeContext.ActiveContexts)
+                    {
+                        if (!IsEligibleBody(bodyContext))
+                        {
+                            continue;
+                        }
+
+                        var physicsPosition = gravityEngine.GetPositionDoubleV3(
+                            bodyContext.GravityBody);
+                        var deltaX = anchorPosition.x - physicsPosition.x * physicalScale;
+                        var deltaY = anchorPosition.y - physicsPosition.y * physicalScale;
+                        var deltaZ = anchorPosition.z - physicsPosition.z * physicalScale;
+                        var radialDistanceMeters = Math.Sqrt(
+                            deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+                        var candidateDistance = Math.Abs(
+                            radialDistanceMeters -
+                            bodyContext.ConfiguredReferenceRadiusMeters);
+                        if (!IsFinite(candidateDistance) ||
+                            candidateDistance >= nearestSurfaceDistanceMeters)
+                        {
+                            continue;
+                        }
+
+                        selectedBody = bodyContext;
+                        selectedRing = null;
+                        surfaceDistanceMeters = candidateDistance;
+                        characteristicScaleMeters =
+                            bodyContext.ConfiguredReferenceRadiusMeters;
+                        nearestSurfaceDistanceMeters = candidateDistance;
+                    }
                 }
-
-                var gravityBody =
-                    bodyContext.GravityBody;
-                var planetRadiusMeters =
-                    bodyContext.ConfiguredReferenceRadiusMeters;
-                var physicsPosition =
-                    gravityEngine.GetPositionDoubleV3(
-                        gravityBody);
-                var deltaX =
-                    anchorPosition.x -
-                    physicsPosition.x *
-                        physicalScale;
-                var deltaY =
-                    anchorPosition.y -
-                    physicsPosition.y *
-                        physicalScale;
-                var deltaZ =
-                    anchorPosition.z -
-                    physicsPosition.z *
-                        physicalScale;
-                var radialDistanceMeters =
-                    Math.Sqrt(
-                        deltaX *
-                            deltaX +
-                        deltaY *
-                            deltaY +
-                        deltaZ *
-                            deltaZ);
-                var candidateAltitudeMeters =
-                    radialDistanceMeters -
-                    planetRadiusMeters;
-                var surfaceDistanceMeters =
-                    Math.Abs(
-                        candidateAltitudeMeters);
-
-                if (!IsFinite(
-                        surfaceDistanceMeters) ||
-                    surfaceDistanceMeters >=
-                        nearestSurfaceDistanceMeters)
-                {
-                    continue;
-                }
-
-                selectedPlanet =
-                    bodyContext;
-                altitudeMeters =
-                    candidateAltitudeMeters;
-                radiusMeters =
-                    planetRadiusMeters;
-                nearestSurfaceDistanceMeters =
-                    surfaceDistanceMeters;
             }
 
-            return
-                selectedPlanet != null;
+            foreach (var ringPresentation in
+                CelestialRingMeshPresentation.ActivePresentations)
+            {
+                if (ringPresentation == null || ringPresentation.Body == null ||
+                    !IsEligibleBody(ringPresentation.Body) ||
+                    !ringPresentation.TryGetNearestSurfaceDistance(
+                        anchorPosition,
+                        out var candidateDistance,
+                        out var candidateScale) ||
+                    candidateDistance >= nearestSurfaceDistanceMeters)
+                {
+                    continue;
+                }
+
+                selectedBody = ringPresentation.Body;
+                selectedRing = ringPresentation;
+                surfaceDistanceMeters = candidateDistance;
+                characteristicScaleMeters = candidateScale;
+                nearestSurfaceDistanceMeters = candidateDistance;
+            }
+
+            return selectedBody != null;
         }
 
-        private bool IsEligiblePlanet(
+        private bool IsEligibleBody(
             CelestialBodyRuntimeContext bodyContext)
         {
-            if (bodyContext == null ||
-                !bodyContext.HasValidConfiguration ||
-                bodyContext.ResolvedSurfaceSystem !=
-                    CelestialSurfaceSystem.RoundMapMagic ||
-                bodyContext.GravityBody == null ||
-                !IsFinite(
-                    bodyContext.ConfiguredReferenceRadiusMeters) ||
-                bodyContext.ConfiguredReferenceRadiusMeters <=
-                    0.0)
-            {
-                return false;
-            }
-
-            return
-                universeFrame == null ||
-                bodyContext.UniverseFrame ==
-                    universeFrame;
+            return bodyContext != null &&
+                bodyContext.HasValidConfiguration &&
+                bodyContext.GravityBody != null &&
+                IsFinite(bodyContext.ConfiguredReferenceRadiusMeters) &&
+                bodyContext.ConfiguredReferenceRadiusMeters > 0.0 &&
+                (universeFrame == null ||
+                    bodyContext.UniverseFrame == universeFrame);
         }
 
         private void SubscribeToDebugMenu()
