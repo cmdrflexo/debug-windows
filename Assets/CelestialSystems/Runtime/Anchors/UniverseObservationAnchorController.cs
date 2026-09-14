@@ -46,12 +46,26 @@ namespace jcan.CelestialSystems
             public float pitch;
             public Vector3 planeNormal;
             public Vector3 planeForward;
+            public bool hasCameraRotation;
+            public Quaternion cameraRotation;
+            public bool hasCameraPosition;
+            public UniversePosition cameraPosition;
         }
 
         private SavedView lastRenderedView;
         private bool checkedSavedView;
         private bool hasRenderedPivot;
         private UniversePosition renderedPivot;
+        private bool navigationActive = true;
+        private UniversePosition suspendedPivot;
+        private bool hasSuspendedPivot;
+        private Quaternion handoffRotation = Quaternion.identity;
+        private bool settleHandoffRotation;
+        private bool retainHandoffRotation;
+        private Quaternion retainedRotation;
+        private bool holdTransferredPose;
+        private UniverseMotionState transferredPose;
+        public bool NavigationActive => navigationActive;
         private string ViewPreferenceKey =>
             "CelestialSystems.Observation.LastView.v1." + gameObject.scene.path;
 
@@ -302,6 +316,12 @@ namespace jcan.CelestialSystems
             out Vector3 planeForward,
             out Vector3 planeUp)
         {
+            if (!navigationActive && hasSuspendedPivot)
+            {
+                pivotPosition = suspendedPivot;
+                GetReferencePlaneAxes(out planeRight, out planeForward, out planeUp);
+                return true;
+            }
             if (!TryGetPivotMotion(out var targetMotion))
             {
                 pivotPosition = default;
@@ -429,6 +449,7 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            if (!navigationActive) return;
             ResolveSelectionTarget();
 
             if (selectionController == null && !originLocked)
@@ -446,6 +467,7 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            if (!navigationActive) return;
             TryRestoreSessionView();
             if ((!originLocked && target == null) || anchorBridge == null)
             {
@@ -529,14 +551,23 @@ namespace jcan.CelestialSystems
                 pivotOffset.y,
                 pivotOffset.z);
 
-            var yawRotation = Quaternion.AngleAxis(yawDegrees, planeUp);
-            var yawForward = yawRotation * planeForward;
-            var yawRight = yawRotation * planeRight;
-            var pitchRotation = Quaternion.AngleAxis(-pitchDegrees, yawRight);
-            var pivotToCameraDirection =
-                pitchRotation * -yawForward;
+            if (settleHandoffRotation)
+            {
+                retainHandoffRotation = false;
+                handoffRotation = Quaternion.Slerp(
+                    handoffRotation, Quaternion.identity,
+                    1.0f - Mathf.Exp(-8.0f * Time.unscaledDeltaTime));
+                if (Quaternion.Angle(handoffRotation, Quaternion.identity) < 0.001f)
+                {
+                    handoffRotation = Quaternion.identity;
+                    settleHandoffRotation = false;
+                }
+            }
+            var cameraRotation = retainHandoffRotation
+                ? retainedRotation : handoffRotation * GetOrbitRotation();
+            var pivotToCameraDirection = -(cameraRotation * Vector3.forward);
             var cameraOffset =
-                ToDoubleVector(pivotToCameraDirection.normalized) *
+                ToDoubleVector(pivotToCameraDirection) *
                 distanceMeters;
             var cameraPosition = pivotPosition;
             cameraPosition.AddLocalMeters(
@@ -544,9 +575,13 @@ namespace jcan.CelestialSystems
                 cameraOffset.y,
                 cameraOffset.z);
 
-            var cameraRotation = Quaternion.LookRotation(
-                -pivotToCameraDirection.normalized,
-                planeUp);
+            // Avoid multiplying a tiny float quaternion reconstruction error by an
+            // astronomical pivot distance during an otherwise motionless handoff.
+            if (holdTransferredPose)
+            {
+                cameraPosition = transferredPose.Position;
+                cameraRotation = transferredPose.Rotation;
+            }
 
             if (!anchorBridge.TrySetUniversePose(
                     new UniverseMotionState(
@@ -572,6 +607,10 @@ namespace jcan.CelestialSystems
                 lastRenderedView.pitch = pitchDegrees;
                 lastRenderedView.planeNormal = referencePlaneNormal;
                 lastRenderedView.planeForward = referencePlaneForward;
+                lastRenderedView.hasCameraRotation = true;
+                lastRenderedView.cameraRotation = cameraRotation;
+                lastRenderedView.hasCameraPosition = true;
+                lastRenderedView.cameraPosition = cameraPosition;
             }
         }
 
@@ -581,6 +620,7 @@ namespace jcan.CelestialSystems
             {
                 return;
             }
+            holdTransferredPose = false;
 
             var preserveDistance =
                 newTarget != null &&
@@ -686,6 +726,7 @@ namespace jcan.CelestialSystems
         [ContextMenu("Recenter On Target")]
         public void RecenterOnTarget()
         {
+            holdTransferredPose = false;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
             planeElevationMeters = 0.0;
@@ -697,6 +738,10 @@ namespace jcan.CelestialSystems
         [ContextMenu("Reset Target View")]
         public void ResetTargetView()
         {
+            holdTransferredPose = false;
+            retainHandoffRotation = false;
+            handoffRotation = Quaternion.identity;
+            settleHandoffRotation = false;
             plateOffsetRightMeters = 0.0;
             plateOffsetForwardMeters = 0.0;
             ClearPanVelocity();
@@ -779,6 +824,17 @@ namespace jcan.CelestialSystems
             }
 
             var pointerDelta = ReadVector2(pointerDeltaAction);
+
+            if (((IsPressed(orbitAction) || IsPressed(panAction)) &&
+                    pointerDelta.sqrMagnitude > Mathf.Epsilon) ||
+                ReadVector2(panDirectionAction).sqrMagnitude > Mathf.Epsilon ||
+                !Mathf.Approximately(ReadFloat(zoomAction), 0.0f) ||
+                WasPressedThisFrame(zoomInAction) || WasPressedThisFrame(zoomOutAction) ||
+                WasPressedThisFrame(orbitLeftStepAction) || WasPressedThisFrame(orbitRightStepAction) ||
+                WasPressedThisFrame(recenterAction))
+            {
+                holdTransferredPose = false;
+            }
 
             ApplyOrbitInput(pointerDelta, deltaTime);
             ApplyOrbitStepInput();
@@ -872,6 +928,7 @@ namespace jcan.CelestialSystems
             {
                 if (pointerDelta.sqrMagnitude > Mathf.Epsilon)
                 {
+                    settleHandoffRotation = true;
                     recenterZoomArmed = false;
                 }
 
@@ -944,6 +1001,7 @@ namespace jcan.CelestialSystems
             }
 
             ClearOrbitVelocity();
+            settleHandoffRotation = true;
             yawDegrees += step;
             recenterZoomArmed = false;
         }
@@ -1309,6 +1367,16 @@ namespace jcan.CelestialSystems
             distanceMeters = Math.Min(saved.distance, maximumDistanceMeters);
             targetDistanceMeters = distanceMeters;
             SetOriginPivot(saved.pivot);
+            handoffRotation = saved.hasCameraRotation && IsFiniteViewRotation(saved.cameraRotation)
+                ? saved.cameraRotation.normalized * Quaternion.Inverse(GetOrbitRotation())
+                : Quaternion.identity;
+            retainHandoffRotation = saved.hasCameraRotation && IsFiniteViewRotation(saved.cameraRotation);
+            retainedRotation = retainHandoffRotation ? saved.cameraRotation.normalized : Quaternion.identity;
+            holdTransferredPose = retainHandoffRotation && saved.hasCameraPosition &&
+                saved.cameraPosition.TryGetOffsetMetersFrom(default(UniversePosition), out _);
+            if (holdTransferredPose)
+                transferredPose = new UniverseMotionState(saved.cameraPosition, retainedRotation);
+            settleHandoffRotation = false;
             ClearPanVelocity();
             ClearOrbitVelocity();
             viewInitialized = true;
@@ -1324,6 +1392,104 @@ namespace jcan.CelestialSystems
         {
             return IsFiniteViewValue(value.x) && IsFiniteViewValue(value.y) &&
                 IsFiniteViewValue(value.z) && value.sqrMagnitude > Mathf.Epsilon;
+        }
+
+        private static bool IsFiniteViewRotation(Quaternion value)
+        {
+            return IsFiniteViewValue(value.x) && IsFiniteViewValue(value.y) &&
+                IsFiniteViewValue(value.z) && IsFiniteViewValue(value.w) &&
+                Quaternion.Dot(value, value) > Mathf.Epsilon;
+        }
+
+        private Quaternion GetOrbitRotation()
+        {
+            GetReferencePlaneAxes(out var right, out var forward, out var up);
+            var yaw = Quaternion.AngleAxis(yawDegrees, up);
+            var direction = Quaternion.AngleAxis(-pitchDegrees, yaw * right) * (yaw * forward);
+            return Quaternion.LookRotation(direction, up);
+        }
+
+        public void SetNavigationActive(bool active)
+        {
+            if (navigationActive == active) return;
+            if (!active)
+            {
+                hasSuspendedPivot = TryGetObservationPlane(
+                    out suspendedPivot, out _, out _, out _);
+                if (hasRenderedPivot)
+                {
+                    suspendedPivot = renderedPivot;
+                    hasSuspendedPivot = true;
+                }
+            }
+            navigationActive = active;
+            ClearPanVelocity();
+            ClearOrbitVelocity();
+        }
+
+        // Adopt the displayed pose without forcing free-flight roll/pitch into orbit limits.
+        // Orbit input gradually removes the residual rotation; switching itself never does.
+        public void AdoptUniversePose(UniverseMotionState pose)
+        {
+            ResolveReferences();
+            NormalizeReferencePlane();
+            originLocked = true;
+            selectionController?.LockToOrigin();
+            GetReferencePlaneAxes(out var right, out var forward, out var up);
+            var direction = pose.Rotation * Vector3.forward;
+            var flat = Vector3.ProjectOnPlane(direction, up);
+            if (flat.sqrMagnitude > Mathf.Epsilon)
+            {
+                yawDegrees = Mathf.Atan2(Vector3.Dot(flat, right),
+                    Vector3.Dot(flat, forward)) * Mathf.Rad2Deg;
+            }
+            pitchDegrees = Mathf.Clamp(
+                Mathf.Asin(Mathf.Clamp(Vector3.Dot(direction, up), -1.0f, 1.0f)) *
+                Mathf.Rad2Deg, -80.0f, 80.0f);
+            distanceMeters = Math.Max(1.0, viewInitialized ? distanceMeters : initialOriginDistanceMeters);
+            targetDistanceMeters = distanceMeters;
+            var pivot = pose.Position;
+            pivot.AddLocalMeters(direction.x * distanceMeters,
+                direction.y * distanceMeters, direction.z * distanceMeters);
+            SetOriginPivot(pivot);
+            handoffRotation = pose.Rotation * Quaternion.Inverse(GetOrbitRotation());
+            retainHandoffRotation = true;
+            retainedRotation = pose.Rotation;
+            holdTransferredPose = true;
+            transferredPose = pose;
+            settleHandoffRotation = false;
+            ClearPanVelocity();
+            ClearOrbitVelocity();
+            renderedPivot = pivot;
+            hasRenderedPivot = true;
+            viewInitialized = true;
+            recenterZoomArmed = false;
+            // A deliberate mode switch takes precedence over a delayed startup restore.
+            checkedSavedView = true;
+        }
+
+        public void RecordExternalPose(UniverseMotionState pose)
+        {
+            if (!rememberViewOnStop) return;
+            if (generationController == null)
+                generationController = FindFirstObjectByType<CelestialUniverseRuntimeController>();
+            if (generationController == null || !generationController.GenerationSucceeded) return;
+            var distance = Math.Max(1.0, viewInitialized ? distanceMeters : initialOriginDistanceMeters);
+            var direction = pose.Rotation * Vector3.forward;
+            var pivot = pose.Position;
+            pivot.AddLocalMeters(direction.x * distance, direction.y * distance, direction.z * distance);
+            lastRenderedView ??= new SavedView();
+            lastRenderedView.seed = generationController.ResolvedSeed;
+            lastRenderedView.pivot = pivot;
+            lastRenderedView.distance = distance;
+            lastRenderedView.yaw = yawDegrees;
+            lastRenderedView.pitch = pitchDegrees;
+            lastRenderedView.planeNormal = referencePlaneNormal;
+            lastRenderedView.planeForward = referencePlaneForward;
+            lastRenderedView.hasCameraRotation = true;
+            lastRenderedView.cameraRotation = pose.Rotation;
+            lastRenderedView.hasCameraPosition = true;
+            lastRenderedView.cameraPosition = pose.Position;
         }
 
         private void ResolveReferences()

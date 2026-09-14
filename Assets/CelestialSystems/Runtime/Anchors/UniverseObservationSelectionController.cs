@@ -58,6 +58,7 @@ namespace jcan.CelestialSystems
         private bool debugMenuVisible;
 
         public bool IsOriginLocked { get; private set; } = true;
+        public bool NavigationEnabled { get; set; } = true;
 
         public void LockToOrigin()
         {
@@ -100,6 +101,7 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            if (!NavigationEnabled) return;
             if (!IsOriginLocked && selectedTarget == null && automaticallySelectFirstTarget)
             {
                 RefreshTargets();
@@ -377,7 +379,7 @@ namespace jcan.CelestialSystems
 
         private void OnNextTargetPerformed(InputAction.CallbackContext context)
         {
-            if (!debugMenuVisible)
+            if (NavigationEnabled && !debugMenuVisible)
             {
                 SelectNextTarget();
             }
@@ -385,7 +387,7 @@ namespace jcan.CelestialSystems
 
         private void OnPreviousTargetPerformed(InputAction.CallbackContext context)
         {
-            if (!debugMenuVisible)
+            if (NavigationEnabled && !debugMenuVisible)
             {
                 SelectPreviousTarget();
             }

@@ -308,6 +308,8 @@ GameObject:
   - component: {fileID: 288112566}
   - component: {fileID: 288112568}
   - component: {fileID: 288112569}
+  - component: {fileID: 288112570}
+  - component: {fileID: 288112571}
   m_Layer: 0
   m_Name: Universal Observer Anchor
   m_TagString: Untagged
@@ -362,6 +364,76 @@ Transform:
   - {fileID: 433888932}
   m_Father: {fileID: 266950183}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &288112570
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288112564}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a1db598ff87480681e65038c50cde48, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.FreeUniverseAnchorController
+  movementReference: {fileID: 433888932}
+  universeFrame: {fileID: 1242513958}
+  debugWindowManager: {fileID: 1757395889}
+  listen: 1
+  damping: 10
+  speedMin: 1
+  speedMax: 10
+  maxSpeedAltitudeRadiusFraction: 0.2
+  collideWithScene: 0
+  collisionRadiusMeters: 1
+  collisionSkinMeters: 0.05
+  collisionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  moveAction: {fileID: 0}
+  verticalAction: {fileID: 0}
+  speedMultiplierAction: {fileID: 0}
+  boostAction: {fileID: 0}
+  speedMultiplierStep: 2
+  minimumSpeedMultiplier: 0.0625
+  maximumSpeedMultiplier: 64
+  moveSpeedMultiplier: 1
+  maximumBoostMultiplier: 8
+  boostRampSeconds: 3
+  currentBoostMultiplier: 1
+--- !u!114 &288112571
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288112564}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3c6d9321b1c45e4976c211ac3e12b26, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.UniverseCameraModeController
+  anchorBridge: {fileID: 876592154}
+  viewCamera: {fileID: 433888931}
+  observer: {fileID: 288112568}
+  freeFlight: {fileID: 288112570}
+  selection: {fileID: 288112569}
+  legacyLookBehaviours:
+  - {fileID: 433888928}
+  mode: 0
+  observerModeAction: {fileID: 0}
+  freeModeAction: {fileID: 0}
+  toggleModeAction: {fileID: 0}
+  lookDeltaAction: {fileID: 0}
+  lookHoldAction: {fileID: 0}
+  rollAction: {fileID: 0}
+  lookDegreesPerPixel: 0.2
+  rollDegreesPerSecond: 45
+  invertPitch: 0
+  moveAction: {fileID: 0}
+  verticalAction: {fileID: 0}
+  speedAction: {fileID: 0}
+  boostAction: {fileID: 0}
 --- !u!114 &288112568
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -673,7 +745,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 433888925}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8f6d5316b170fe34e886c05572b3006e, type: 3}
   m_Name: 
@@ -1404,7 +1476,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.SgtGravityOriginBridge
   universeFrame: {fileID: 1242513958}
   activeBehaviours:
-  - {fileID: 288112568}
+  - {fileID: 288112571}
   floatingCamera: {fileID: 288112566}
   poseRotationSource: {fileID: 433888932}
 --- !u!4 &876592155
@@ -3253,3 +3325,4 @@ SceneRoots:
   - {fileID: 885589078}
   - {fileID: 266950183}
   - {fileID: 730520857}
+

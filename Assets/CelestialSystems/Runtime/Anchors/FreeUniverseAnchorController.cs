@@ -10,7 +10,7 @@ using UnityEngine.InputSystem;
 
 namespace jcan.CelestialSystems
 {
-    [DefaultExecutionOrder(400)]
+    [DefaultExecutionOrder(50)]
     [DisallowMultipleComponent]
     public sealed class FreeUniverseAnchorController : MonoBehaviour
     {
@@ -184,6 +184,24 @@ namespace jcan.CelestialSystems
 
         private GravityEngine gravityEngine;
         private Vector3 remainingDelta;
+        private SgtUniverseOriginBridge poseBridge;
+        private int activationFrame;
+
+        // Configure while disabled; the mode owner owns any runtime input references.
+        public void ConfigureSharedRig(
+            SgtUniverseOriginBridge bridge, Transform cameraTransform,
+            InputActionReference move, InputActionReference vertical,
+            InputActionReference speed, InputActionReference boost)
+        {
+            poseBridge = bridge;
+            universeFrame = bridge.UniverseFrame;
+            movementReference = cameraTransform;
+            if (moveAction == null) moveAction = move;
+            if (verticalAction == null) verticalAction = vertical;
+            if (speedMultiplierAction == null) speedMultiplierAction = speed;
+            if (boostAction == null) boostAction = boost;
+            ClearActiveInput();
+        }
         private bool enabledMoveAction;
         private bool enabledVerticalAction;
         private bool enabledSpeedMultiplierAction;
@@ -227,6 +245,8 @@ namespace jcan.CelestialSystems
 
         private void OnEnable()
         {
+            activationFrame = Time.frameCount;
+            ClearActiveInput();
             CwInputManager.EnsureThisComponentExists();
 
             enabledMoveAction =
@@ -259,6 +279,7 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
+            ClearActiveInput();
             UnsubscribeFromDebugMenu();
 
             if (speedMultiplierAction != null &&
@@ -324,6 +345,7 @@ namespace jcan.CelestialSystems
 
         private void Update()
         {
+            if (poseBridge != null) return;
             UpdateBoostMultiplier(
                 Time.deltaTime);
             UpdateSpeedState();
@@ -339,6 +361,14 @@ namespace jcan.CelestialSystems
 
         private void LateUpdate()
         {
+            if (poseBridge != null)
+            {
+                if (Time.frameCount == activationFrame) return;
+                UpdateBoostMultiplier(Time.deltaTime);
+                UpdateSpeedState();
+                if (listen && !debugMenuVisible)
+                    AddToDelta(GetDelta(Time.deltaTime));
+            }
             if (listen &&
                 !debugMenuVisible)
             {
@@ -512,8 +542,28 @@ namespace jcan.CelestialSystems
                 ResolveCollisionMovement(
                     requestedMovement);
 
-            transform.position +=
-                appliedMovement;
+            if (poseBridge != null)
+            {
+                // Set and snap the authoritative pose before body placement (order 100).
+                // Keep the unmanaged legacy path available for existing free-anchor scenes.
+                if (!poseBridge.TryGetUniversePose(out var pose))
+                {
+                    ClearActiveInput();
+                    return;
+                }
+                var position = pose.Position;
+                position.AddLocalMeters(appliedMovement.x, appliedMovement.y, appliedMovement.z);
+                if (!poseBridge.TrySetUniversePose(new UniverseMotionState(
+                        position, movementReference.rotation)))
+                {
+                    ClearActiveInput();
+                    return;
+                }
+            }
+            else
+            {
+                transform.position += appliedMovement;
+            }
 
             if (hasCollision)
             {
