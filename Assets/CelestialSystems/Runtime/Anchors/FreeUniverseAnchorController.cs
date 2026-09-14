@@ -377,14 +377,6 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     1.0001f,
                     speedMultiplierStep);
-            minimumSpeedMultiplier =
-                Mathf.Max(
-                    0.0001f,
-                    minimumSpeedMultiplier);
-            maximumSpeedMultiplier =
-                Mathf.Max(
-                    minimumSpeedMultiplier,
-                    maximumSpeedMultiplier);
             moveSpeedMultiplier =
                 Mathf.Max(
                     0.000001f,
