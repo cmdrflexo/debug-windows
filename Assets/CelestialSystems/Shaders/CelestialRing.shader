@@ -82,18 +82,16 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                 return previous.yzw;
             }
 
-            half EvaluateCurve(
-                StructuredBuffer<float4> keys,
-                int keyCount,
-                float radialFraction,
-                half fallback)
+            half EvaluateDensityCurve(
+                float radialFraction)
             {
-                if (keyCount < 1)
+                if (_RingDensityKeyCount < 1)
                 {
-                    return fallback;
+                    return 1.0h;
                 }
 
-                float4 previous = keys[0];
+                float4 previous =
+                    _RingDensityKeys[0];
                 if (radialFraction <= previous.x)
                 {
                     return previous.y;
@@ -101,10 +99,11 @@ Shader "jcan/Celestial Systems/Celestial Ring"
 
                 [loop]
                 for (int index = 1;
-                    index < keyCount;
+                    index < _RingDensityKeyCount;
                     index++)
                 {
-                    float4 next = keys[index];
+                    float4 next =
+                        _RingDensityKeys[index];
                     if (radialFraction <= next.x)
                     {
                         float duration = max(
@@ -115,14 +114,63 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                             duration);
                         float u2 = u * u;
                         float u3 = u2 * u;
-                        float h00 = 2.0 * u3 - 3.0 * u2 + 1.0;
-                        float h10 = u3 - 2.0 * u2 + u;
-                        float h01 = -2.0 * u3 + 3.0 * u2;
-                        float h11 = u3 - u2;
-                        return h00 * previous.y +
-                            h10 * duration * previous.w +
-                            h01 * next.y +
-                            h11 * duration * next.z;
+                        return (2.0 * u3 - 3.0 * u2 + 1.0) *
+                                previous.y +
+                            (u3 - 2.0 * u2 + u) *
+                                duration * previous.w +
+                            (-2.0 * u3 + 3.0 * u2) *
+                                next.y +
+                            (u3 - u2) *
+                                duration * next.z;
+                    }
+
+                    previous = next;
+                }
+
+                return previous.y;
+            }
+
+            half EvaluatePopulationCurve(
+                float radialFraction,
+                half fallback)
+            {
+                if (_RingPopulationKeyCount < 1)
+                {
+                    return fallback;
+                }
+
+                float4 previous =
+                    _RingPopulationKeys[0];
+                if (radialFraction <= previous.x)
+                {
+                    return previous.y;
+                }
+
+                [loop]
+                for (int index = 1;
+                    index < _RingPopulationKeyCount;
+                    index++)
+                {
+                    float4 next =
+                        _RingPopulationKeys[index];
+                    if (radialFraction <= next.x)
+                    {
+                        float duration = max(
+                            next.x - previous.x,
+                            0.000001);
+                        float u = saturate(
+                            (radialFraction - previous.x) /
+                            duration);
+                        float u2 = u * u;
+                        float u3 = u2 * u;
+                        return (2.0 * u3 - 3.0 * u2 + 1.0) *
+                                previous.y +
+                            (u3 - 2.0 * u2 + u) *
+                                duration * previous.w +
+                            (-2.0 * u3 + 3.0 * u2) *
+                                next.y +
+                            (u3 - u2) *
+                                duration * next.z;
                     }
 
                     previous = next;
@@ -137,15 +185,10 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                 out half density)
             {
                 density = saturate(
-                    EvaluateCurve(
-                        _RingDensityKeys,
-                        _RingDensityKeyCount,
-                        radialFraction,
-                        1.0h));
+                    EvaluateDensityCurve(
+                        radialFraction));
                 half population = saturate(
-                    EvaluateCurve(
-                        _RingPopulationKeys,
-                        _RingPopulationKeyCount,
+                    EvaluatePopulationCurve(
                         radialFraction,
                         density));
                 half coverage = sqrt(
