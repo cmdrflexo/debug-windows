@@ -4,6 +4,7 @@
  * visible transparency and shadow-map coverage.
  */
 
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -277,7 +278,9 @@ namespace jcan.CelestialSystems
                 nearestDistance = Math.Min(nearestDistance, candidateDistance);
             }
 
-            if (!double.IsFinite(nearestDistance) || largestOuterRadius <= 0.0)
+            if (double.IsNaN(nearestDistance) ||
+                double.IsInfinity(nearestDistance) ||
+                largestOuterRadius <= 0.0)
             {
                 return false;
             }
