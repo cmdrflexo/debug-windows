@@ -39,6 +39,7 @@ namespace jcan.CelestialSystems
         public double DensityMultiplier { get; }
     }
 
+    [Serializable]
     public readonly struct CelestialRingMicrostructure
     {
         public CelestialRingMicrostructure(
