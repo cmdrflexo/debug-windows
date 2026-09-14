@@ -79,6 +79,10 @@ namespace jcan.CelestialSystems
         [Tooltip("Signed axis action used to roll the free camera.")]
         private InputActionReference rollAction;
 
+        [SerializeField]
+        [Tooltip("Button action that toggles tracking of the nearest body or ring owner.")]
+        private InputActionReference lockNearestFeatureAction;
+
         [SerializeField, Min(0.0f)]
         private float lookDegreesPerPixel = 0.2f;
 
@@ -184,6 +188,16 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private float automaticCruiseSpeedMetersPerSecond;
 
+        [Header("Runtime Feature Lock")]
+        [SerializeField]
+        private CelestialBodyRuntimeContext lockedFeatureBody;
+
+        [SerializeField]
+        private bool hasLockedFeatureMotion;
+
+        [SerializeField]
+        private UniverseMotionState lockedFeatureMotion;
+
         [Header("Runtime Collision")]
         [SerializeField]
         private bool hasCollision;
@@ -207,7 +221,8 @@ namespace jcan.CelestialSystems
             SgtUniverseOriginBridge bridge, Transform cameraTransform,
             InputActionReference move, InputActionReference vertical,
             InputActionReference speed, InputActionReference boost,
-            InputActionReference lookDelta, InputActionReference roll)
+            InputActionReference lookDelta, InputActionReference roll,
+            InputActionReference lockNearestFeature)
         {
             poseBridge = bridge;
             universeFrame = bridge.UniverseFrame;
@@ -218,6 +233,8 @@ namespace jcan.CelestialSystems
             if (boostAction == null) boostAction = boost;
             if (lookDeltaAction == null) lookDeltaAction = lookDelta;
             if (rollAction == null) rollAction = roll;
+            if (lockNearestFeatureAction == null)
+                lockNearestFeatureAction = lockNearestFeature;
             ClearActiveInput();
         }
         private bool enabledMoveAction;
@@ -226,6 +243,7 @@ namespace jcan.CelestialSystems
         private bool enabledBoostAction;
         private bool enabledLookDeltaAction;
         private bool enabledRollAction;
+        private bool enabledLockNearestFeatureAction;
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
 
@@ -243,6 +261,12 @@ namespace jcan.CelestialSystems
 
         public double NearestNavigationFeatureScaleMeters =>
             nearestNavigationFeatureScaleMeters;
+
+        public CelestialBodyRuntimeContext LockedFeatureBody =>
+            lockedFeatureBody;
+
+        public bool IsFeatureLocked =>
+            lockedFeatureBody != null;
 
         public float MoveSpeedMultiplier =>
             moveSpeedMultiplier;
@@ -322,6 +346,9 @@ namespace jcan.CelestialSystems
             enabledRollAction =
                 EnableAction(
                     rollAction);
+            enabledLockNearestFeatureAction =
+                EnableAction(
+                    lockNearestFeatureAction);
 
             if (speedMultiplierAction != null &&
                 speedMultiplierAction.action != null)
@@ -368,6 +395,9 @@ namespace jcan.CelestialSystems
             DisableAction(
                 rollAction,
                 enabledRollAction);
+            DisableAction(
+                lockNearestFeatureAction,
+                enabledLockNearestFeatureAction);
 
             enabledMoveAction = false;
             enabledVerticalAction = false;
@@ -375,7 +405,9 @@ namespace jcan.CelestialSystems
             enabledBoostAction = false;
             enabledLookDeltaAction = false;
             enabledRollAction = false;
+            enabledLockNearestFeatureAction = false;
             currentBoostMultiplier = 1.0f;
+            ClearFeatureLock();
             hasAutomaticCruiseSpeed = false;
             automaticCruiseSpeedMetersPerSecond = 0.0f;
         }
@@ -412,6 +444,14 @@ namespace jcan.CelestialSystems
         private void Update()
         {
             UpdateCameraLook();
+
+            if (!debugMenuVisible &&
+                lockNearestFeatureAction != null &&
+                lockNearestFeatureAction.action != null &&
+                lockNearestFeatureAction.action.WasPressedThisFrame())
+            {
+                ToggleNearestFeatureLock();
+            }
 
             if (poseBridge != null) return;
             UpdateBoostMultiplier(
@@ -464,6 +504,7 @@ namespace jcan.CelestialSystems
             if (poseBridge != null)
             {
                 if (Time.frameCount == activationFrame) return;
+                FollowLockedFeature();
                 UpdateBoostMultiplier(Time.deltaTime);
                 UpdateSpeedState();
                 if (listen && !debugMenuVisible)
@@ -474,6 +515,86 @@ namespace jcan.CelestialSystems
             {
                 DampenDelta();
             }
+        }
+
+        public void ToggleNearestFeatureLock()
+        {
+            if (lockedFeatureBody != null)
+            {
+                ClearFeatureLock();
+                return;
+            }
+
+            UpdateSpeedState();
+            if (nearestBody == null ||
+                !nearestBody.TryGetMotionState(out var motion))
+            {
+                return;
+            }
+
+            lockedFeatureBody = nearestBody;
+            lockedFeatureMotion = motion;
+            hasLockedFeatureMotion = true;
+        }
+
+        private void FollowLockedFeature()
+        {
+            if (lockedFeatureBody == null ||
+                !lockedFeatureBody.TryGetMotionState(out var currentMotion))
+            {
+                ClearFeatureLock();
+                return;
+            }
+
+            if (!hasLockedFeatureMotion)
+            {
+                lockedFeatureMotion = currentMotion;
+                hasLockedFeatureMotion = true;
+                return;
+            }
+
+            // TryGetOffsetMetersFrom returns this position relative to the
+            // argument. Advancing the camera by current-minus-previous motion
+            // preserves the camera's local offset from the locked feature.
+            if (!currentMotion.Position.TryGetOffsetMetersFrom(
+                    lockedFeatureMotion.Position,
+                    out var featureMotionDelta))
+            {
+                lockedFeatureMotion = currentMotion;
+                return;
+            }
+
+            if (poseBridge != null &&
+                poseBridge.TryGetUniversePose(out var cameraPose))
+            {
+                var position = cameraPose.Position;
+                position.AddLocalMeters(
+                    featureMotionDelta.x,
+                    featureMotionDelta.y,
+                    featureMotionDelta.z);
+                poseBridge.TrySetUniversePose(
+                    new UniverseMotionState(
+                        position,
+                        movementReference != null
+                            ? movementReference.rotation
+                            : cameraPose.Rotation));
+            }
+            else
+            {
+                transform.position += new Vector3(
+                    (float)featureMotionDelta.x,
+                    (float)featureMotionDelta.y,
+                    (float)featureMotionDelta.z);
+            }
+
+            lockedFeatureMotion = currentMotion;
+        }
+
+        private void ClearFeatureLock()
+        {
+            lockedFeatureBody = null;
+            hasLockedFeatureMotion = false;
+            lockedFeatureMotion = default;
         }
 
         private Vector3 GetDelta(float deltaTime)
