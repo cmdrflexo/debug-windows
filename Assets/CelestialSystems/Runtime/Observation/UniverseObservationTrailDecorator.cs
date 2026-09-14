@@ -24,6 +24,7 @@ namespace jcan.CelestialSystems
         }
 
         public static bool GlobalVisibility { get; private set; }
+        public static bool NavigationVisible { get; private set; } = true;
 
         [Header("References")]
         [SerializeField] private CelestialBodyRuntimeContext targetContext;
@@ -60,6 +61,11 @@ namespace jcan.CelestialSystems
         private Bounds geometryBounds;
         private double lastSampleTime = double.NegativeInfinity;
         private bool enabledToggleAction;
+
+        public static void SetNavigationVisible(bool value)
+        {
+            NavigationVisible = value;
+        }
 
         public CelestialBodyRuntimeContext TargetContext => targetContext;
         public int SampleCount => sampleCount;
@@ -113,7 +119,8 @@ namespace jcan.CelestialSystems
         private void LateUpdate()
         {
             EnsureVisual();
-            var active = visible && GlobalVisibility && targetContext != null;
+            var active = visible && GlobalVisibility && NavigationVisible &&
+                targetContext != null;
             if (!active)
             {
                 if (recording || samples.Count > 0) ClearTrail();
