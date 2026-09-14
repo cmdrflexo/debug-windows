@@ -15,4 +15,5 @@ MonoBehaviour:
   definitionId: moon-like-surface-appearance
   lightingMode: 0
   layers:
-  - {fileID: 11400000, guid: 32627a0ecc4872b4ca7728519ddfcb61, type: 2}
+  - {fileID: 11400000, guid: 220ae60afc7174842bd0d03875f00e55, type: 2}
+  - {fileID: 11400000, guid: 80f5d73a936ebdb42b701f3f3525c886, type: 2}
