@@ -98,7 +98,7 @@ namespace jcan.CelestialSystems
         private float moveSpeedMultiplier = 1.0f;
 
         [SerializeField]
-        [Tooltip("Initial travel time to the nearest body or ring after entering Free mode.")]
+        [Tooltip("Seconds used for both the initial Free-mode cruise speed and automatic approach braking.")]
         [Min(0.01f)]
         private float initialFeatureTravelSeconds = 10.0f;
 
@@ -177,6 +177,12 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private float resolvedSpeed;
+
+        [SerializeField]
+        private bool hasAutomaticCruiseSpeed;
+
+        [SerializeField]
+        private float automaticCruiseSpeedMetersPerSecond;
 
         [Header("Runtime Collision")]
         [SerializeField]
@@ -261,29 +267,30 @@ namespace jcan.CelestialSystems
             moveSpeedMultiplier *
             currentBoostMultiplier;
 
-        // Called by the shared mode owner after it has handed the displayed
-        // camera pose to Free mode. It deliberately sets the multiplier, so
-        // wheel adjustments continue from this practical starting speed.
+        // Capture one cruise ceiling per transition into Free mode. Nearest
+        // feature changes can brake the camera, but never recalculate this
+        // ceiling until Free mode is entered again.
         public void SetInitialSpeedFromNearestFeature()
         {
+            hasAutomaticCruiseSpeed = false;
+            automaticCruiseSpeedMetersPerSecond = 0.0f;
+            moveSpeedMultiplier = 1.0f;
             UpdateSpeedState();
 
-            if (!hasNearestNavigationFeature ||
-                nearestNavigationFeatureDistanceMeters <= 0.0 ||
-                resolvedSpeed <= 0.0f)
+            if (!hasNearestNavigationFeature)
             {
-                moveSpeedMultiplier = 1.0f;
+                automaticCruiseSpeedMetersPerSecond =
+                    minimumAutomaticSpeedMetersPerSecond;
+                hasAutomaticCruiseSpeed = true;
+                resolvedSpeed = automaticCruiseSpeedMetersPerSecond;
                 return;
             }
 
-            var desiredSpeed = Math.Max(
-                minimumAutomaticSpeedMetersPerSecond,
-                nearestNavigationFeatureDistanceMeters /
-                Math.Max(0.01f, initialFeatureTravelSeconds));
-            var multiplier = desiredSpeed / resolvedSpeed;
-            moveSpeedMultiplier = IsFinite(multiplier)
-                ? Mathf.Max(0.000001f, (float)Math.Min(multiplier, float.MaxValue))
-                : 1.0f;
+            automaticCruiseSpeedMetersPerSecond =
+                CalculateDistanceLimitedSpeed(
+                    nearestNavigationFeatureDistanceMeters);
+            hasAutomaticCruiseSpeed = true;
+            resolvedSpeed = automaticCruiseSpeedMetersPerSecond;
         }
 
         private void Awake()
@@ -369,6 +376,8 @@ namespace jcan.CelestialSystems
             enabledLookDeltaAction = false;
             enabledRollAction = false;
             currentBoostMultiplier = 1.0f;
+            hasAutomaticCruiseSpeed = false;
+            automaticCruiseSpeedMetersPerSecond = 0.0f;
         }
 
         private void OnValidate()
@@ -826,7 +835,9 @@ namespace jcan.CelestialSystems
                 nearestNavigationFeatureName = string.Empty;
                 nearestNavigationFeatureDistanceMeters = default;
                 nearestNavigationFeatureScaleMeters = default;
-                resolvedSpeed = minimumAutomaticSpeedMetersPerSecond;
+                resolvedSpeed = hasAutomaticCruiseSpeed
+                    ? automaticCruiseSpeedMetersPerSecond
+                    : minimumAutomaticSpeedMetersPerSecond;
                 return;
             }
 
@@ -838,28 +849,27 @@ namespace jcan.CelestialSystems
                 : body.InstanceId;
             nearestNavigationFeatureDistanceMeters = surfaceDistanceMeters;
             nearestNavigationFeatureScaleMeters = characteristicScaleMeters;
-            resolvedSpeed = CalculateAutomaticSpeed(
-                surfaceDistanceMeters,
-                characteristicScaleMeters);
+
+            var distanceLimitedSpeed =
+                CalculateDistanceLimitedSpeed(surfaceDistanceMeters);
+            resolvedSpeed = hasAutomaticCruiseSpeed
+                ? Mathf.Min(
+                    automaticCruiseSpeedMetersPerSecond,
+                    distanceLimitedSpeed)
+                : distanceLimitedSpeed;
         }
 
-        // The speed response is derived from distance to the nearest physical
-        // feature, scaled by that feature's size. There is deliberately no
-        // manual maximum: astronomical separation produces astronomical travel
-        // speed, while the positive floor prevents a stationary camera on a
-        // surface or when no generated feature exists.
-        private float CalculateAutomaticSpeed(
-            double surfaceDistanceMeters,
-            double characteristicScaleMeters)
+        private float CalculateDistanceLimitedSpeed(
+            double surfaceDistanceMeters)
         {
-            var distance = Math.Max(0.0, surfaceDistanceMeters);
-            var scaleFactor = Math.Max(
-                1.0,
-                characteristicScaleMeters / 1000000.0);
-            var speed = Math.Sqrt(distance * scaleFactor);
+            var speed = Math.Max(
+                minimumAutomaticSpeedMetersPerSecond,
+                Math.Max(0.0, surfaceDistanceMeters) /
+                    Math.Max(0.01f, initialFeatureTravelSeconds));
+
             if (!IsFinite(speed))
             {
-                speed = minimumAutomaticSpeedMetersPerSecond;
+                return minimumAutomaticSpeedMetersPerSecond;
             }
 
             return Mathf.Max(
