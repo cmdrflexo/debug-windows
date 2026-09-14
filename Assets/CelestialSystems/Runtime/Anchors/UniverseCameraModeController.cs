@@ -173,6 +173,11 @@ namespace jcan.CelestialSystems
             {
                 observerInterfaceRoot.SetActive(observerActive);
             }
+
+            UniverseObservationBodyMarkerDecorator.SetNavigationVisible(observerActive);
+            UniverseObservationPivotMarker.SetNavigationVisible(observerActive);
+            UniverseObservationOrbitDecorator.SetNavigationVisible(observerActive);
+            UniverseObservationTrailDecorator.SetNavigationVisible(observerActive);
         }
 
         public bool SetMode(NavigationMode requested)
@@ -187,6 +192,11 @@ namespace jcan.CelestialSystems
                 observer.RecordExternalPose(pose);
             mode = requested;
             ApplyMode();
+            if (mode == NavigationMode.Free)
+            {
+                freeFlight.SetInitialSpeedFromNearestFeature();
+            }
+
             return true;
         }
 
