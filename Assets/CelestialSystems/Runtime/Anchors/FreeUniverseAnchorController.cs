@@ -553,38 +553,43 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            // TryGetOffsetMetersFrom returns this position relative to the
-            // argument. Advancing the camera by current-minus-previous motion
-            // preserves the camera's local offset from the locked feature.
-            if (!currentMotion.Position.TryGetOffsetMetersFrom(
-                    lockedFeatureMotion.Position,
-                    out var featureMotionDelta))
-            {
-                lockedFeatureMotion = currentMotion;
-                return;
-            }
+            var rotationDelta =
+                currentMotion.Rotation *
+                Quaternion.Inverse(
+                    lockedFeatureMotion.Rotation);
 
             if (poseBridge != null &&
-                poseBridge.TryGetUniversePose(out var cameraPose))
+                poseBridge.TryGetUniversePose(out var cameraPose) &&
+                cameraPose.Position.TryGetOffsetMetersFrom(
+                    lockedFeatureMotion.Position,
+                    out var cameraOffsetFromPreviousFeature))
             {
-                var position = cameraPose.Position;
+                // Preserve the complete camera transform in the body's local
+                // frame: rotate its offset about the moving center and apply
+                // the same rotation delta to the camera's orientation.
+                var rotatedOffset = Rotate(
+                    rotationDelta,
+                    cameraOffsetFromPreviousFeature);
+                var position = currentMotion.Position;
                 position.AddLocalMeters(
-                    featureMotionDelta.x,
-                    featureMotionDelta.y,
-                    featureMotionDelta.z);
+                    rotatedOffset.x,
+                    rotatedOffset.y,
+                    rotatedOffset.z);
                 poseBridge.TrySetUniversePose(
                     new UniverseMotionState(
                         position,
-                        movementReference != null
-                            ? movementReference.rotation
-                            : cameraPose.Rotation));
+                        rotationDelta * cameraPose.Rotation));
             }
-            else
+            else if (currentMotion.Position.TryGetOffsetMetersFrom(
+                lockedFeatureMotion.Position,
+                out var featureMotionDelta))
             {
                 transform.position += new Vector3(
                     (float)featureMotionDelta.x,
                     (float)featureMotionDelta.y,
                     (float)featureMotionDelta.z);
+                transform.rotation =
+                    rotationDelta * transform.rotation;
             }
 
             lockedFeatureMotion = currentMotion;
@@ -595,6 +600,31 @@ namespace jcan.CelestialSystems
             lockedFeatureBody = null;
             hasLockedFeatureMotion = false;
             lockedFeatureMotion = default;
+        }
+
+        private static DoubleVector3 Rotate(
+            Quaternion rotation,
+            DoubleVector3 vector)
+        {
+            // Quaternion-vector rotation performed in doubles so a distant
+            // camera retains its orbit offset while following a rotating body.
+            var tx = 2.0 * (
+                rotation.y * vector.z -
+                rotation.z * vector.y);
+            var ty = 2.0 * (
+                rotation.z * vector.x -
+                rotation.x * vector.z);
+            var tz = 2.0 * (
+                rotation.x * vector.y -
+                rotation.y * vector.x);
+
+            return new DoubleVector3(
+                vector.x + rotation.w * tx +
+                    rotation.y * tz - rotation.z * ty,
+                vector.y + rotation.w * ty +
+                    rotation.z * tx - rotation.x * tz,
+                vector.z + rotation.w * tz +
+                    rotation.x * ty - rotation.y * tx);
         }
 
         private Vector3 GetDelta(float deltaTime)
