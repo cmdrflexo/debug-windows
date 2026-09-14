@@ -140,7 +140,13 @@ namespace jcan.CelestialSystems
             ResolveReferences();
             EnsureGeneratedVisuals();
 
-            if (!visible || !NavigationVisible || observationController == null ||
+            if (!visible || !NavigationVisible)
+            {
+                SetRenderersVisible(false);
+                return;
+            }
+
+            if (observationController == null ||
                 floatingObject == null ||
                 !TryResolveTarget(out var bodyPosition) ||
                 !observationController.TryGetObservationPlane(
