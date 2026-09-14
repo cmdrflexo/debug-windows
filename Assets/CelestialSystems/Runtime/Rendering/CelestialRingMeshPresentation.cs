@@ -169,12 +169,20 @@ namespace jcan.CelestialSystems
                         definition.RingPopulationGradients.Count
                         ? definition.RingPopulationGradients[index]
                         : null;
+                var microstructure =
+                    index <
+                        definition.RingMicrostructures.Count
+                        ? definition.RingMicrostructures[index]
+                        : default;
                 var material =
                     BuildMaterial(
                         shader,
                         gradient,
                         density,
                         population,
+                        microstructure,
+                        innerRadius,
+                        outerRadius,
                         definition.DefinitionId,
                         index,
                         out var dataBuffers);
@@ -419,6 +427,9 @@ namespace jcan.CelestialSystems
             Gradient albedo,
             AnimationCurve density,
             AnimationCurve population,
+            CelestialRingMicrostructure microstructure,
+            double innerRadiusMeters,
+            double outerRadiusMeters,
             string definitionId,
             int bandIndex,
             out GraphicsBuffer[] dataBuffers)
@@ -482,6 +493,22 @@ namespace jcan.CelestialSystems
             material.SetFloat(
                 "_AmbientStrength",
                 0.2f);
+            material.SetFloat(
+                "_RingInnerRadiusMeters",
+                (float)innerRadiusMeters);
+            material.SetFloat(
+                "_RingOuterRadiusMeters",
+                (float)outerRadiusMeters);
+            material.SetVector(
+                "_RingMicrostructure",
+                new Vector4(
+                    (float)microstructure.PrimarySpacingMeters,
+                    (float)microstructure.SecondarySpacingRatio,
+                    (float)microstructure.TertiarySpacingRatio,
+                    (float)microstructure.Contrast));
+            material.SetFloat(
+                "_RingMicrostructurePhase",
+                (float)microstructure.Phase);
             return material;
         }
 
