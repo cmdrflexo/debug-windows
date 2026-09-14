@@ -21,6 +21,8 @@ namespace jcan.CelestialSystems
         [SerializeField] private UniverseObservationAnchorController observer;
         [SerializeField] private FreeUniverseAnchorController freeFlight;
         [SerializeField] private UniverseObservationSelectionController selection;
+        [Tooltip("Root containing the grid, markers, orbits, and other observer-only decorations.")]
+        [SerializeField] private GameObject observerInterfaceRoot;
         [Tooltip("Other look components that must not compete with the navigation modes.")]
         [SerializeField] private Behaviour[] legacyLookBehaviours;
         [SerializeField] private NavigationMode mode = NavigationMode.Observer;
@@ -55,6 +57,12 @@ namespace jcan.CelestialSystems
             observer = observer != null ? observer : GetComponent<UniverseObservationAnchorController>();
             freeFlight = freeFlight != null ? freeFlight : GetComponent<FreeUniverseAnchorController>();
             selection = selection != null ? selection : GetComponent<UniverseObservationSelectionController>();
+            if (observerInterfaceRoot == null)
+            {
+                var grid = FindFirstObjectByType<UniverseObservationGridRenderer>(
+                    FindObjectsInactive.Include);
+                observerInterfaceRoot = grid != null ? grid.gameObject : null;
+            }
             viewCamera = viewCamera != null ? viewCamera : Camera.main;
             anchorBridge = anchorBridge != null ? anchorBridge : FindFirstObjectByType<SgtUniverseOriginBridge>();
             if (observer == null || freeFlight == null || viewCamera == null ||
@@ -156,9 +164,15 @@ namespace jcan.CelestialSystems
 
         private void ApplyMode()
         {
-            observer.SetNavigationActive(mode == NavigationMode.Observer);
+            var observerActive = mode == NavigationMode.Observer;
+            observer.SetNavigationActive(observerActive);
             freeFlight.enabled = mode == NavigationMode.Free;
-            if (selection != null) selection.NavigationEnabled = mode == NavigationMode.Observer;
+            if (selection != null) selection.NavigationEnabled = observerActive;
+            if (observerInterfaceRoot != null &&
+                observerInterfaceRoot.activeSelf != observerActive)
+            {
+                observerInterfaceRoot.SetActive(observerActive);
+            }
         }
 
         public bool SetMode(NavigationMode requested)
