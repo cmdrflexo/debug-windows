@@ -50,6 +50,8 @@ namespace jcan.CelestialSystems
             public Quaternion cameraRotation;
             public bool hasCameraPosition;
             public UniversePosition cameraPosition;
+            public bool hasUniversalTime;
+            public double universalTimeSeconds;
         }
 
         private SavedView lastRenderedView;
@@ -611,6 +613,7 @@ namespace jcan.CelestialSystems
                 lastRenderedView.cameraRotation = cameraRotation;
                 lastRenderedView.hasCameraPosition = true;
                 lastRenderedView.cameraPosition = cameraPosition;
+                CaptureUniversalTime(lastRenderedView);
             }
         }
 
@@ -1356,7 +1359,9 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            // Restore a spatial view, not a body-relative offset: simulation time restarts.
+            // Restore time before querying target motion or applying the saved
+            // camera pose, so trajectory bodies occupy the same positions.
+            RestoreUniversalTime(saved);
             originLocked = true;
             selectionController?.LockToOrigin();
             referencePlaneNormal = saved.planeNormal;
@@ -1381,6 +1386,36 @@ namespace jcan.CelestialSystems
             ClearOrbitVelocity();
             viewInitialized = true;
             recenterZoomArmed = false;
+        }
+
+        private static void CaptureUniversalTime(SavedView view)
+        {
+            var timeController = CelestialTimeController.Instance ??
+                FindFirstObjectByType<CelestialTimeController>();
+            if (timeController == null ||
+                !IsFiniteViewValue(timeController.UniversalTimeSeconds))
+            {
+                view.hasUniversalTime = false;
+                return;
+            }
+
+            view.hasUniversalTime = true;
+            view.universalTimeSeconds =
+                timeController.UniversalTimeSeconds;
+        }
+
+        private static void RestoreUniversalTime(SavedView view)
+        {
+            if (!view.hasUniversalTime ||
+                !IsFiniteViewValue(view.universalTimeSeconds))
+            {
+                return;
+            }
+
+            var timeController = CelestialTimeController.Instance ??
+                FindFirstObjectByType<CelestialTimeController>();
+            timeController?.SetUniversalTimeSeconds(
+                view.universalTimeSeconds);
         }
 
         private static bool IsFiniteViewValue(double value)
@@ -1490,6 +1525,7 @@ namespace jcan.CelestialSystems
             lastRenderedView.cameraRotation = pose.Rotation;
             lastRenderedView.hasCameraPosition = true;
             lastRenderedView.cameraPosition = pose.Position;
+            CaptureUniversalTime(lastRenderedView);
         }
 
         private void ResolveReferences()
