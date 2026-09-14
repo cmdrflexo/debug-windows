@@ -92,10 +92,17 @@ void ComputeExposure(
     bool uninitialized =
         _ExposureState[3] <
         0.0;
+    // A transient invalid/empty meter frame must not request maximum exposure:
+    // that causes the background to flash white. Hold the prior exposure until
+    // a valid histogram arrives instead.
     float targetExposure =
-        _MaximumExposure;
+        uninitialized
+            ? 0.0
+            : _ExposureState[0];
     float averageLogLuminance =
-        _HistogramMinimumLog;
+        uninitialized
+            ? 0.0
+            : _ExposureState[2];
 
     if (totalSampleCount > 0)
     {
