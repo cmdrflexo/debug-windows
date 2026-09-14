@@ -225,6 +225,56 @@ namespace jcan.CelestialSystems
         public string LastError =>
             lastError;
 
+        /// <summary>
+        /// Gets the generated system's primary stellar body. For multi-star
+        /// systems, primary means the stellar body with the greatest mass.
+        /// </summary>
+        public bool TryGetPrimaryStellarBody(
+            out CelestialBodyRuntimeContext primaryStar)
+        {
+            primaryStar = null;
+
+            var starSystem =
+                generatedUniverse?.Galaxy?.StarSystem;
+            if (!generationSucceeded ||
+                starSystem == null)
+            {
+                return false;
+            }
+
+            var greatestMass = 0.0;
+            foreach (var bodySystem in
+                starSystem.BodySystems.Values)
+            {
+                if (bodySystem == null)
+                {
+                    continue;
+                }
+
+                foreach (var body in
+                    bodySystem.Bodies.Values)
+                {
+                    var definition =
+                        body != null
+                            ? body.Definition
+                            : null;
+                    if (definition == null ||
+                        !definition.HasStellarProperties ||
+                        !IsFinitePositive(
+                            definition.MassKilograms) ||
+                        definition.MassKilograms <= greatestMass)
+                    {
+                        continue;
+                    }
+
+                    primaryStar = body;
+                    greatestMass = definition.MassKilograms;
+                }
+            }
+
+            return primaryStar != null;
+        }
+
         private IEnumerator Start()
         {
             if (!generateOnStart)
