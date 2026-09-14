@@ -161,15 +161,27 @@ namespace jcan.CelestialSystems
                 out var ice,
                 out var rock,
                 out var dust);
+            var radiusMeters =
+                innerRadius +
+                (outerRadius - innerRadius) *
+                fraction;
+            var microstructure =
+                definition.RingMicrostructures != null &&
+                bandIndex < definition.RingMicrostructures.Count
+                    ? definition.RingMicrostructures[bandIndex]
+                    : default;
+            var microCoverage =
+                EvaluateMicrostructure(
+                    microstructure,
+                    radiusMeters);
+            density *= microCoverage;
+            population *= microCoverage;
 
             sample =
                 new CelestialRingSample(
                     bandIndex,
                     fraction,
-                    innerRadius +
-                        (outerRadius -
-                            innerRadius) *
-                        fraction,
+                    radiusMeters,
                     albedo,
                     Mathf.Clamp01(
                         density),
@@ -185,6 +197,52 @@ namespace jcan.CelestialSystems
                     rock,
                     dust);
             return true;
+        }
+
+
+        public static float EvaluateMicrostructure(
+            CelestialRingMicrostructure microstructure,
+            double radiusMeters)
+        {
+            if (microstructure.PrimarySpacingMeters <= 0.0 ||
+                microstructure.Contrast <= 0.0)
+            {
+                return 1.0f;
+            }
+
+            var primary =
+                radiusMeters /
+                microstructure.PrimarySpacingMeters +
+                microstructure.Phase;
+            var secondary =
+                primary /
+                Math.Max(
+                    0.0001,
+                    microstructure.SecondarySpacingRatio);
+            var tertiary =
+                primary /
+                Math.Max(
+                    0.0001,
+                    microstructure.TertiarySpacingRatio);
+            var signal =
+                (Math.Sin(primary) +
+                    0.52 * Math.Sin(
+                        secondary + microstructure.Phase * 1.73) +
+                    0.24 * Math.Sin(
+                        tertiary - microstructure.Phase * 0.61)) /
+                1.76;
+            var ringlet =
+                Mathf.SmoothStep(
+                    0.0f,
+                    1.0f,
+                    (float)(signal * 0.5 + 0.5));
+
+            return Mathf.Lerp(
+                1.0f -
+                    Mathf.Clamp01(
+                        (float)microstructure.Contrast),
+                1.0f,
+                ringlet);
         }
 
         public static uint GetStableCellHash(
