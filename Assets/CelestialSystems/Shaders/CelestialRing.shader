@@ -12,6 +12,10 @@ Shader "jcan/Celestial Systems/Celestial Ring"
         [Range(0, 1)] _Opacity ("Opacity", Float) = 1
         [Range(0, 0.25)] _DensityCutoff ("Density Cutoff", Float) = 0.005
         [Range(0, 1)] _AmbientStrength ("Ambient Strength", Float) = 0.2
+        [HideInInspector] _RingInnerRadiusMeters ("Ring Inner Radius", Float) = 0
+        [HideInInspector] _RingOuterRadiusMeters ("Ring Outer Radius", Float) = 1
+        [HideInInspector] _RingMicrostructure ("Ring Microstructure", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _RingMicrostructurePhase ("Ring Microstructure Phase", Float) = 0
     }
 
     SubShader
@@ -40,6 +44,10 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                 half _Opacity;
                 half _DensityCutoff;
                 half _AmbientStrength;
+                float _RingInnerRadiusMeters;
+                float _RingOuterRadiusMeters;
+                float4 _RingMicrostructure;
+                float _RingMicrostructurePhase;
             CBUFFER_END
 
             half3 EvaluateAlbedo(
@@ -179,6 +187,54 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                 return previous.y;
             }
 
+
+            half EvaluateMicrostructure(
+                float radiusMeters)
+            {
+                float spacing =
+                    _RingMicrostructure.x;
+                float contrast =
+                    saturate(
+                        _RingMicrostructure.w);
+
+                if (spacing <= 0.0001 ||
+                    contrast <= 0.0001)
+                {
+                    return 1.0h;
+                }
+
+                float primary =
+                    radiusMeters / spacing +
+                    _RingMicrostructurePhase;
+                float secondary =
+                    primary / max(
+                        0.0001,
+                        _RingMicrostructure.y);
+                float tertiary =
+                    primary / max(
+                        0.0001,
+                        _RingMicrostructure.z);
+                float signal =
+                    (sin(primary) +
+                        0.52 * sin(
+                            secondary +
+                            _RingMicrostructurePhase * 1.73) +
+                        0.24 * sin(
+                            tertiary -
+                            _RingMicrostructurePhase * 0.61)) /
+                    1.76;
+                float ringlet =
+                    smoothstep(
+                        0.0,
+                        1.0,
+                        signal * 0.5 +
+                        0.5);
+                return lerp(
+                    1.0h - contrast,
+                    1.0h,
+                    ringlet);
+            }
+
             void EvaluateRingData(
                 float radialFraction,
                 out half3 albedo,
@@ -191,6 +247,14 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                     EvaluatePopulationCurve(
                         radialFraction,
                         density));
+                half microstructure =
+                    EvaluateMicrostructure(
+                        lerp(
+                            _RingInnerRadiusMeters,
+                            _RingOuterRadiusMeters,
+                            radialFraction));
+                density *= microstructure;
+                population *= microstructure;
                 half coverage = sqrt(
                     density * population);
                 albedo = EvaluateAlbedo(
