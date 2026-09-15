@@ -95,9 +95,19 @@ namespace jcan.CelestialSystems
                         name + " [" + GetInstanceID() + "]"
                         + "\nError: " + errorMeters.ToString("G6") + " m"
                         + " | Peak: " + peakErrorMeters.ToString("G6") + " m"
-                        + "\nXYZ: " + reconstructedSceneOrigin.ToString("G9")
+                        + "\nReconstructed zero: " +
+                            reconstructedSceneOrigin.ToString("G9")
+                        + "\nWorld position: " +
+                            objectWorldPosition.ToString("G9")
+                        + "\nLocal position: " +
+                            transform.localPosition.ToString("G9")
+                        + "\nParent: " +
+                            (transform.parent != null
+                                ? transform.parent.name
+                                : "(none)")
                         + (errorMagnification > 1f
-                            ? "\nDisplay magnification: " + errorMagnification + "x"
+                            ? "\nDisplay magnification: " +
+                                errorMagnification + "x"
                             : ""), style);
                 }
 #endif
