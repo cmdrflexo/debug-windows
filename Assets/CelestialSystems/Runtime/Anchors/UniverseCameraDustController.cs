@@ -253,7 +253,7 @@ namespace jcan.CelestialSystems
             out CelestialBodyRuntimeContext body)
         {
             body = useLockedBodyReferenceFrame && freeFlight != null &&
-                freeFlight.IsFeatureLocked
+                freeFlight.isActiveAndEnabled && freeFlight.IsFeatureLocked
                 ? freeFlight.LockedFeatureBody
                 : referenceBody;
 
