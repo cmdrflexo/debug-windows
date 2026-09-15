@@ -17,13 +17,23 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
 
         [HDR] _DirtColor ("Dirt Color", Color) = (0.20, 0.14, 0.08, 1)
         [Range(0, 1)] _DirtAmount ("Dirt Amount", Float) = 0.12
-        [Range(0.05, 16)] _DirtScale ("Dirt Scale", Float) = 2
+        [Range(0.05, 64)] _DirtScale ("Dirt Scale", Float) = 2
         [Range(0.01, 1)] _DirtSoftness ("Dirt Softness", Float) = 0.22
 
         [HDR] _MineralColor ("Mineral Color", Color) = (0.62, 0.46, 0.28, 1)
         [Range(0, 1)] _MineralAmount ("Mineral Amount", Float) = 0.08
         [Range(0.05, 32)] _MineralScale ("Mineral Scale", Float) = 5
         [Range(0, 1)] _MineralColorStrength ("Mineral Color Strength", Float) = 0.65
+
+        [HDR] _FrostColor ("Frost Color", Color) = (0.78, 0.94, 1.0, 1)
+        [Range(0, 1)] _FrostAmount ("Frost Amount", Float) = 0.35
+        [Range(0.5, 12)] _FrostEdgePower ("Frost Edge Power", Float) = 3
+
+        [HDR] _FractureColor ("Fracture Color", Color) = (0.62, 0.86, 1.0, 1)
+        [Range(0, 1)] _FractureAmount ("Internal Fracture Amount", Float) = 0.3
+        [Range(0.1, 64)] _FractureScale ("Internal Fracture Scale", Float) = 12
+        [Range(0.005, 0.3)] _FractureWidth ("Internal Fracture Width", Float) = 0.065
+        [Range(0, 2)] _AbsorptionStrength ("Interior Absorption", Float) = 0.65
 
         [Range(0, 1)] _SurfaceRoughness ("Surface Roughness", Float) = 0.55
         [Range(0, 1)] _ShadowOpacity ("Shadow Opacity", Float) = 0.85
@@ -58,6 +68,14 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                 half _MineralAmount;
                 half _MineralScale;
                 half _MineralColorStrength;
+                half4 _FrostColor;
+                half _FrostAmount;
+                half _FrostEdgePower;
+                half4 _FractureColor;
+                half _FractureAmount;
+                half _FractureScale;
+                half _FractureWidth;
+                half _AbsorptionStrength;
                 half _SurfaceRoughness;
                 half _ShadowOpacity;
                 float _ChunkSeed;
@@ -133,7 +151,8 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
             void EvaluateInclusions(
                 float3 positionOS,
                 out half dirt,
-                out half mineral)
+                out half mineral,
+                out half fracture)
             {
                 float3 seedOffset =
                     float3(
@@ -150,6 +169,18 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                         positionOS *
                         _MineralScale +
                         seedOffset * 3.17);
+                float fractureNoiseA =
+                    FractalNoise(
+                        positionOS *
+                        _FractureScale +
+                        seedOffset * 5.31);
+                float fractureNoiseB =
+                    FractalNoise(
+                        (positionOS.yzx +
+                            positionOS.zxy * 0.37) *
+                        _FractureScale *
+                        0.73 +
+                        seedOffset * 7.19);
 
                 dirt = smoothstep(
                     1.0 - _DirtAmount -
@@ -163,6 +194,17 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                     1.0 - _MineralAmount +
                         0.12,
                     mineralNoise);
+                half fractureDistance =
+                    abs(
+                        fractureNoiseA -
+                        fractureNoiseB);
+                fracture =
+                    (1.0h -
+                        smoothstep(
+                            0.0h,
+                            _FractureWidth,
+                            fractureDistance)) *
+                    _FractureAmount;
             }
         ENDHLSL
 
@@ -232,10 +274,12 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
             {
                 half dirt;
                 half mineral;
+                half fracture;
                 EvaluateInclusions(
                     input.positionOS,
                     dirt,
-                    mineral);
+                    mineral,
+                    fracture);
 
                 half3 baseColor =
                     lerp(
@@ -248,6 +292,11 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                         _MineralColor.rgb,
                         mineral *
                         _MineralColorStrength);
+                baseColor =
+                    lerp(
+                        baseColor,
+                        _FractureColor.rgb,
+                        fracture);
 
                 half3 normalWS =
                     normalize(
@@ -284,6 +333,25 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                     SafeNormalize(
                         GetCameraPositionWS() -
                         input.positionWS);
+                half viewFacing =
+                    saturate(
+                        abs(
+                            dot(
+                                normalWS,
+                                viewDirection)));
+                half edgeFrost =
+                    pow(
+                        1.0h -
+                            viewFacing,
+                        _FrostEdgePower) *
+                    _FrostAmount;
+                baseColor =
+                    lerp(
+                        baseColor,
+                        _FrostColor.rgb,
+                        saturate(
+                            edgeFrost +
+                            fracture * 0.35h));
                 half3 halfDirection =
                     SafeNormalize(
                         mainLight.direction +
@@ -307,10 +375,33 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                         0.28h,
                         0.035h,
                         dirt);
+                half interiorDepth =
+                    saturate(
+                        viewFacing *
+                        (1.0h -
+                            edgeFrost));
+                half absorption =
+                    exp2(
+                        -_AbsorptionStrength *
+                        interiorDepth *
+                        2.0h);
+                half3 transmittedLighting =
+                    lighting *
+                    lerp(
+                        _TransmissionColor.rgb,
+                        half3(
+                            1.0h,
+                            1.0h,
+                            1.0h),
+                        absorption);
                 half3 color =
                     MixFog(
                         baseColor *
-                        lighting +
+                        transmittedLighting +
+                        _FractureColor.rgb *
+                        fracture *
+                        backLight *
+                        0.35h +
                         mainLight.color *
                         mainLight.shadowAttenuation *
                         specular,
@@ -318,7 +409,9 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                 half alpha =
                     saturate(
                         _Opacity +
-                        dirt * 0.14h -
+                        dirt * 0.14h +
+                        edgeFrost * 0.12h +
+                        fracture * 0.06h -
                         mineral * 0.06h);
                 return half4(
                     color,
@@ -407,14 +500,17 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
             {
                 half dirt;
                 half mineral;
+                half fracture;
                 EvaluateInclusions(
                     input.positionOS,
                     dirt,
-                    mineral);
+                    mineral,
+                    fracture);
                 half alpha =
                     saturate(
                         _Opacity +
-                        dirt * 0.14h -
+                        dirt * 0.14h +
+                        fracture * 0.06h -
                         mineral * 0.06h) *
                     _ShadowOpacity;
                 clip(
