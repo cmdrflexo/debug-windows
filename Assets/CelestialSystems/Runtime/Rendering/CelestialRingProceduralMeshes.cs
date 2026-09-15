@@ -40,7 +40,7 @@ namespace jcan.CelestialSystems
                 CreateMesh(
                     kind,
                     MixSeed(
-                        seed,
+                        (uint)variant,
                         (uint)kind));
             cachedMeshes[key] =
                 mesh;
