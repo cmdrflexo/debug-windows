@@ -14,6 +14,8 @@ namespace jcan.CelestialSystems
         [SerializeField] private Material material;
         [SerializeField, Range(1, 20)] private int numberOfAsteroids = 1;
         [SerializeField, Min(0.01f)] private float batchSpacing = 10f;
+        [SerializeField] private bool autoUpdate;
+        [SerializeField] private bool randomizeOnRegenerate;
         [SerializeField, HideInInspector] private Mesh previewMesh;
 
         private bool rebuildQueued;
@@ -35,7 +37,10 @@ namespace jcan.CelestialSystems
         public float BatchSpacing => batchSpacing;
 
         private void OnEnable() => QueueRebuild();
-        private void OnValidate() => QueueRebuild();
+        private void OnValidate()
+        {
+            if (autoUpdate) QueueRebuild();
+        }
         private void OnDisable() => ReleasePreview();
 
         public void AdvanceSeed(int direction)
@@ -46,6 +51,14 @@ namespace jcan.CelestialSystems
         }
 
         [ContextMenu("Regenerate")]
+        public void Regenerate()
+        {
+            if (settings == null) settings = new CelestialAsteroidSettings();
+            if (randomizeOnRegenerate)
+                settings.Seed = unchecked((uint)System.DateTime.UtcNow.Ticks);
+            Rebuild(false);
+        }
+
         public void Rebuild() => Rebuild(false);
 
         public void Rebuild(bool renderDetail)
