@@ -29,7 +29,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private CelestialRingObjectFamilyKind kind;
 
-        [Header("Variants")]
+        [Header("Body Source")]
+        [SerializeField]
+        [Tooltip("Optional provider used by any ring-body consumer. Legacy variants remain the fallback.")]
+        private CelestialRingBodySource bodySource;
+
+        [Header("Legacy Variants")]
         [SerializeField]
         private Mesh[] meshVariants =
             Array.Empty<Mesh>();
@@ -78,6 +83,9 @@ namespace jcan.CelestialSystems
         public CelestialRingObjectFamilyKind Kind =>
             kind;
 
+        public CelestialRingBodySource BodySource =>
+            bodySource;
+
         public IReadOnlyList<Mesh> MeshVariants =>
             meshVariants;
 
@@ -103,8 +111,9 @@ namespace jcan.CelestialSystems
             maximumDiameterMeters;
 
         public bool HasRenderableVariant =>
-            meshVariants != null &&
-            meshVariants.Length > 0;
+            bodySource != null ||
+            (meshVariants != null &&
+             meshVariants.Length > 0);
 
         public float EvaluateSelectionWeight(
             float iceWeight,
