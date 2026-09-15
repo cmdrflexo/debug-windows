@@ -54,6 +54,8 @@ namespace jcan.CelestialSystems
             public double universalTimeSeconds;
             public bool hasNavigationMode;
             public int navigationMode;
+            public bool hasFreeFeatureLock;
+            public string freeFeatureLockInstanceId;
         }
 
         private SavedView lastRenderedView;
@@ -71,6 +73,7 @@ namespace jcan.CelestialSystems
         private UniverseMotionState transferredPose;
         private bool hasPendingRestoredNavigationMode;
         private UniverseCameraModeController.NavigationMode pendingRestoredNavigationMode;
+        private string pendingRestoredFreeLockInstanceId;
         public bool NavigationActive => navigationActive;
         private string ViewPreferenceKey =>
             "CelestialSystems.Observation.LastView.v1." + gameObject.scene.path;
@@ -1375,6 +1378,12 @@ namespace jcan.CelestialSystems
                 pendingRestoredNavigationMode =
                     (UniverseCameraModeController.NavigationMode)saved.navigationMode;
                 hasPendingRestoredNavigationMode = true;
+                pendingRestoredFreeLockInstanceId =
+                    pendingRestoredNavigationMode ==
+                        UniverseCameraModeController.NavigationMode.Free &&
+                    saved.hasFreeFeatureLock
+                    ? saved.freeFeatureLockInstanceId ?? string.Empty
+                    : string.Empty;
             }
             originLocked = true;
             selectionController?.LockToOrigin();
@@ -1417,6 +1426,17 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            if (pendingRestoredNavigationMode ==
+                    UniverseCameraModeController.NavigationMode.Free &&
+                !string.IsNullOrEmpty(pendingRestoredFreeLockInstanceId))
+            {
+                var freeFlight =
+                    FindFirstObjectByType<FreeUniverseAnchorController>();
+                freeFlight?.RequestFeatureLockRestore(
+                    pendingRestoredFreeLockInstanceId);
+            }
+
+            pendingRestoredFreeLockInstanceId = string.Empty;
             hasPendingRestoredNavigationMode = false;
         }
 
@@ -1432,6 +1452,28 @@ namespace jcan.CelestialSystems
 
             view.hasNavigationMode = true;
             view.navigationMode = (int)modeController.Mode;
+            view.hasFreeFeatureLock = false;
+            view.freeFeatureLockInstanceId = string.Empty;
+
+            if (modeController.Mode !=
+                UniverseCameraModeController.NavigationMode.Free)
+            {
+                return;
+            }
+
+            var freeFlight =
+                FindFirstObjectByType<FreeUniverseAnchorController>();
+            var lockedBody = freeFlight != null
+                ? freeFlight.LockedFeatureBody
+                : null;
+            if (lockedBody == null ||
+                string.IsNullOrEmpty(lockedBody.InstanceId))
+            {
+                return;
+            }
+
+            view.hasFreeFeatureLock = true;
+            view.freeFeatureLockInstanceId = lockedBody.InstanceId;
         }
 
         private static void CaptureUniversalTime(SavedView view)
