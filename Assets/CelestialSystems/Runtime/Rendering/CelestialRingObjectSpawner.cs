@@ -57,7 +57,7 @@ namespace jcan.CelestialSystems
         [Header("Debug Gizmos")]
         [SerializeField]
         [Tooltip("Draw a wire sphere and forward line for every active streamed ring object.")]
-        private bool drawObjectGizmos;
+        private bool drawObjectGizmos = true;
 
         [Header("Runtime Diagnostics")]
         [SerializeField]
