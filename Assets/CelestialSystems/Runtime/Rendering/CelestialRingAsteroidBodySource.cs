@@ -101,9 +101,24 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
+            ClearGeneratedMeshCache();
+        }
+
+        [ContextMenu("Clear Generated Mesh Cache")]
+        public void ClearGeneratedMeshCache()
+        {
             foreach (var mesh in cachedVariants.Values)
             {
-                if (mesh != null) Destroy(mesh);
+                if (mesh == null) continue;
+
+                if (Application.isPlaying)
+                {
+                    Destroy(mesh);
+                }
+                else
+                {
+                    DestroyImmediate(mesh);
+                }
             }
 
             cachedVariants.Clear();
