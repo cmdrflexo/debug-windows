@@ -17,25 +17,27 @@ namespace jcan.CelestialSystems
         public uint Seed;
         [Range(0, 4)] public int Subdivisions;
         public Vector3 AxisScale;
-        [Range(0.0f, 0.8f)] public float BroadDeformation;
-        [Range(0.0f, 0.5f)] public float CavityStrength;
-        [Range(0.0f, 0.35f)] public float MediumBreakup;
+        [Range(0.0f, 0.5f)] public float BroadDeformation;
+        [Range(0.0f, 0.5f)] public float CellularFacetStrength;
+        [Range(0.0f, 0.25f)] public float MediumBreakup;
         public bool SmoothNormals;
 
         public static CelestialRockMeshSettings Default => new CelestialRockMeshSettings
         {
             Seed = 1u,
-            Subdivisions = 2,
+            Subdivisions = 3,
             AxisScale = new Vector3(1.0f, 0.9f, 1.1f),
-            BroadDeformation = 0.22f,
-            CavityStrength = 0.17f,
-            MediumBreakup = 0.06f,
+            BroadDeformation = 0.14f,
+            CellularFacetStrength = 0.18f,
+            MediumBreakup = 0.035f,
             SmoothNormals = true
         };
     }
 
     public static class CelestialRockMeshGenerator
     {
+        private const int CellularSiteCount = 18;
+
         public static Mesh Create(CelestialRockMeshSettings settings)
         {
             settings.Subdivisions = Mathf.Clamp(settings.Subdivisions, 0, 4);
@@ -50,10 +52,11 @@ namespace jcan.CelestialSystems
                 Subdivide(vertices, triangles);
             }
 
+            var cellularSites = CreateCellularSites(settings.Seed);
             for (var index = 0; index < vertices.Count; index++)
             {
                 var direction = vertices[index].normalized;
-                var radius = EvaluateRadius(direction, settings);
+                var radius = EvaluateRadius(direction, settings, cellularSites);
                 vertices[index] = Vector3.Scale(
                     direction * radius,
                     settings.AxisScale);
@@ -78,46 +81,87 @@ namespace jcan.CelestialSystems
             return mesh;
         }
 
-        private static float EvaluateRadius(Vector3 direction, CelestialRockMeshSettings settings)
+        private static float EvaluateRadius(
+            Vector3 direction,
+            CelestialRockMeshSettings settings,
+            CellularSite[] cellularSites)
         {
             var broad = 0.0f;
-            for (var layer = 0; layer < 3; layer++)
+            for (var lobe = 0; lobe < 4; lobe++)
             {
-                var axis = SeedDirection(settings.Seed, (uint)(layer + 1));
-                var phase = Hash01(settings.Seed + (uint)(31 + layer)) * Mathf.PI * 2.0f;
-                broad += Mathf.Sin(
-                    Vector3.Dot(direction, axis) * (2.0f + layer) * Mathf.PI + phase)
-                    * (0.65f / (layer + 1.0f));
+                var axis = SeedDirection(settings.Seed, (uint)(lobe + 1));
+                var prominence = Mathf.Lerp(
+                    0.45f,
+                    1.0f,
+                    Hash01(settings.Seed + (uint)(31 + lobe)));
+                var facing = Mathf.Max(0.0f, Vector3.Dot(direction, axis));
+                broad += facing * facing * prominence;
             }
-            broad *= settings.BroadDeformation;
+            // Center the positive lobe sum, keeping the overall volume stable.
+            broad = (broad - 0.70f) * settings.BroadDeformation;
 
-            var cavity = 0.0f;
-            for (var cavityIndex = 0; cavityIndex < 5; cavityIndex++)
+            var nearest = -2.0f;
+            var secondNearest = -2.0f;
+            var nearestIndex = 0;
+            for (var index = 0; index < cellularSites.Length; index++)
             {
-                var center = SeedDirection(settings.Seed, (uint)(101 + cavityIndex));
-                var extent = Mathf.Lerp(
-                    0.55f,
-                    0.80f,
-                    Hash01(settings.Seed + (uint)(151 + cavityIndex)));
-                var coverage = Mathf.Clamp01(
-                    (Vector3.Dot(direction, center) - extent) / (1.0f - extent));
-                cavity += coverage * coverage *
-                    Mathf.Lerp(0.45f, 1.0f,
-                        Hash01(settings.Seed + (uint)(201 + cavityIndex)));
+                var proximity = Vector3.Dot(direction, cellularSites[index].Direction);
+                if (proximity > nearest)
+                {
+                    secondNearest = nearest;
+                    nearest = proximity;
+                    nearestIndex = index;
+                }
+                else if (proximity > secondNearest)
+                {
+                    secondNearest = proximity;
+                }
             }
-            cavity *= settings.CavityStrength;
+
+            // The difference is zero on a Voronoi boundary and rises toward the
+            // centre of a cell. Low boundaries and differently raised centres
+            // produce the broad plates and creases seen on fractured asteroids.
+            var centreWeight = Mathf.SmoothStep(
+                0.015f,
+                0.150f,
+                nearest - secondNearest);
+            var cellHeight = cellularSites[nearestIndex].Height;
+            var cellular = Mathf.Lerp(
+                -0.18f,
+                cellHeight,
+                centreWeight) * settings.CellularFacetStrength;
 
             var medium = 0.0f;
-            for (var layer = 0; layer < 2; layer++)
+            for (var layer = 0; layer < 3; layer++)
             {
-                var axis = SeedDirection(settings.Seed, (uint)(251 + layer));
-                var phase = Hash01(settings.Seed + (uint)(271 + layer)) * Mathf.PI * 2.0f;
-                medium += Mathf.Abs(Mathf.Sin(
-                    Vector3.Dot(direction, axis) * (7.0f + layer * 3.0f) + phase)) - 0.5f;
+                var axis = SeedDirection(settings.Seed, (uint)(301 + layer));
+                var phase = Hash01(settings.Seed + (uint)(331 + layer)) * Mathf.PI * 2.0f;
+                medium += (Mathf.Abs(Mathf.Sin(
+                    Vector3.Dot(direction, axis) * (9.0f + layer * 4.0f) + phase))
+                    - 0.5f) * (0.60f / (layer + 1.0f));
             }
             medium *= settings.MediumBreakup;
 
-            return Mathf.Max(0.28f, 1.0f + broad - cavity + medium);
+            return Mathf.Max(0.45f, 1.0f + broad + cellular + medium);
+        }
+
+        private static CellularSite[] CreateCellularSites(uint seed)
+        {
+            var sites = new CellularSite[CellularSiteCount];
+            for (var index = 0; index < sites.Length; index++)
+            {
+                var salt = (uint)(101 + index);
+                sites[index] = new CellularSite
+                {
+                    Direction = SeedDirection(seed, salt),
+                    Height = Mathf.Lerp(
+                        0.18f,
+                        0.95f,
+                        Hash01(seed + salt * 0x9E3779B9u))
+                };
+            }
+
+            return sites;
         }
 
         private static void CreateIcosphere(
@@ -229,6 +273,12 @@ namespace jcan.CelestialSystems
             value *= 0x846CA68Bu;
             value ^= value >> 16;
             return (value & 0x00FFFFFFu) / 16777216.0f;
+        }
+
+        private struct CellularSite
+        {
+            public Vector3 Direction;
+            public float Height;
         }
     }
 }
