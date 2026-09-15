@@ -26,6 +26,15 @@ namespace jcan.CelestialSystems
         [Tooltip("Camera used to convert universe velocity into the particle system's local axes.")]
         private Transform cameraTransform;
 
+        [Header("Reference Frame")]
+        [SerializeField]
+        [Tooltip("When Free mode is locked to a body, subtract that body's motion before driving dust.")]
+        private bool useLockedBodyReferenceFrame = true;
+
+        [SerializeField]
+        [Tooltip("Optional body whose motion defines the dust reference frame when no Free-mode lock is active.")]
+        private CelestialBodyRuntimeContext referenceBody;
+
         [Header("Speed Visibility")]
         [SerializeField]
         [Tooltip("Dust begins fading out at this relative camera speed in metres per second.")]
@@ -52,6 +61,9 @@ namespace jcan.CelestialSystems
         private bool hasPoseSample;
 
         [SerializeField]
+        private string activeReferenceFrameName;
+
+        [SerializeField]
         private float rawCameraSpeedMetersPerSecond;
 
         [SerializeField]
@@ -65,7 +77,11 @@ namespace jcan.CelestialSystems
         private Vector3 localDustVelocityMetersPerSecond;
 
         private UniversePosition previousPosition;
+        private UniversePosition previousReferencePosition;
+        private CelestialBodyRuntimeContext sampledReferenceBody;
+        private bool hasReferenceFrameSample;
         private Vector3 smoothedUniverseVelocity;
+        private FreeUniverseAnchorController freeFlight;
         private float baseEmissionRateMultiplier = 1.0f;
         private bool capturedEmissionRate;
 
@@ -142,6 +158,35 @@ namespace jcan.CelestialSystems
             var velocityX = offset.x / deltaTime;
             var velocityY = offset.y / deltaTime;
             var velocityZ = offset.z / deltaTime;
+
+            // The dust frame follows a locked body (or an explicitly supplied
+            // body) in the same rendered time domain. Sampling positions rather
+            // than using physical velocity also stays correct under time scale.
+            if (TryGetReferenceFramePosition(out var referencePosition,
+                    out var currentReferenceBody))
+            {
+                if (hasReferenceFrameSample &&
+                    sampledReferenceBody == currentReferenceBody &&
+                    referencePosition.TryGetOffsetMetersFrom(
+                        previousReferencePosition,
+                        out var referenceOffset))
+                {
+                    velocityX -= referenceOffset.x / deltaTime;
+                    velocityY -= referenceOffset.y / deltaTime;
+                    velocityZ -= referenceOffset.z / deltaTime;
+                }
+
+                previousReferencePosition = referencePosition;
+                sampledReferenceBody = currentReferenceBody;
+                hasReferenceFrameSample = true;
+            }
+            else
+            {
+                hasReferenceFrameSample = false;
+                sampledReferenceBody = null;
+                activeReferenceFrameName = string.Empty;
+            }
+
             var rawSpeed = Math.Sqrt(
                 velocityX * velocityX +
                 velocityY * velocityY +
@@ -196,6 +241,31 @@ namespace jcan.CelestialSystems
             {
                 poseBridge = FindFirstObjectByType<SgtUniverseOriginBridge>();
             }
+
+            if (freeFlight == null)
+            {
+                freeFlight = FindFirstObjectByType<FreeUniverseAnchorController>();
+            }
+        }
+
+        private bool TryGetReferenceFramePosition(
+            out UniversePosition position,
+            out CelestialBodyRuntimeContext body)
+        {
+            body = useLockedBodyReferenceFrame && freeFlight != null &&
+                freeFlight.IsFeatureLocked
+                ? freeFlight.LockedFeatureBody
+                : referenceBody;
+
+            if (body != null && body.TryGetMotionState(out var motion))
+            {
+                position = motion.Position;
+                activeReferenceFrameName = body.name;
+                return true;
+            }
+
+            position = default;
+            return false;
         }
 
         private void CaptureParticleSettings()
@@ -295,6 +365,10 @@ namespace jcan.CelestialSystems
         {
             hasPoseSample = false;
             previousPosition = default;
+            previousReferencePosition = default;
+            sampledReferenceBody = null;
+            hasReferenceFrameSample = false;
+            activeReferenceFrameName = string.Empty;
             smoothedUniverseVelocity = Vector3.zero;
             rawCameraSpeedMetersPerSecond = 0.0f;
             visualDustSpeedMetersPerSecond = 0.0f;
