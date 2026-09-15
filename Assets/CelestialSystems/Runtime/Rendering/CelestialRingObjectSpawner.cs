@@ -87,6 +87,24 @@ namespace jcan.CelestialSystems
         public int CandidateCellCount =>
             candidateCellCount;
 
+        /// <summary>
+        /// Supplies scene-owned resources used by this generated spawner.
+        /// A null camera remains valid and falls back to Camera.main at runtime.
+        /// </summary>
+        public void Configure(
+            CelestialRingObjectSet newObjectSet,
+            Camera newObserverCamera)
+        {
+            if (objectSet != newObjectSet)
+            {
+                ClearObjects();
+            }
+
+            objectSet = newObjectSet;
+            observerCamera = newObserverCamera;
+            nextRefreshTime = 0.0f;
+        }
+
         private void Awake()
         {
             body =

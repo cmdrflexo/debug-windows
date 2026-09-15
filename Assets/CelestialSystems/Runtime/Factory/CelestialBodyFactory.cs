@@ -74,6 +74,15 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private bool generateStellarBeams = true;
 
+        [Header("Ring Object Streaming")]
+        [SerializeField]
+        [Tooltip("Optional scene resource provider for generated ring-object streaming. The first RingResources in the scene is used when this is empty.")]
+        private RingResources ringResources;
+
+        [SerializeField]
+        [Tooltip("Adds close-range object streaming to generated bodies with ring-system properties when RingResources supplies an object set.")]
+        private bool generateRingObjects = true;
+
         [Header("Optional Startup Body")]
         [SerializeField]
         private bool spawnOnStart;
@@ -668,6 +677,9 @@ namespace jcan.CelestialSystems
             AttachRingMeshPresentation(
                 instance,
                 request.Definition);
+            AttachRingObjectSpawner(
+                instance,
+                request.Definition);
             AttachRingSystemDebugGizmos(
                 instance,
                 request.Definition);
@@ -720,6 +732,56 @@ namespace jcan.CelestialSystems
 
             presentation.Initialize(
                 body);
+        }
+
+        private void AttachRingObjectSpawner(
+            CelestialBodyRuntimeContext body,
+            CelestialBodyDefinition definition)
+        {
+            var spawner =
+                body != null
+                    ? body.GetComponent<CelestialRingObjectSpawner>()
+                    : null;
+
+            if (!generateRingObjects ||
+                definition == null ||
+                !definition.HasRingSystemProperties)
+            {
+                if (spawner != null)
+                {
+                    spawner.enabled = false;
+                }
+
+                return;
+            }
+
+            ringResources ??=
+                FindFirstObjectByType<RingResources>();
+            var objectSet =
+                ringResources != null
+                    ? ringResources.ObjectSet
+                    : null;
+
+            if (objectSet == null)
+            {
+                if (spawner != null)
+                {
+                    spawner.enabled = false;
+                }
+
+                return;
+            }
+
+            if (spawner == null)
+            {
+                spawner =
+                    body.gameObject.AddComponent<CelestialRingObjectSpawner>();
+            }
+
+            spawner.Configure(
+                objectSet,
+                Camera.main);
+            spawner.enabled = true;
         }
 
         private static void AttachRingSystemDebugGizmos(
