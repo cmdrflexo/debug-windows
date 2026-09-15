@@ -7,6 +7,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using SpaceGraphicsToolkit;
 
 namespace jcan.CelestialSystems
 {
@@ -466,18 +467,36 @@ namespace jcan.CelestialSystems
             CelestialRingPolarCell cell,
             Vector3 localPosition)
         {
-            if (!activeObjects.TryGetValue(
+            var isNewInstance =
+                !activeObjects.TryGetValue(
                     key,
                     out var instance) ||
-                instance == null)
+                instance == null;
+
+            if (isNewInstance)
             {
                 instance =
                     AcquireObject();
                 instance.name =
                     $"Ring Object {cell.BandIndex + 1}:{cell.RadialIndex}:{cell.AngularIndex}";
+                // A body-centered parent loses meter precision near a
+                // full-scale body. SGT projects this object independently.
                 instance.transform.SetParent(
-                    body.VisualRoot,
+                    null,
                     false);
+
+                if (instance.GetComponent<SgtFloatingObject>() == null)
+                {
+                    instance.AddComponent<SgtFloatingObject>();
+                }
+
+                if (instance.GetComponent<
+                        CelestialRingObjectInertialMotion>() == null)
+                {
+                    instance.AddComponent<
+                        CelestialRingObjectInertialMotion>();
+                }
+
                 instance.SetActive(
                     true);
                 activeObjects[key] =
@@ -579,12 +598,21 @@ namespace jcan.CelestialSystems
             {
                 diameter *= sourceBody.SafeDiameterMultiplier;
             }
-            instance.transform.localPosition =
-                localPosition;
             instance.transform.localRotation =
                 RandomRotation(
                     definition,
                     cell);
+
+            if (isNewInstance &&
+                body.TryGetMotionState(
+                    out var bodyMotion))
+            {
+                instance.GetComponent<
+                    CelestialRingObjectInertialMotion>()
+                    .Initialize(
+                        bodyMotion,
+                        localPosition);
+            }
             instance.transform.localScale =
                 Vector3.one *
                 diameter;
