@@ -40,11 +40,11 @@ The strengths and texture parameters have the reference's randomized distributio
 | Base Shape | -1 selects randomly; 0–11 locks an original cage recipe for comparisons. |
 | Meters Per Unit | Final uniform unit conversion; does not change texture frequency or the seed pattern. |
 | Smooth Normals | Smooth shared normals or flat triangle shading. |
-| Generate UVs | Six padded planar charts in UV0, with normals preserved across UV splits; tangents generated. |
+| Generate UVs | One continuous longitude/latitude chart in UV0, with a single seam on the rear longitude; tangents generated. |
 | Random Seed | Explicit Regenerate chooses a seed and displays it. Previous/Next and automatic updates remain reproducible. |
 | Number Of Rocks / Batch Spacing | Editor batch creation count and spacing in Unity units. |
 
-Scale/skew/texture axes use Blender's X/Y/Z convention. Final coordinates are converted to Unity Y-up (Blender Z becomes Unity Y). UVs do not drive mesh displacement. These projection UVs are suitable for tiled detail; they are not a unique unwrap for baking, and concave regions can overlap. A triplanar material also works.
+Scale/skew/texture axes use Blender's X/Y/Z convention. Final coordinates are converted to Unity Y-up (Blender Z becomes Unity Y). UVs do not drive mesh displacement. The UVs are suitable for tiled detail. They have pole stretching and are not a unique unwrap for baking; a triplanar material also works.
 
 Runtime use:
 

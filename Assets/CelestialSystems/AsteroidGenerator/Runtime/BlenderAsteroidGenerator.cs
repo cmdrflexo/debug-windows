@@ -240,28 +240,40 @@ namespace jcan.CelestialSystems
             {
                 var normal = Normals(); var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var triangles = new List<int>();
                 var shared = new Dictionary<ulong, int>();
-                // Six planar UV charts in a padded 3x2 atlas. Split UV chart boundaries, retain welded normals.
-                var bounds = new Bounds(Vertices[0], Vector3.zero); foreach (var p in Vertices) bounds.Encapsulate(p);
+                // A single longitude/latitude chart is deliberately used here. The previous
+                // normal-selected six-chart projection changed charts between neighbouring
+                // displaced triangles, creating visible patchwork with tiled UV materials.
+                // Only triangles crossing the rear longitude seam split their shared vertices.
                 foreach (var f in Faces)
                 {
                     for (int j = 1; j + 1 < f.Length; j++)
                     {
                         var tri = new[] { f[0], f[j], f[j + 1] };
                         Vector3 fn = Vector3.Cross(Vertices[tri[1]] - Vertices[tri[0]], Vertices[tri[2]] - Vertices[tri[0]]).normalized;
-                        int chart = Mathf.Abs(fn.x) >= Mathf.Abs(fn.y) && Mathf.Abs(fn.x) >= Mathf.Abs(fn.z) ? (fn.x >= 0 ? 0 : 1) : Mathf.Abs(fn.y) >= Mathf.Abs(fn.z) ? (fn.y >= 0 ? 2 : 3) : (fn.z >= 0 ? 4 : 5);
+                        var triU = new float[3];
+                        for (int k = 0; k < tri.Length; k++)
+                        {
+                            Vector3 p = Vertices[tri[k]];
+                            triU[k] = Mathf.Repeat(Mathf.Atan2(p.x, p.z) / (2.0f * Mathf.PI) + 0.5f, 1.0f);
+                        }
+                        float minU = Mathf.Min(triU[0], Mathf.Min(triU[1], triU[2]));
+                        float maxU = Mathf.Max(triU[0], Mathf.Max(triU[1], triU[2]));
+                        bool crossesSeam = maxU - minU > 0.5f;
                         foreach (int index in tri)
                         {
-                            ulong key = ((ulong)(uint)index << 3) | (uint)(uvs ? chart : 0);
+                            Vector3 p = Vertices[index];
+                            float u = Mathf.Repeat(Mathf.Atan2(p.x, p.z) / (2.0f * Mathf.PI) + 0.5f, 1.0f);
+                            bool seamCopy = crossesSeam && u < 0.5f;
+                            if (seamCopy) u += 1.0f;
+                            ulong key = ((ulong)(uint)index << 1) | (uint)(uvs && seamCopy ? 1 : 0);
                             if (!smooth || !shared.TryGetValue(key, out int existing))
                             {
                                 existing = v.Count; v.Add(Vertices[index]); n.Add(smooth ? normal[index] : fn);
                                 if (uvs)
                                 {
-                                    Vector3 p = Vertices[index] - bounds.min;
-                                    p = new Vector3(p.x / Mathf.Max(0.000001f, bounds.size.x), p.y / Mathf.Max(0.000001f, bounds.size.y), p.z / Mathf.Max(0.000001f, bounds.size.z));
-                                    Vector2 t = chart < 2 ? new Vector2(p.z, p.y) : chart < 4 ? new Vector2(p.x, p.z) : new Vector2(p.x, p.y);
-                                    if ((chart & 1) != 0) t.x = 1 - t.x;
-                                    uv.Add(new Vector2((chart % 3 + 0.02f + t.x * 0.96f) / 3, (chart / 3 + 0.02f + t.y * 0.96f) / 2));
+                                    float radius = Mathf.Max(0.000001f, p.magnitude);
+                                    float vCoordinate = Mathf.Asin(Mathf.Clamp(p.y / radius, -1.0f, 1.0f)) / Mathf.PI + 0.5f;
+                                    uv.Add(new Vector2(u, vCoordinate));
                                 }
                                 if (smooth) shared[key] = existing;
                             }
