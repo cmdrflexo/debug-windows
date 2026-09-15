@@ -193,6 +193,20 @@ namespace jcan.CelestialSystems
                     ref random);
             }
 
+            // The ring-to-ring construction is ordered inward; reverse each
+            // triangle so URP's front-face culling and normals face outward.
+            for (var index = 0;
+                index < triangles.Count;
+                index += 3)
+            {
+                var temporary =
+                    triangles[index + 1];
+                triangles[index + 1] =
+                    triangles[index + 2];
+                triangles[index + 2] =
+                    temporary;
+            }
+
             var mesh =
                 new Mesh
                 {
