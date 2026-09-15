@@ -448,8 +448,12 @@ namespace jcan.CelestialSystems
                 hash = hash * 31 + s.ScaleY.GetHashCode();
                 hash = hash * 31 + s.ScaleZ.GetHashCode();
                 hash = hash * 31 + s.Skew.GetHashCode();
+                hash = hash * 31 + s.NormalizeNoiseCoordinates.GetHashCode();
+                hash = hash * 31 + s.NoiseScale.GetHashCode();
                 hash = hash * 31 + s.Deformation.GetHashCode();
                 hash = hash * 31 + s.Roughness.GetHashCode();
+                hash = hash * 31 + s.SmoothFactor.GetHashCode();
+                hash = hash * 31 + s.SmoothIterations;
                 hash = hash * 31 + s.MetersPerUnit.GetHashCode();
                 return hash;
             }
