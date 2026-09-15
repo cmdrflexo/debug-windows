@@ -35,7 +35,7 @@ namespace jcan.CelestialSystems
         private bool useRenderDetail;
 
         [SerializeField]
-        [Range(1, 4)]
+        [Range(0, 4)]
         [Tooltip("Zero keeps the template detail. Otherwise overrides both preview and render detail.")]
         private int detailOverride;
 
