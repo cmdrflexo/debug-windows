@@ -40,6 +40,7 @@ namespace jcan.CelestialSystems
 
         public void AdvanceSeed(int direction)
         {
+            if (settings == null) settings = new CelestialAsteroidSettings();
             unchecked { settings.Seed = (uint)((int)settings.Seed + direction); }
             Rebuild();
         }
@@ -52,10 +53,17 @@ namespace jcan.CelestialSystems
             rebuildQueued = false;
             var filter = GetComponent<MeshFilter>();
             if (filter == null) return;
+            if (settings == null) settings = new CelestialAsteroidSettings();
 
             ReleasePreview();
-            settings.UseRuntimeMeshCache = false;
-            previewMesh = CelestialAsteroidGenerator.Create(settings, renderDetail);
+
+            // A preview owns and destroys its mesh. Clone settings so its
+            // regenerate cycle never writes into or destroys the runtime cache.
+            var previewSettings = JsonUtility.FromJson<CelestialAsteroidSettings>(
+                JsonUtility.ToJson(settings));
+            previewSettings.UseRuntimeMeshCache = false;
+
+            previewMesh = CelestialAsteroidGenerator.Create(previewSettings, renderDetail);
             previewMesh.name = $"Preview Celestial Asteroid {settings.Seed:X8}";
             previewMesh.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
             filter.sharedMesh = previewMesh;
