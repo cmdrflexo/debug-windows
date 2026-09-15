@@ -5,6 +5,7 @@
  */
 
 using UnityEngine;
+using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -36,12 +37,14 @@ namespace jcan.CelestialSystems
         private float broadDeformation = 0.22f;
 
         [SerializeField]
+        [FormerlySerializedAs("cavityStrength")]
         [Range(0.0f, 0.5f)]
-        private float cavityStrength = 0.17f;
+        [Tooltip("Strength of the broad Voronoi-like plates and their lower boundaries.")]
+        private float cellularFacetStrength = 0.18f;
 
         [SerializeField]
-        [Range(0.0f, 0.35f)]
-        private float mediumBreakup = 0.06f;
+        [Range(0.0f, 0.25f)]
+        private float mediumBreakup = 0.035f;
 
         [SerializeField]
         private bool smoothNormals = true;
@@ -95,7 +98,7 @@ namespace jcan.CelestialSystems
             settings.Subdivisions = subdivisions;
             settings.AxisScale = axisScale * (physicalSizeMeters * 0.5f);
             settings.BroadDeformation = broadDeformation;
-            settings.CavityStrength = cavityStrength;
+            settings.CellularFacetStrength = cellularFacetStrength;
             settings.MediumBreakup = mediumBreakup;
             settings.SmoothNormals = smoothNormals;
 
