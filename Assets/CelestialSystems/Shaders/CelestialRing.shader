@@ -188,6 +188,38 @@ Shader "jcan/Celestial Systems/Celestial Ring"
             }
 
 
+            float HashRingletNoise(
+                float cell,
+                float seed)
+            {
+                return frac(
+                    sin(
+                        cell * 127.1 +
+                        seed * 311.7) *
+                    43758.5453123);
+            }
+
+            float EvaluateRingletValueNoise(
+                float coordinate,
+                float seed)
+            {
+                float cell =
+                    floor(coordinate);
+                float blend =
+                    frac(coordinate);
+                blend =
+                    blend * blend *
+                    (3.0 - 2.0 * blend);
+                return lerp(
+                    HashRingletNoise(
+                        cell,
+                        seed),
+                    HashRingletNoise(
+                        cell + 1.0,
+                        seed),
+                    blend);
+            }
+
             half EvaluateMicrostructure(
                 float radiusMeters)
             {
@@ -206,16 +238,23 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                 float primary =
                     radiusMeters / spacing +
                     _RingMicrostructurePhase;
+                float warped =
+                    primary +
+                    (EvaluateRingletValueNoise(
+                        primary * 0.075 +
+                        _RingMicrostructurePhase * 0.173,
+                        _RingMicrostructurePhase) - 0.5) *
+                    6.5;
                 float secondary =
-                    primary / max(
+                    warped / max(
                         0.0001,
                         _RingMicrostructure.y);
                 float tertiary =
-                    primary / max(
+                    warped / max(
                         0.0001,
                         _RingMicrostructure.z);
                 float signal =
-                    (sin(primary) +
+                    (sin(warped) +
                         0.52 * sin(
                             secondary +
                             _RingMicrostructurePhase * 1.73) +
@@ -229,10 +268,28 @@ Shader "jcan/Celestial Systems/Celestial Ring"
                         1.0,
                         signal * 0.5 +
                         0.5);
+
+                // Fade unresolved rings to their mean coverage to prevent
+                // sub-pixel stripes from producing a distant moire pattern.
+                float footprint =
+                    max(
+                        fwidth(warped),
+                        max(
+                            fwidth(secondary),
+                            fwidth(tertiary)));
+                float resolved =
+                    saturate(
+                        1.0 -
+                        footprint * 1.2);
+                float coverage =
+                    lerp(
+                        0.5,
+                        ringlet,
+                        resolved);
                 return lerp(
                     1.0h - contrast,
                     1.0h,
-                    ringlet);
+                    coverage);
             }
 
             void EvaluateRingData(
