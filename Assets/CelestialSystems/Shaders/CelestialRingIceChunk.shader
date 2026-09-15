@@ -64,25 +64,25 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
             CBUFFER_END
 
             float Hash31(
-                float3 point)
+                float3 samplePosition)
             {
-                point = frac(
-                    point * 0.1031);
-                point += dot(
-                    point,
-                    point.yzx + 33.33);
+                samplePosition = frac(
+                    samplePosition * 0.1031);
+                samplePosition += dot(
+                    samplePosition,
+                    samplePosition.yzx + 33.33);
                 return frac(
-                    (point.x + point.y) *
-                    point.z);
+                    (samplePosition.x + samplePosition.y) *
+                    samplePosition.z);
             }
 
             float ValueNoise3D(
-                float3 point)
+                float3 samplePosition)
             {
                 float3 cell =
-                    floor(point);
+                    floor(samplePosition);
                 float3 fraction =
-                    frac(point);
+                    frac(samplePosition);
                 fraction =
                     fraction * fraction *
                     (3.0 - 2.0 * fraction);
@@ -106,7 +106,7 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
             }
 
             float FractalNoise(
-                float3 point)
+                float3 samplePosition)
             {
                 float result = 0.0;
                 float amplitude = 0.57;
@@ -117,10 +117,10 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                     octave++)
                 {
                     result +=
-                        ValueNoise3D(point) *
+                        ValueNoise3D(samplePosition) *
                         amplitude;
-                    point =
-                        point * 2.07 +
+                    samplePosition =
+                        samplePosition * 2.07 +
                         19.17;
                     amplitude *=
                         0.5;
