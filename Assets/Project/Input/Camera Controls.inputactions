@@ -100,7 +100,7 @@
                     "name": "Orbit Left Step",
                     "type": "Button",
                     "id": "26885f5c-e277-48ae-bbcf-b414c4b267b9",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -335,7 +335,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Orbit Left Step",
+                    "action": "Orbit Right Step",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -346,7 +346,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Orbit Right Step",
+                    "action": "Orbit Left Step",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

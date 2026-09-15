@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d14bfe38ba9416d8953ca707fd1dc62, type: 3}
+  m_Name: Ring Object Set
+  m_EditorClassIdentifier: Assembly-CSharp::jcan.CelestialSystems.CelestialRingObjectSet
+  families:
+  - displayName: Fine Ice
+    kind: 0
+    meshVariants: []
+    materialVariants: []
+    baseSelectionWeight: 1
+    iceAffinity: 1
+    rockAffinity: 0.05
+    dustAffinity: 0.1
+    minimumDiameterMeters: 0.02
+    maximumDiameterMeters: 0.2
+  - displayName: Ice Chunk
+    kind: 1
+    meshVariants: []
+    materialVariants:
+    - {fileID: 2100000, guid: 39a88d378f61d5249ae9c53c95cb278a, type: 2}
+    baseSelectionWeight: 1
+    iceAffinity: 1
+    rockAffinity: 0.25
+    dustAffinity: 0
+    minimumDiameterMeters: 0.2
+    maximumDiameterMeters: 5
+  - displayName: Dark Rubble
+    kind: 2
+    meshVariants: []
+    materialVariants: []
+    baseSelectionWeight: 1
+    iceAffinity: 0.1
+    rockAffinity: 1
+    dustAffinity: 0.35
+    minimumDiameterMeters: 0.1
+    maximumDiameterMeters: 3
+  - displayName: Dust Cluster
+    kind: 3
+    meshVariants: []
+    materialVariants: []
+    baseSelectionWeight: 1
+    iceAffinity: 0.25
+    rockAffinity: 0.4
+    dustAffinity: 1
+    minimumDiameterMeters: 0.02
+    maximumDiameterMeters: 0.5
