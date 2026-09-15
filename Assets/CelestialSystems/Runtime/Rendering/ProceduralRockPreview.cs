@@ -127,15 +127,9 @@ namespace jcan.CelestialSystems
                 meshFilter.sharedMesh = null;
             }
 
-            if (Application.isPlaying)
-            {
-                Destroy(previewMesh);
-            }
-            else
-            {
-                DestroyImmediate(previewMesh);
-            }
-
+            // This method is called by OnValidate as well as normal editor
+            // actions. Unity forbids DestroyImmediate from that callback.
+            Destroy(previewMesh);
             previewMesh = null;
         }
     }
