@@ -1,11 +1,14 @@
 /*
- * Temporary moonlet test component. Attach it to a planet/body to create one
- * simple spherical moonlet in that body's local ring plane. It deliberately
- * contains only the data and circular motion needed for visual testing; later
- * generation can replace the sphere and use this orbit to create displacement
- * waves in nearby rings.
+ * Temporary moonlet test component. Attach it to a convenient scene-level
+ * object. It follows the current body reported by UniverseLocalEnvironmentContext
+ * and creates a basic sphere in that body's local XZ ring plane.
+ *
+ * The context is resolved by name while its API is still being established.
+ * Replace that small adapter with a direct dependency once the context script is
+ * committed to this branch.
  */
 
+using System.Reflection;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -13,6 +16,14 @@ namespace jcan.CelestialSystems
     [DisallowMultipleComponent]
     public sealed class MoonletGenerator : MonoBehaviour
     {
+        [Header("Local Environment")]
+        [SerializeField]
+        [Tooltip("Optional explicit UniverseLocalEnvironmentContext. Leave empty to find it in the scene.")]
+        private MonoBehaviour localEnvironmentContext;
+
+        [SerializeField, HideInInspector]
+        private Transform currentBody;
+
         [Header("Moonlet Properties")]
         [SerializeField]
         [Min(0.01f)]
@@ -27,7 +38,7 @@ namespace jcan.CelestialSystems
         [Header("Circular Test Orbit")]
         [SerializeField]
         [Min(0.01f)]
-        [Tooltip("Distance from this body's centre to the moonlet centre, in metres.")]
+        [Tooltip("Distance from the current body's centre to the moonlet centre, in metres.")]
         private float orbitRadiusMeters = 10000.0f;
 
         [SerializeField]
@@ -62,25 +73,32 @@ namespace jcan.CelestialSystems
         public double MassKilograms => massKilograms;
         public float OrbitRadiusMeters => orbitRadiusMeters;
         public float OrbitPhaseDegrees => currentPhaseDegrees;
+        public Transform CurrentBody => currentBody;
 
         private void OnEnable()
         {
             currentPhaseDegrees = orbitPhaseDegrees;
-            EnsureMoonlet();
-            UpdateMoonletTransform();
+            ResolveCurrentBody();
         }
 
         private void Update()
         {
-            if (!Application.isPlaying || orbitPeriodSeconds <= 0.0f)
+            ResolveCurrentBody();
+
+            if (currentBody == null)
             {
                 return;
             }
 
-            var direction = orbitClockwise ? -1.0f : 1.0f;
-            currentPhaseDegrees = Mathf.Repeat(
-                currentPhaseDegrees + direction * 360.0f * Time.deltaTime / orbitPeriodSeconds,
-                360.0f);
+            EnsureMoonlet();
+
+            if (Application.isPlaying && orbitPeriodSeconds > 0.0f)
+            {
+                var direction = orbitClockwise ? -1.0f : 1.0f;
+                currentPhaseDegrees = Mathf.Repeat(
+                    currentPhaseDegrees + direction * 360.0f * Time.deltaTime / orbitPeriodSeconds,
+                    360.0f);
+            }
 
             UpdateMoonletTransform();
         }
@@ -108,15 +126,116 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private void ResolveCurrentBody()
+        {
+            if (localEnvironmentContext == null)
+            {
+                localEnvironmentContext = FindLocalEnvironmentContext();
+            }
+
+            var nextBody = GetContextBodyTransform(localEnvironmentContext);
+            if (nextBody == currentBody)
+            {
+                return;
+            }
+
+            currentBody = nextBody;
+            if (moonletObject == null)
+            {
+                return;
+            }
+
+            moonletObject.SetActive(currentBody != null);
+            if (currentBody == null)
+            {
+                return;
+            }
+
+            moonletObject.transform.SetParent(currentBody, false);
+            ConfigureRenderer();
+            UpdateMoonletTransform();
+        }
+
+        private static MonoBehaviour FindLocalEnvironmentContext()
+        {
+            var behaviours = FindObjectsByType<MonoBehaviour>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+
+            foreach (var behaviour in behaviours)
+            {
+                if (behaviour.GetType().Name == "UniverseLocalEnvironmentContext")
+                {
+                    return behaviour;
+                }
+            }
+
+            return null;
+        }
+
+        private static Transform GetContextBodyTransform(MonoBehaviour context)
+        {
+            if (context == null)
+            {
+                return null;
+            }
+
+            const BindingFlags Flags =
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.NonPublic;
+
+            // CurrentBody is the intended context API. The alternatives keep the
+            // temporary test component usable while the context API is finalized.
+            var type = context.GetType();
+            object body = null;
+            foreach (var memberName in new[]
+            {
+                "CurrentBody",
+                "CurrentBodyContext",
+                "LocalBody",
+                "LocalBodyContext"
+            })
+            {
+                var property = type.GetProperty(memberName, Flags);
+                if (property != null)
+                {
+                    body = property.GetValue(context);
+                    break;
+                }
+
+                var field = type.GetField(memberName, Flags);
+                if (field != null)
+                {
+                    body = field.GetValue(context);
+                    break;
+                }
+            }
+
+            return body switch
+            {
+                Transform transform => transform,
+                Component component => component.transform,
+                GameObject gameObject => gameObject.transform,
+                _ => null
+            };
+        }
+
         private void EnsureMoonlet()
         {
+            if (currentBody == null)
+            {
+                return;
+            }
+
             if (moonletObject == null)
             {
                 moonletObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 moonletObject.name = "Test Moonlet";
-                moonletObject.transform.SetParent(transform, false);
+                moonletObject.transform.SetParent(currentBody, false);
             }
 
+            moonletObject.SetActive(true);
             ConfigureRenderer();
         }
 
@@ -143,7 +262,7 @@ namespace jcan.CelestialSystems
 
         private void UpdateMoonletTransform()
         {
-            if (moonletObject == null)
+            if (moonletObject == null || currentBody == null)
             {
                 return;
             }
