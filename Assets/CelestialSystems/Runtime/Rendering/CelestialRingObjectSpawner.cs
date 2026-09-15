@@ -462,6 +462,16 @@ namespace jcan.CelestialSystems
             var renderer =
                 instance.GetComponent<MeshRenderer>();
 
+            if (renderer != null)
+            {
+                renderer.shadowCastingMode =
+                    prototypeCastShadows
+                        ? ShadowCastingMode.On
+                        : ShadowCastingMode.Off;
+                renderer.receiveShadows =
+                    prototypeCastShadows;
+            }
+
             if (filter != null &&
                 family.MeshVariants.Count > 0)
             {
