@@ -6,6 +6,7 @@
 
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace jcan.CelestialSystems
 {
@@ -37,6 +38,10 @@ namespace jcan.CelestialSystems
         private float prototypeVisualScaleMultiplier =
             1.0f;
 
+        [SerializeField]
+        [Tooltip("Disabled by default because this GameObject prototype is not the final shadow solution.")]
+        private bool prototypeCastShadows;
+
         [Header("Streaming")]
         [SerializeField]
         [Min(1.0f)]
@@ -60,6 +65,9 @@ namespace jcan.CelestialSystems
 
         private readonly HashSet<int> refreshedKeys =
             new HashSet<int>();
+
+        private readonly Stack<GameObject> pooledObjects =
+            new Stack<GameObject>();
 
         private CelestialBodyRuntimeContext body;
         private float nextRefreshTime;
@@ -437,21 +445,14 @@ namespace jcan.CelestialSystems
                 instance == null)
             {
                 instance =
-                    GameObject.CreatePrimitive(
-                        PrimitiveType.Sphere);
+                    AcquireObject();
                 instance.name =
                     $"Ring Object {cell.BandIndex + 1}:{cell.RadialIndex}:{cell.AngularIndex}";
                 instance.transform.SetParent(
                     body.VisualRoot,
                     false);
-                var collider =
-                    instance.GetComponent<Collider>();
-
-                if (collider != null)
-                {
-                    Destroy(collider);
-                }
-
+                instance.SetActive(
+                    true);
                 activeObjects[key] =
                     instance;
             }
@@ -625,7 +626,9 @@ namespace jcan.CelestialSystems
                 {
                     if (pair.Value != null)
                     {
-                        Destroy(
+                        pair.Value.SetActive(
+                            false);
+                        pooledObjects.Push(
                             pair.Value);
                     }
 
@@ -643,6 +646,33 @@ namespace jcan.CelestialSystems
             }
         }
 
+        private GameObject AcquireObject()
+        {
+            while (pooledObjects.Count > 0)
+            {
+                var pooled =
+                    pooledObjects.Pop();
+
+                if (pooled != null)
+                {
+                    return pooled;
+                }
+            }
+
+            var instance =
+                GameObject.CreatePrimitive(
+                    PrimitiveType.Sphere);
+            var collider =
+                instance.GetComponent<Collider>();
+
+            if (collider != null)
+            {
+                Destroy(collider);
+            }
+
+            return instance;
+        }
+
         private void ClearObjects()
         {
             foreach (var pair in activeObjects)
@@ -651,6 +681,18 @@ namespace jcan.CelestialSystems
                 {
                     Destroy(
                         pair.Value);
+                }
+            }
+
+            while (pooledObjects.Count > 0)
+            {
+                var pooled =
+                    pooledObjects.Pop();
+
+                if (pooled != null)
+                {
+                    Destroy(
+                        pooled);
                 }
             }
 
