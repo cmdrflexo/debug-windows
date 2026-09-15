@@ -12,6 +12,7 @@ namespace jcan.CelestialSystems
 {
     [DefaultExecutionOrder(50)]
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(UniverseLocalEnvironmentContext))]
     public sealed class FreeUniverseAnchorController : MonoBehaviour
     {
         [Header("Reference")]
@@ -618,10 +619,20 @@ namespace jcan.CelestialSystems
 
         private void ResolveLocalEnvironmentContext()
         {
+            if (localEnvironmentContext != null)
+            {
+                return;
+            }
+
+            localEnvironmentContext =
+                GetComponent<UniverseLocalEnvironmentContext>();
             if (localEnvironmentContext == null)
             {
+                // Existing scenes may predate the required component. Add it
+                // once at runtime rather than leaving consumers with a null
+                // context until the scene is manually resaved.
                 localEnvironmentContext =
-                    GetComponent<UniverseLocalEnvironmentContext>();
+                    gameObject.AddComponent<UniverseLocalEnvironmentContext>();
             }
         }
 
