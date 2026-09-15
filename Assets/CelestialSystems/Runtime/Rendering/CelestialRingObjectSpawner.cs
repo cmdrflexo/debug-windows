@@ -69,6 +69,9 @@ namespace jcan.CelestialSystems
         private readonly Stack<GameObject> pooledObjects =
             new Stack<GameObject>();
 
+        private readonly MaterialPropertyBlock materialProperties =
+            new MaterialPropertyBlock();
+
         private CelestialBodyRuntimeContext body;
         private float nextRefreshTime;
 
@@ -531,20 +534,98 @@ namespace jcan.CelestialSystems
                 Vector3.one *
                 diameter;
 
-            if (renderer != null &&
-                family.MaterialVariants.Count == 0)
+            if (renderer != null)
             {
-                var block =
-                    new MaterialPropertyBlock();
-                block.SetColor(
+                ConfigureMaterialProperties(
+                    renderer,
+                    family,
+                    sample,
+                    definition,
+                    cell);
+            }
+        }
+
+        private void ConfigureMaterialProperties(
+            MeshRenderer renderer,
+            CelestialRingObjectFamily family,
+            CelestialRingSample sample,
+            CelestialBodyDefinition definition,
+            CelestialRingPolarCell cell)
+        {
+            materialProperties.Clear();
+
+            if (family.MaterialVariants.Count == 0)
+            {
+                materialProperties.SetColor(
                     "_BaseColor",
                     sample.Albedo);
-                block.SetColor(
+                materialProperties.SetColor(
                     "_Color",
                     sample.Albedo);
-                renderer.SetPropertyBlock(
-                    block);
             }
+
+            var material =
+                renderer.sharedMaterial;
+
+            if (material != null &&
+                material.HasProperty(
+                    "_ChunkSeed"))
+            {
+                materialProperties.SetFloat(
+                    "_ChunkSeed",
+                    CelestialRingSampling
+                        .HashToUnitFloat(
+                            CelestialRingSampling
+                                .GetStableCellHash(
+                                    definition.GenerationSeed,
+                                    definition.DefinitionId,
+                                    cell,
+                                    11u)) *
+                        4096.0f);
+            }
+
+            var isIceFamily =
+                family.Kind ==
+                    CelestialRingObjectFamilyKind.FineIce ||
+                family.Kind ==
+                    CelestialRingObjectFamilyKind.IceChunk;
+
+            if (material != null &&
+                isIceFamily)
+            {
+                if (material.HasProperty(
+                        "_IceColor"))
+                {
+                    materialProperties.SetColor(
+                        "_IceColor",
+                        sample.Albedo);
+                }
+
+                if (material.HasProperty(
+                        "_MineralAmount"))
+                {
+                    materialProperties.SetFloat(
+                        "_MineralAmount",
+                        Mathf.Clamp01(
+                            sample.RockWeight *
+                            0.8f));
+                }
+
+                if (material.HasProperty(
+                        "_DirtAmount"))
+                {
+                    materialProperties.SetFloat(
+                        "_DirtAmount",
+                        Mathf.Clamp01(
+                            sample.DustWeight *
+                                0.75f +
+                            sample.RockWeight *
+                                0.10f));
+                }
+            }
+
+            renderer.SetPropertyBlock(
+                materialProperties);
         }
 
         private static Quaternion RandomRotation(
