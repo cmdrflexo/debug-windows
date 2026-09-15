@@ -53,6 +53,11 @@ namespace jcan.CelestialSystems
         private float refreshIntervalSeconds =
             0.25f;
 
+        [Header("Debug Gizmos")]
+        [SerializeField]
+        [Tooltip("Draw a wire sphere and forward line for every active streamed ring object.")]
+        private bool drawObjectGizmos;
+
         [Header("Runtime Diagnostics")]
         [SerializeField]
         private int activeObjectCount;
@@ -566,6 +571,18 @@ namespace jcan.CelestialSystems
                 Vector3.one *
                 diameter;
 
+            var debugGizmo =
+                instance.GetComponent<CelestialRingObjectDebugGizmo>();
+            if (debugGizmo == null)
+            {
+                debugGizmo =
+                    instance.AddComponent<CelestialRingObjectDebugGizmo>();
+            }
+
+            debugGizmo.Configure(
+                drawObjectGizmos,
+                GetGizmoColor(family.Kind));
+
             if (renderer != null)
             {
                 ConfigureMaterialProperties(
@@ -576,6 +593,25 @@ namespace jcan.CelestialSystems
                     definition,
                     cell);
             }
+        }
+
+        private static Color GetGizmoColor(
+            CelestialRingObjectFamilyKind kind)
+        {
+            return kind switch
+            {
+                CelestialRingObjectFamilyKind.FineIce =>
+                    new Color(0.35f, 0.9f, 1.0f, 1.0f),
+                CelestialRingObjectFamilyKind.IceChunk =>
+                    new Color(0.2f, 0.55f, 1.0f, 1.0f),
+                CelestialRingObjectFamilyKind.DarkRubble =>
+                    new Color(0.8f, 0.55f, 0.25f, 1.0f),
+                CelestialRingObjectFamilyKind.DustCluster =>
+                    new Color(0.9f, 0.75f, 0.25f, 1.0f),
+                CelestialRingObjectFamilyKind.LargeClump =>
+                    new Color(1.0f, 0.35f, 0.7f, 1.0f),
+                _ => Color.cyan
+            };
         }
 
         private void ConfigureMaterialProperties(
