@@ -27,7 +27,8 @@ namespace jcan.CelestialSystems.Editor
 
                 if (GUILayout.Button("Regenerate"))
                 {
-                    preview.Rebuild();
+                    preview.Regenerate();
+                    EditorUtility.SetDirty(preview);
                 }
 
                 if (GUILayout.Button("Next Seed"))
