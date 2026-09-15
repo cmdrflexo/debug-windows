@@ -308,8 +308,12 @@ namespace jcan.CelestialSystems
             }
 
             // Local particles move opposite the camera's world motion.
+            // Use the particle system's axes, not the camera's axes: dust is
+            // intentionally a sibling of the camera so camera look does not
+            // rotate an inertial particle field.
             localDustVelocityMetersPerSecond =
-                -cameraTransform.InverseTransformDirection(universeVelocity);
+                -dustParticles.transform.InverseTransformDirection(
+                    universeVelocity);
             visualDustSpeedMetersPerSecond =
                 localDustVelocityMetersPerSecond.magnitude;
 
