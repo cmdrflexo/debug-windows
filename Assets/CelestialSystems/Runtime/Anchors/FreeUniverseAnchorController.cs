@@ -371,6 +371,9 @@ namespace jcan.CelestialSystems
 
         private void OnDisable()
         {
+            ResolveLocalEnvironmentContext();
+            localEnvironmentContext?.ClearIfSource(
+                UniverseLocalEnvironmentContext.EnvironmentSource.FreeFlightLock);
             ClearActiveInput();
             UnsubscribeFromDebugMenu();
 
