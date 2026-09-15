@@ -476,39 +476,6 @@ namespace jcan.CelestialSystems
                     prototypeCastShadows;
             }
 
-            if (filter != null)
-            {
-                filter.sharedMesh =
-                    family.MeshVariants.Count > 0
-                        ? family.MeshVariants[
-                            GetVariantIndex(
-                                definition,
-                                cell,
-                                2u,
-                                family.MeshVariants.Count)]
-                        : CelestialRingProceduralMeshes
-                            .GetMesh(
-                                family.Kind,
-                                CelestialRingSampling
-                                    .GetStableCellHash(
-                                        definition.GenerationSeed,
-                                        definition.DefinitionId,
-                                        cell,
-                                        10u));
-            }
-
-            if (renderer != null &&
-                family.MaterialVariants.Count > 0)
-            {
-                renderer.sharedMaterial =
-                    family.MaterialVariants[
-                        GetVariantIndex(
-                            definition,
-                            cell,
-                            3u,
-                            family.MaterialVariants.Count)];
-            }
-
             var diameter =
                 Mathf.Lerp(
                     family.MinimumDiameterMeters,
@@ -525,6 +492,69 @@ namespace jcan.CelestialSystems
                     0.05f,
                     sample.ParticleScale) *
                 prototypeVisualScaleMultiplier;
+            var sourceRequest = new CelestialRingBodyRequest
+            {
+                Seed = CelestialRingSampling.GetStableCellHash(
+                    definition.GenerationSeed,
+                    definition.DefinitionId,
+                    cell,
+                    10u),
+                FamilyKind = family.Kind,
+                NominalDiameterMeters = diameter
+            };
+            var resolvedBySource =
+                family.BodySource != null &&
+                family.BodySource.TryResolve(
+                    sourceRequest,
+                    out var sourceBody) &&
+                sourceBody.HasVisual;
+            var hasExplicitMaterial =
+                resolvedBySource &&
+                sourceBody.Material != null;
+
+            if (filter != null)
+            {
+                filter.sharedMesh =
+                    resolvedBySource &&
+                    sourceBody.Mesh != null
+                        ? sourceBody.Mesh
+                        : family.MeshVariants.Count > 0
+                            ? family.MeshVariants[
+                                GetVariantIndex(
+                                    definition,
+                                    cell,
+                                    2u,
+                                    family.MeshVariants.Count)]
+                            : CelestialRingProceduralMeshes
+                                .GetMesh(
+                                    family.Kind,
+                                    sourceRequest.Seed);
+            }
+
+            if (renderer != null)
+            {
+                if (hasExplicitMaterial)
+                {
+                    renderer.sharedMaterial =
+                        sourceBody.Material;
+                }
+                else if (family.MaterialVariants.Count > 0)
+                {
+                    renderer.sharedMaterial =
+                        family.MaterialVariants[
+                            GetVariantIndex(
+                                definition,
+                                cell,
+                                3u,
+                                family.MaterialVariants.Count)];
+                    hasExplicitMaterial = true;
+                }
+            }
+
+            if (resolvedBySource)
+            {
+                diameter *= sourceBody.SafeDiameterMultiplier;
+            }
             instance.transform.localPosition =
                 localPosition;
             instance.transform.localRotation =
@@ -540,6 +570,7 @@ namespace jcan.CelestialSystems
                 ConfigureMaterialProperties(
                     renderer,
                     family,
+                    hasExplicitMaterial,
                     sample,
                     definition,
                     cell);
@@ -549,6 +580,7 @@ namespace jcan.CelestialSystems
         private void ConfigureMaterialProperties(
             MeshRenderer renderer,
             CelestialRingObjectFamily family,
+            bool hasExplicitMaterial,
             CelestialRingSample sample,
             CelestialBodyDefinition definition,
             CelestialRingPolarCell cell)
@@ -557,7 +589,7 @@ namespace jcan.CelestialSystems
                 new MaterialPropertyBlock();
             materialProperties.Clear();
 
-            if (family.MaterialVariants.Count == 0)
+            if (!hasExplicitMaterial)
             {
                 materialProperties.SetColor(
                     "_BaseColor",
