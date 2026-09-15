@@ -214,18 +214,25 @@ namespace jcan.CelestialSystems
                 radiusMeters /
                 microstructure.PrimarySpacingMeters +
                 microstructure.Phase;
+            var warped =
+                primary +
+                (EvaluateValueNoise(
+                    primary * 0.075 +
+                    microstructure.Phase * 0.173,
+                    microstructure.Phase) - 0.5) *
+                6.5;
             var secondary =
-                primary /
+                warped /
                 Math.Max(
                     0.0001,
                     microstructure.SecondarySpacingRatio);
             var tertiary =
-                primary /
+                warped /
                 Math.Max(
                     0.0001,
                     microstructure.TertiarySpacingRatio);
             var signal =
-                (Math.Sin(primary) +
+                (Math.Sin(warped) +
                     0.52 * Math.Sin(
                         secondary + microstructure.Phase * 1.73) +
                     0.24 * Math.Sin(
@@ -243,6 +250,40 @@ namespace jcan.CelestialSystems
                         (float)microstructure.Contrast),
                 1.0f,
                 ringlet);
+        }
+
+
+        private static double EvaluateValueNoise(
+            double coordinate,
+            double seed)
+        {
+            var cell =
+                Math.Floor(coordinate);
+            var blend =
+                coordinate - cell;
+            blend =
+                blend * blend *
+                (3.0 - 2.0 * blend);
+            var left =
+                HashNoise(cell, seed);
+            var right =
+                HashNoise(cell + 1.0, seed);
+            return left +
+                (right - left) *
+                blend;
+        }
+
+        private static double HashNoise(
+            double cell,
+            double seed)
+        {
+            var value =
+                Math.Sin(
+                    cell * 127.1 +
+                    seed * 311.7) *
+                43758.5453123;
+            return value -
+                Math.Floor(value);
         }
 
         public static uint GetStableCellHash(
