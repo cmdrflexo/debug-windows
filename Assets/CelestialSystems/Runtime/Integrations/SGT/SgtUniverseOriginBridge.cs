@@ -67,11 +67,7 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (floatingCamera.transform.position.magnitude >
-                floatingCamera.SnapDistance)
-            {
-                floatingCamera.Snap();
-            }
+            SnapIfBeyondDistance();
         }
 
         private void OnDisable()
@@ -113,7 +109,10 @@ namespace jcan.CelestialSystems
 
             floatingCamera.Position = targetPosition;
             ResolvePoseRotationSource().rotation = pose.Rotation;
-            floatingCamera.Snap();
+
+            // Tracking a time-driven body updates its pose every frame. Snapping
+            // unconditionally here causes a no-op origin shift on every update.
+            SnapIfBeyondDistance();
             return true;
         }
 
@@ -181,6 +180,15 @@ namespace jcan.CelestialSystems
             if (TryShiftOrigin(originAdvanceMeters, sceneDelta))
             {
                 previousSnappedPoint = currentSnappedPoint;
+            }
+        }
+
+        private void SnapIfBeyondDistance()
+        {
+            if (floatingCamera.transform.position.magnitude >
+                floatingCamera.SnapDistance)
+            {
+                floatingCamera.Snap();
             }
         }
 
