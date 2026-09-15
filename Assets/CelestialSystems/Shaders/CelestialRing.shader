@@ -271,16 +271,18 @@ Shader "jcan/Celestial Systems/Celestial Ring"
 
                 // Fade unresolved rings to their mean coverage to prevent
                 // sub-pixel stripes from producing a distant moire pattern.
+                // Secondary and tertiary layers are intentionally much
+                // finer than the main ringlet spacing. Filtering against their
+                // footprint erased every line, so retain the primary rhythm and
+                // fade it only when several primary bands cross one pixel.
                 float footprint =
-                    max(
-                        fwidth(warped),
-                        max(
-                            fwidth(secondary),
-                            fwidth(tertiary)));
+                    fwidth(warped);
                 float resolved =
-                    saturate(
-                        1.0 -
-                        footprint * 1.2);
+                    1.0 -
+                    smoothstep(
+                        1.5,
+                        8.0,
+                        footprint);
                 float coverage =
                     lerp(
                         0.5,
