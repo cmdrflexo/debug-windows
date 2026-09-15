@@ -1442,6 +1442,9 @@ namespace jcan.CelestialSystems
 
         private static void CaptureNavigationMode(SavedView view)
         {
+            view.hasFreeFeatureLock = false;
+            view.freeFeatureLockInstanceId = string.Empty;
+
             var modeController =
                 FindFirstObjectByType<UniverseCameraModeController>();
             if (modeController == null)
@@ -1452,8 +1455,6 @@ namespace jcan.CelestialSystems
 
             view.hasNavigationMode = true;
             view.navigationMode = (int)modeController.Mode;
-            view.hasFreeFeatureLock = false;
-            view.freeFeatureLockInstanceId = string.Empty;
 
             if (modeController.Mode !=
                 UniverseCameraModeController.NavigationMode.Free)
