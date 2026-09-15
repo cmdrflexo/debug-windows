@@ -33,6 +33,25 @@ namespace jcan.CelestialSystems
                 Vector3.zero,
                 Vector3.forward * 0.7f);
 
+            // Use world-space meters for streaming-distance reference rings.
+            Gizmos.matrix = Matrix4x4.identity;
+            Gizmos.color = new Color(
+                gizmoColor.r,
+                gizmoColor.g,
+                gizmoColor.b,
+                0.8f);
+            Gizmos.DrawWireSphere(
+                transform.position,
+                1000.0f);
+            Gizmos.color = new Color(
+                gizmoColor.r,
+                gizmoColor.g,
+                gizmoColor.b,
+                0.35f);
+            Gizmos.DrawWireSphere(
+                transform.position,
+                10000.0f);
+
             Gizmos.matrix = previousMatrix;
             Gizmos.color = previousColor;
         }
