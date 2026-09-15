@@ -5,6 +5,9 @@
  */
 
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace jcan.CelestialSystems
 {
@@ -49,6 +52,8 @@ namespace jcan.CelestialSystems
         [SerializeField, HideInInspector]
         private Mesh previewMesh;
 
+        private bool isValidating;
+
         public uint Seed => seed;
 
         private void OnEnable()
@@ -58,6 +63,7 @@ namespace jcan.CelestialSystems
 
         private void OnValidate()
         {
+            isValidating = true;
             subdivisions = Mathf.Clamp(subdivisions, 0, 4);
             physicalSizeMeters = Mathf.Max(0.01f, physicalSizeMeters);
             axisScale = new Vector3(
@@ -65,6 +71,7 @@ namespace jcan.CelestialSystems
                 Mathf.Max(0.05f, axisScale.y),
                 Mathf.Max(0.05f, axisScale.z));
             Rebuild();
+            isValidating = false;
         }
 
         private void OnDisable()
@@ -121,16 +128,38 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            var meshToRelease = previewMesh;
             var meshFilter = GetComponent<MeshFilter>();
-            if (meshFilter != null && meshFilter.sharedMesh == previewMesh)
+            if (meshFilter != null && meshFilter.sharedMesh == meshToRelease)
             {
                 meshFilter.sharedMesh = null;
             }
 
-            // This method is called by OnValidate as well as normal editor
-            // actions. Unity forbids DestroyImmediate from that callback.
-            Destroy(previewMesh);
             previewMesh = null;
+
+            if (Application.isPlaying)
+            {
+                Destroy(meshToRelease);
+                return;
+            }
+
+#if UNITY_EDITOR
+            if (isValidating)
+            {
+                // DestroyImmediate is correct for editor-only temporary assets,
+                // but Unity forbids it inside OnValidate itself.
+                EditorApplication.delayCall += () =>
+                {
+                    if (meshToRelease != null)
+                    {
+                        DestroyImmediate(meshToRelease);
+                    }
+                };
+                return;
+            }
+#endif
+
+            DestroyImmediate(meshToRelease);
         }
     }
 }
