@@ -1,6 +1,7 @@
 /*
- * Prototype close-range ring-object streamer. It proves deterministic cell
- * placement, family selection, and camera-local lifecycle before GPU instancing.
+ * Prototype close-range ring-object streamer. It queries only meter-scale
+ * polar cells near the camera, proving deterministic placement and selection
+ * before the same data is moved to GPU-instanced rendering.
  */
 
 using System.Collections.Generic;
@@ -20,14 +21,10 @@ namespace jcan.CelestialSystems
 
         [Header("Prototype Cell Resolution")]
         [SerializeField]
-        [Range(1, 512)]
-        private int radialCellCount =
-            64;
-
-        [SerializeField]
-        [Range(4, 2048)]
-        private int angularCellCount =
-            256;
+        [Min(1.0f)]
+        [Tooltip("Target radial and outer-edge arc length for one candidate cell.")]
+        private float targetCellSizeMeters =
+            100.0f;
 
         [SerializeField]
         [Range(0.0f, 1.0f)]
@@ -75,7 +72,8 @@ namespace jcan.CelestialSystems
 
         private void OnEnable()
         {
-            nextRefreshTime = 0.0f;
+            nextRefreshTime =
+                0.0f;
         }
 
         private void OnDisable()
@@ -85,27 +83,34 @@ namespace jcan.CelestialSystems
 
         private void OnValidate()
         {
-            radialCellCount =
-                Mathf.Clamp(radialCellCount, 1, 512);
-            angularCellCount =
-                Mathf.Clamp(angularCellCount, 4, 2048);
+            targetCellSizeMeters =
+                Mathf.Max(
+                    1.0f,
+                    targetCellSizeMeters);
             minimumPopulation =
-                Mathf.Clamp01(minimumPopulation);
+                Mathf.Clamp01(
+                    minimumPopulation);
             streamingRadiusMeters =
-                Mathf.Max(1.0f, streamingRadiusMeters);
+                Mathf.Max(
+                    1.0f,
+                    streamingRadiusMeters);
             refreshIntervalSeconds =
-                Mathf.Max(0.05f, refreshIntervalSeconds);
+                Mathf.Max(
+                    0.05f,
+                    refreshIntervalSeconds);
         }
 
         private void Update()
         {
-            if (Time.time < nextRefreshTime)
+            if (Time.time <
+                nextRefreshTime)
             {
                 return;
             }
 
             nextRefreshTime =
-                Time.time + refreshIntervalSeconds;
+                Time.time +
+                refreshIntervalSeconds;
             RefreshObjects();
         }
 
@@ -136,11 +141,15 @@ namespace jcan.CelestialSystems
 
             refreshedKeys.Clear();
             candidateCellCount = 0;
-            var definition = body.Definition;
+            var definition =
+                body.Definition;
             var orientation =
                 Quaternion.FromToRotation(
                     Vector3.up,
                     definition.NorthAxis.normalized);
+            var cameraLocal =
+                body.VisualRoot.InverseTransformPoint(
+                    camera.transform.position);
             var bandCount =
                 Mathf.Min(
                     definition.RingBandInnerRadiiMeters.Count,
@@ -150,25 +159,119 @@ namespace jcan.CelestialSystems
                 bandIndex < bandCount;
                 bandIndex++)
             {
-                RefreshBand(
+                RefreshNearbyBandCells(
                     definition,
                     camera,
                     orientation,
+                    cameraLocal,
                     bandIndex);
             }
 
             RemoveStaleObjects();
-            activeObjectCount = activeObjects.Count;
+            activeObjectCount =
+                activeObjects.Count;
         }
 
-        private void RefreshBand(
+        private void RefreshNearbyBandCells(
             CelestialBodyDefinition definition,
             Camera camera,
             Quaternion orientation,
+            Vector3 cameraLocal,
             int bandIndex)
         {
-            for (var radialIndex = 0;
-                radialIndex < radialCellCount;
+            var innerRadius =
+                definition.RingBandInnerRadiiMeters[
+                    bandIndex];
+            var outerRadius =
+                definition.RingBandOuterRadiiMeters[
+                    bandIndex];
+
+            if (outerRadius <=
+                    innerRadius ||
+                outerRadius >
+                    float.MaxValue)
+            {
+                return;
+            }
+
+            var bandWidth =
+                (float)(outerRadius -
+                    innerRadius);
+            var radialCellCount =
+                Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        bandWidth /
+                        targetCellSizeMeters));
+            var radialStep =
+                bandWidth /
+                radialCellCount;
+            var angularCellCount =
+                Mathf.Max(
+                    4,
+                    Mathf.CeilToInt(
+                        Mathf.PI *
+                        2.0f *
+                        (float)outerRadius /
+                        targetCellSizeMeters));
+            var ringSpaceCamera =
+                Quaternion.Inverse(
+                    orientation) *
+                cameraLocal;
+            var cameraRadius =
+                new Vector2(
+                    ringSpaceCamera.x,
+                    ringSpaceCamera.z)
+                    .magnitude;
+            var cameraAngle =
+                Mathf.Atan2(
+                    ringSpaceCamera.z,
+                    ringSpaceCamera.x);
+
+            if (cameraAngle < 0.0f)
+            {
+                cameraAngle +=
+                    Mathf.PI * 2.0f;
+            }
+
+            var radialCenter =
+                Mathf.FloorToInt(
+                    (cameraRadius -
+                        (float)innerRadius) /
+                    radialStep);
+            var radialRange =
+                Mathf.CeilToInt(
+                    streamingRadiusMeters /
+                    radialStep) + 1;
+            var angularStep =
+                Mathf.PI * 2.0f /
+                angularCellCount;
+            var angularCenter =
+                Mathf.FloorToInt(
+                    cameraAngle /
+                    angularStep);
+            var angularRange =
+                Mathf.CeilToInt(
+                    streamingRadiusMeters /
+                    Mathf.Max(
+                        cameraRadius,
+                        (float)innerRadius) /
+                    angularStep) + 1;
+            var radialFirst =
+                Mathf.Max(
+                    0,
+                    radialCenter -
+                    radialRange);
+            var radialLast =
+                Mathf.Min(
+                    radialCellCount - 1,
+                    radialCenter +
+                    radialRange);
+
+            for (var radialIndex =
+                    radialFirst;
+                radialIndex <=
+                    radialLast;
                 radialIndex++)
             {
                 var radiusFraction =
@@ -184,10 +287,17 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
-                for (var angularIndex = 0;
-                    angularIndex < angularCellCount;
-                    angularIndex++)
+                for (var angularOffset =
+                        -angularRange;
+                    angularOffset <=
+                        angularRange;
+                    angularOffset++)
                 {
+                    var angularIndex =
+                        WrapIndex(
+                            angularCenter +
+                            angularOffset,
+                            angularCellCount);
                     var cell =
                         new CelestialRingPolarCell(
                             bandIndex,
@@ -197,7 +307,8 @@ namespace jcan.CelestialSystems
                         GetCellLocalPosition(
                             orientation,
                             sample,
-                            cell);
+                            cell,
+                            angularCellCount);
                     var worldPosition =
                         body.VisualRoot.TransformPoint(
                             localPosition);
@@ -212,24 +323,21 @@ namespace jcan.CelestialSystems
                     }
 
                     candidateCellCount++;
-                    var occupancy = CelestialRingSampling
-                        .HashToUnitFloat(
-                            CelestialRingSampling
-                                .GetStableCellHash(
-                                    definition.GenerationSeed,
-                                    definition.DefinitionId,
-                                    cell,
-                                    0u));
+                    var occupancy =
+                        CelestialRingSampling
+                            .HashToUnitFloat(
+                                CelestialRingSampling
+                                    .GetStableCellHash(
+                                        definition.GenerationSeed,
+                                        definition.DefinitionId,
+                                        cell,
+                                        0u));
 
                     if (sample.Population <
                             minimumPopulation ||
                         occupancy >=
-                            sample.Population)
-                    {
-                        continue;
-                    }
-
-                    if (!objectSet.TrySelectFamily(
+                            sample.Population ||
+                        !objectSet.TrySelectFamily(
                             sample,
                             CelestialRingSampling
                                 .HashToUnitFloat(
@@ -246,8 +354,12 @@ namespace jcan.CelestialSystems
                     }
 
                     var key =
-                        GetCellKey(cell);
-                    refreshedKeys.Add(key);
+                        GetCellKey(
+                            cell,
+                            radialCellCount,
+                            angularCellCount);
+                    refreshedKeys.Add(
+                        key);
                     CreateOrRefreshObject(
                         key,
                         family,
@@ -262,7 +374,8 @@ namespace jcan.CelestialSystems
         private Vector3 GetCellLocalPosition(
             Quaternion orientation,
             CelestialRingSample sample,
-            CelestialRingPolarCell cell)
+            CelestialRingPolarCell cell,
+            int angularCellCount)
         {
             var angle =
                 (cell.AngularIndex +
@@ -277,19 +390,21 @@ namespace jcan.CelestialSystems
                 angularCellCount *
                 Mathf.PI *
                 2.0f;
-            var direction = orientation *
+            var direction =
+                orientation *
                 new Vector3(
                     Mathf.Cos(angle),
                     0.0f,
                     Mathf.Sin(angle));
             var verticalOffset =
-                (CelestialRingSampling.HashToUnitFloat(
-                    CelestialRingSampling
-                        .GetStableCellHash(
-                            body.Definition.GenerationSeed,
-                            body.Definition.DefinitionId,
-                            cell,
-                            5u)) - 0.5f) *
+                (CelestialRingSampling
+                    .HashToUnitFloat(
+                        CelestialRingSampling
+                            .GetStableCellHash(
+                                body.Definition.GenerationSeed,
+                                body.Definition.DefinitionId,
+                                cell,
+                                5u)) - 0.5f) *
                 sample.VerticalThicknessMeters;
 
             return direction *
@@ -327,21 +442,10 @@ namespace jcan.CelestialSystems
                     Destroy(collider);
                 }
 
-                activeObjects[key] = instance;
+                activeObjects[key] =
+                    instance;
             }
 
-            var meshIndex =
-                GetVariantIndex(
-                    definition,
-                    cell,
-                    2u,
-                    family.MeshVariants.Count);
-            var materialIndex =
-                GetVariantIndex(
-                    definition,
-                    cell,
-                    3u,
-                    family.MaterialVariants.Count);
             var filter =
                 instance.GetComponent<MeshFilter>();
             var renderer =
@@ -351,27 +455,41 @@ namespace jcan.CelestialSystems
                 family.MeshVariants.Count > 0)
             {
                 filter.sharedMesh =
-                    family.MeshVariants[meshIndex];
+                    family.MeshVariants[
+                        GetVariantIndex(
+                            definition,
+                            cell,
+                            2u,
+                            family.MeshVariants.Count)];
             }
 
             if (renderer != null &&
                 family.MaterialVariants.Count > 0)
             {
                 renderer.sharedMaterial =
-                    family.MaterialVariants[materialIndex];
+                    family.MaterialVariants[
+                        GetVariantIndex(
+                            definition,
+                            cell,
+                            3u,
+                            family.MaterialVariants.Count)];
             }
 
-            var diameter = Mathf.Lerp(
-                family.MinimumDiameterMeters,
-                family.MaximumDiameterMeters,
-                CelestialRingSampling.HashToUnitFloat(
+            var diameter =
+                Mathf.Lerp(
+                    family.MinimumDiameterMeters,
+                    family.MaximumDiameterMeters,
                     CelestialRingSampling
-                        .GetStableCellHash(
-                            definition.GenerationSeed,
-                            definition.DefinitionId,
-                            cell,
-                            6u))) *
-                Mathf.Max(0.05f, sample.ParticleScale);
+                        .HashToUnitFloat(
+                            CelestialRingSampling
+                                .GetStableCellHash(
+                                    definition.GenerationSeed,
+                                    definition.DefinitionId,
+                                    cell,
+                                    6u))) *
+                Mathf.Max(
+                    0.05f,
+                    sample.ParticleScale);
             instance.transform.localPosition =
                 localPosition;
             instance.transform.localRotation =
@@ -379,7 +497,8 @@ namespace jcan.CelestialSystems
                     definition,
                     cell);
             instance.transform.localScale =
-                Vector3.one * diameter;
+                Vector3.one *
+                diameter;
 
             if (renderer != null &&
                 family.MaterialVariants.Count == 0)
@@ -392,7 +511,8 @@ namespace jcan.CelestialSystems
                 block.SetColor(
                     "_Color",
                     sample.Albedo);
-                renderer.SetPropertyBlock(block);
+                renderer.SetPropertyBlock(
+                    block);
             }
         }
 
@@ -401,24 +521,30 @@ namespace jcan.CelestialSystems
             CelestialRingPolarCell cell)
         {
             return Quaternion.Euler(
-                CelestialRingSampling.HashToUnitFloat(
-                    CelestialRingSampling.GetStableCellHash(
-                        definition.GenerationSeed,
-                        definition.DefinitionId,
-                        cell,
-                        7u)) * 360.0f,
-                CelestialRingSampling.HashToUnitFloat(
-                    CelestialRingSampling.GetStableCellHash(
-                        definition.GenerationSeed,
-                        definition.DefinitionId,
-                        cell,
-                        8u)) * 360.0f,
-                CelestialRingSampling.HashToUnitFloat(
-                    CelestialRingSampling.GetStableCellHash(
-                        definition.GenerationSeed,
-                        definition.DefinitionId,
-                        cell,
-                        9u)) * 360.0f);
+                CelestialRingSampling
+                    .HashToUnitFloat(
+                        CelestialRingSampling
+                            .GetStableCellHash(
+                                definition.GenerationSeed,
+                                definition.DefinitionId,
+                                cell,
+                                7u)) * 360.0f,
+                CelestialRingSampling
+                    .HashToUnitFloat(
+                        CelestialRingSampling
+                            .GetStableCellHash(
+                                definition.GenerationSeed,
+                                definition.DefinitionId,
+                                cell,
+                                8u)) * 360.0f,
+                CelestialRingSampling
+                    .HashToUnitFloat(
+                        CelestialRingSampling
+                            .GetStableCellHash(
+                                definition.GenerationSeed,
+                                definition.DefinitionId,
+                                cell,
+                                9u)) * 360.0f);
         }
 
         private static int GetVariantIndex(
@@ -444,13 +570,36 @@ namespace jcan.CelestialSystems
         }
 
         private static int GetCellKey(
-            CelestialRingPolarCell cell)
+            CelestialRingPolarCell cell,
+            int radialCellCount,
+            int angularCellCount)
         {
-            return cell.BandIndex *
-                    1048576 +
-                cell.RadialIndex *
-                    2048 +
-                cell.AngularIndex;
+            unchecked
+            {
+                var hash =
+                    17;
+                hash = hash * 31 +
+                    cell.BandIndex;
+                hash = hash * 31 +
+                    radialCellCount;
+                hash = hash * 31 +
+                    angularCellCount;
+                hash = hash * 31 +
+                    cell.RadialIndex;
+                return hash * 31 +
+                    cell.AngularIndex;
+            }
+        }
+
+        private static int WrapIndex(
+            int index,
+            int count)
+        {
+            var result =
+                index % count;
+            return result < 0
+                ? result + count
+                : result;
         }
 
         private void RemoveStaleObjects()
@@ -465,10 +614,12 @@ namespace jcan.CelestialSystems
                 {
                     if (pair.Value != null)
                     {
-                        Destroy(pair.Value);
+                        Destroy(
+                            pair.Value);
                     }
 
-                    staleKeys.Add(pair.Key);
+                    staleKeys.Add(
+                        pair.Key);
                 }
             }
 
@@ -487,7 +638,8 @@ namespace jcan.CelestialSystems
             {
                 if (pair.Value != null)
                 {
-                    Destroy(pair.Value);
+                    Destroy(
+                        pair.Value);
                 }
             }
 
