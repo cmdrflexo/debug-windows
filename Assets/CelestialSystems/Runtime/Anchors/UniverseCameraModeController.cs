@@ -44,6 +44,8 @@ namespace jcan.CelestialSystems
         [SerializeField] private InputActionReference rollAction;
         [Tooltip("Free-mode nearest feature lock (default: L).")]
         [SerializeField] private InputActionReference lockNearestFeatureAction;
+        [Tooltip("Held Free-mode optical zoom (default: right mouse button).")]
+        [SerializeField] private InputActionReference freeZoomAction;
 
         [Header("Free Movement Defaults")]
         [Tooltip("Existing input references on FreeUniverseAnchorController take precedence.")]
@@ -104,6 +106,11 @@ namespace jcan.CelestialSystems
                 "Lock Nearest Feature",
                 InputActionType.Button,
                 "<Keyboard>/l");
+            freeZoomAction = Resolve(
+                freeZoomAction,
+                "Free Zoom",
+                InputActionType.Button,
+                "<Mouse>/rightButton");
             if (ownedReferences.Contains(rollAction))
                 rollAction.action.AddCompositeBinding("1DAxis")
                     .With("Negative", "<Keyboard>/q").With("Positive", "<Keyboard>/e");
@@ -120,7 +127,8 @@ namespace jcan.CelestialSystems
             boostAction = Resolve(boostAction, "Free Boost", InputActionType.Button, "<Keyboard>/leftShift");
             freeFlight.ConfigureSharedRig(anchorBridge, viewCamera.transform,
                 moveAction, verticalAction, speedAction, boostAction,
-                lookDeltaAction, rollAction, lockNearestFeatureAction);
+                lookDeltaAction, rollAction, lockNearestFeatureAction,
+                freeZoomAction);
             initialized = true;
         }
 
