@@ -3,6 +3,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using CW.Common;
 using jcan.DebugWindows;
 using UnityEngine;
@@ -83,6 +84,21 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("Button action that toggles tracking of the nearest body or ring owner.")]
         private InputActionReference lockNearestFeatureAction;
+
+        [Header("Camera Zoom")]
+        [SerializeField]
+        [Tooltip("Held action that narrows both the Main Camera and its child far camera.")]
+        private InputActionReference zoomAction;
+
+        [SerializeField]
+        [Tooltip("Optical magnification while the zoom action is held.")]
+        [Min(1.0f)]
+        private float zoomMagnification = 10.0f;
+
+        [SerializeField]
+        [Tooltip("How quickly camera field of view settles on the zoomed value.")]
+        [Min(0.0f)]
+        private float zoomResponse = 20.0f;
 
         [SerializeField, Min(0.0f)]
         private float lookDegreesPerPixel = 0.2f;
@@ -226,7 +242,8 @@ namespace jcan.CelestialSystems
             InputActionReference move, InputActionReference vertical,
             InputActionReference speed, InputActionReference boost,
             InputActionReference lookDelta, InputActionReference roll,
-            InputActionReference lockNearestFeature)
+            InputActionReference lockNearestFeature,
+            InputActionReference zoom)
         {
             poseBridge = bridge;
             universeFrame = bridge.UniverseFrame;
@@ -239,6 +256,8 @@ namespace jcan.CelestialSystems
             if (rollAction == null) rollAction = roll;
             if (lockNearestFeatureAction == null)
                 lockNearestFeatureAction = lockNearestFeature;
+            if (zoomAction == null) zoomAction = zoom;
+            CaptureZoomCameras();
             ClearActiveInput();
         }
         private bool enabledMoveAction;
@@ -248,6 +267,9 @@ namespace jcan.CelestialSystems
         private bool enabledLookDeltaAction;
         private bool enabledRollAction;
         private bool enabledLockNearestFeatureAction;
+        private bool enabledZoomAction;
+        private readonly List<CameraZoomState> zoomCameras =
+            new List<CameraZoomState>();
         private DebugWindowManager subscribedDebugWindowManager;
         private bool debugMenuVisible;
 
@@ -294,6 +316,10 @@ namespace jcan.CelestialSystems
             resolvedSpeed *
             moveSpeedMultiplier *
             currentBoostMultiplier;
+
+        public bool IsZooming =>
+            !debugMenuVisible && zoomAction != null &&
+            zoomAction.action != null && zoomAction.action.IsPressed();
 
         // Capture one cruise ceiling per transition into Free mode. Nearest
         // feature changes can brake the camera, but never recalculate this
@@ -356,6 +382,10 @@ namespace jcan.CelestialSystems
             enabledLockNearestFeatureAction =
                 EnableAction(
                     lockNearestFeatureAction);
+            enabledZoomAction =
+                EnableAction(
+                    zoomAction);
+            CaptureZoomCameras();
 
             if (speedMultiplierAction != null &&
                 speedMultiplierAction.action != null)
@@ -408,6 +438,10 @@ namespace jcan.CelestialSystems
             DisableAction(
                 lockNearestFeatureAction,
                 enabledLockNearestFeatureAction);
+            DisableAction(
+                zoomAction,
+                enabledZoomAction);
+            RestoreCameraZoom();
 
             enabledMoveAction = false;
             enabledVerticalAction = false;
@@ -416,8 +450,8 @@ namespace jcan.CelestialSystems
             enabledLookDeltaAction = false;
             enabledRollAction = false;
             enabledLockNearestFeatureAction = false;
+            enabledZoomAction = false;
             currentBoostMultiplier = 1.0f;
-            ClearFeatureLock();
             hasAutomaticCruiseSpeed = false;
             automaticCruiseSpeedMetersPerSecond = 0.0f;
         }
@@ -436,6 +470,8 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.01f,
                     initialFeatureTravelSeconds);
+            zoomMagnification = Mathf.Max(1.0f, zoomMagnification);
+            zoomResponse = Mathf.Max(0.0f, zoomResponse);
             maximumBoostMultiplier =
                 Mathf.Max(
                     1.0f,
@@ -526,6 +562,8 @@ namespace jcan.CelestialSystems
             {
                 DampenDelta();
             }
+
+            UpdateCameraZoom(Time.unscaledDeltaTime);
         }
 
         public void ToggleNearestFeatureLock()
@@ -812,6 +850,100 @@ namespace jcan.CelestialSystems
                     0.000001f,
                     moveSpeedMultiplier *
                         multiplierChange);
+        }
+
+        private void CaptureZoomCameras()
+        {
+            zoomCameras.Clear();
+            var root = movementReference != null
+                ? movementReference
+                : Camera.main != null
+                    ? Camera.main.transform
+                    : null;
+            if (root == null)
+            {
+                return;
+            }
+
+            var cameras = root.GetComponentsInChildren<Camera>(true);
+            foreach (var camera in cameras)
+            {
+                if (camera == null || camera.orthographic)
+                {
+                    continue;
+                }
+
+                zoomCameras.Add(new CameraZoomState
+                {
+                    Camera = camera,
+                    BaseFieldOfView = camera.fieldOfView
+                });
+            }
+        }
+
+        private void UpdateCameraZoom(float deltaTime)
+        {
+            if (zoomCameras.Count == 0)
+            {
+                CaptureZoomCameras();
+            }
+
+            var zooming = IsZooming;
+            var blend = zoomResponse <= Mathf.Epsilon
+                ? 1.0f
+                : 1.0f - Mathf.Exp(-zoomResponse * deltaTime);
+
+            for (var index = zoomCameras.Count - 1; index >= 0; index--)
+            {
+                var state = zoomCameras[index];
+                if (state.Camera == null)
+                {
+                    zoomCameras.RemoveAt(index);
+                    continue;
+                }
+
+                var targetFov = zooming
+                    ? GetMagnifiedFieldOfView(
+                        state.BaseFieldOfView,
+                        zoomMagnification)
+                    : state.BaseFieldOfView;
+                state.Camera.fieldOfView = Mathf.Lerp(
+                    state.Camera.fieldOfView,
+                    targetFov,
+                    blend);
+            }
+        }
+
+        private void RestoreCameraZoom()
+        {
+            foreach (var state in zoomCameras)
+            {
+                if (state.Camera != null)
+                {
+                    state.Camera.fieldOfView = state.BaseFieldOfView;
+                }
+            }
+
+            zoomCameras.Clear();
+        }
+
+        private static float GetMagnifiedFieldOfView(
+            float baseFieldOfView,
+            float magnification)
+        {
+            var halfAngleRadians =
+                Mathf.Clamp(baseFieldOfView, 0.01f, 179.0f) *
+                Mathf.Deg2Rad * 0.5f;
+            return 2.0f * Mathf.Atan(
+                Mathf.Tan(halfAngleRadians) /
+                Mathf.Max(1.0f, magnification)) *
+                Mathf.Rad2Deg;
+        }
+
+        private struct CameraZoomState
+        {
+            public Camera Camera;
+            public float BaseFieldOfView;
         }
 
         private static bool EnableAction(
