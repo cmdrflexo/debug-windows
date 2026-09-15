@@ -472,16 +472,25 @@ namespace jcan.CelestialSystems
                     prototypeCastShadows;
             }
 
-            if (filter != null &&
-                family.MeshVariants.Count > 0)
+            if (filter != null)
             {
                 filter.sharedMesh =
-                    family.MeshVariants[
-                        GetVariantIndex(
-                            definition,
-                            cell,
-                            2u,
-                            family.MeshVariants.Count)];
+                    family.MeshVariants.Count > 0
+                        ? family.MeshVariants[
+                            GetVariantIndex(
+                                definition,
+                                cell,
+                                2u,
+                                family.MeshVariants.Count)]
+                        : CelestialRingProceduralMeshes
+                            .GetMesh(
+                                family.Kind,
+                                CelestialRingSampling
+                                    .GetStableCellHash(
+                                        definition.GenerationSeed,
+                                        definition.DefinitionId,
+                                        cell,
+                                        10u));
             }
 
             if (renderer != null &&
