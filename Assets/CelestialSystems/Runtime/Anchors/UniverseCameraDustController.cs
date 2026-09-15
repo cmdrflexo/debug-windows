@@ -28,12 +28,12 @@ namespace jcan.CelestialSystems
 
         [Header("Reference Frame")]
         [SerializeField]
-        [Tooltip("When Free mode is locked to a body, subtract that body's motion before driving dust.")]
-        private bool useLockedBodyReferenceFrame = true;
+        [Tooltip("Shared anchor context that provides the active body or ring reference frame.")]
+        private UniverseLocalEnvironmentContext localEnvironmentContext;
 
         [SerializeField]
-        [Tooltip("Optional body whose motion defines the dust reference frame when no Free-mode lock is active.")]
-        private CelestialBodyRuntimeContext referenceBody;
+        [Tooltip("Optional fallback body used only when the shared context has no valid environment.")]
+        private CelestialBodyRuntimeContext fallbackReferenceBody;
 
         [Header("Speed Visibility")]
         [SerializeField]
@@ -81,7 +81,6 @@ namespace jcan.CelestialSystems
         private CelestialBodyRuntimeContext sampledReferenceBody;
         private bool hasReferenceFrameSample;
         private Vector3 smoothedUniverseVelocity;
-        private FreeUniverseAnchorController freeFlight;
         private float baseEmissionRateMultiplier = 1.0f;
         private bool capturedEmissionRate;
 
@@ -242,9 +241,10 @@ namespace jcan.CelestialSystems
                 poseBridge = FindFirstObjectByType<SgtUniverseOriginBridge>();
             }
 
-            if (freeFlight == null)
+            if (localEnvironmentContext == null)
             {
-                freeFlight = FindFirstObjectByType<FreeUniverseAnchorController>();
+                localEnvironmentContext =
+                    FindFirstObjectByType<UniverseLocalEnvironmentContext>();
             }
         }
 
@@ -252,11 +252,16 @@ namespace jcan.CelestialSystems
             out UniversePosition position,
             out CelestialBodyRuntimeContext body)
         {
-            body = useLockedBodyReferenceFrame && freeFlight != null &&
-                freeFlight.isActiveAndEnabled && freeFlight.IsFeatureLocked
-                ? freeFlight.LockedFeatureBody
-                : referenceBody;
+            if (localEnvironmentContext != null &&
+                localEnvironmentContext.TryGetReferencePosition(out position))
+            {
+                body = localEnvironmentContext.ReferenceBody;
+                activeReferenceFrameName =
+                    localEnvironmentContext.DisplayName;
+                return body != null;
+            }
 
+            body = fallbackReferenceBody;
             if (body != null && body.TryGetMotionState(out var motion))
             {
                 position = motion.Position;
