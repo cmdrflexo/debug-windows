@@ -199,6 +199,8 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private UniverseMotionState lockedFeatureMotion;
 
+        private string pendingFeatureLockInstanceId;
+
         [Header("Runtime Collision")]
         [SerializeField]
         private bool hasCollision;
@@ -512,6 +514,7 @@ namespace jcan.CelestialSystems
             if (poseBridge != null)
             {
                 if (Time.frameCount == activationFrame) return;
+                TryRestorePendingFeatureLock();
                 FollowLockedFeature();
                 UpdateBoostMultiplier(Time.deltaTime);
                 UpdateSpeedState();
@@ -540,7 +543,49 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            lockedFeatureBody = nearestBody;
+            SetFeatureLock(nearestBody, motion);
+        }
+
+        public void RequestFeatureLockRestore(string instanceId)
+        {
+            pendingFeatureLockInstanceId = instanceId ?? string.Empty;
+        }
+
+        private void TryRestorePendingFeatureLock()
+        {
+            if (string.IsNullOrEmpty(pendingFeatureLockInstanceId))
+            {
+                return;
+            }
+
+            foreach (var candidate in CelestialBodyRuntimeContext.ActiveContexts)
+            {
+                if (candidate == null ||
+                    !string.Equals(
+                        candidate.InstanceId,
+                        pendingFeatureLockInstanceId,
+                        StringComparison.Ordinal) ||
+                    !candidate.TryGetMotionState(out var motion))
+                {
+                    continue;
+                }
+
+                pendingFeatureLockInstanceId = string.Empty;
+                SetFeatureLock(candidate, motion);
+                return;
+            }
+        }
+
+        private void SetFeatureLock(
+            CelestialBodyRuntimeContext body,
+            UniverseMotionState motion)
+        {
+            if (body == null)
+            {
+                return;
+            }
+
+            lockedFeatureBody = body;
             lockedFeatureMotion = motion;
             hasLockedFeatureMotion = true;
             ResolveLocalEnvironmentContext();
@@ -610,6 +655,7 @@ namespace jcan.CelestialSystems
         private void ClearFeatureLock()
         {
             lockedFeatureBody = null;
+            pendingFeatureLockInstanceId = string.Empty;
             hasLockedFeatureMotion = false;
             lockedFeatureMotion = default;
             ResolveLocalEnvironmentContext();
