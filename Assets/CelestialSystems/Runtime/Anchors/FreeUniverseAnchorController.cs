@@ -214,6 +214,7 @@ namespace jcan.CelestialSystems
         private GravityEngine gravityEngine;
         private Vector3 remainingDelta;
         private SgtUniverseOriginBridge poseBridge;
+        private UniverseLocalEnvironmentContext localEnvironmentContext;
         private int activationFrame;
 
         // Configure while disabled; the mode owner owns any runtime input references.
@@ -320,11 +321,14 @@ namespace jcan.CelestialSystems
         private void Awake()
         {
             ResolveUniverseFrame();
+            ResolveLocalEnvironmentContext();
         }
 
         private void OnEnable()
         {
             activationFrame = Time.frameCount;
+            ResolveLocalEnvironmentContext();
+            PublishLockedEnvironment();
             ClearActiveInput();
             CwInputManager.EnsureThisComponentExists();
 
@@ -535,6 +539,10 @@ namespace jcan.CelestialSystems
             lockedFeatureBody = nearestBody;
             lockedFeatureMotion = motion;
             hasLockedFeatureMotion = true;
+            ResolveLocalEnvironmentContext();
+            localEnvironmentContext?.SetBody(
+                lockedFeatureBody,
+                UniverseLocalEnvironmentContext.EnvironmentSource.FreeFlightLock);
         }
 
         private void FollowLockedFeature()
@@ -600,6 +608,32 @@ namespace jcan.CelestialSystems
             lockedFeatureBody = null;
             hasLockedFeatureMotion = false;
             lockedFeatureMotion = default;
+            ResolveLocalEnvironmentContext();
+            localEnvironmentContext?.ClearIfSource(
+                UniverseLocalEnvironmentContext.EnvironmentSource.FreeFlightLock);
+        }
+
+        private void ResolveLocalEnvironmentContext()
+        {
+            if (localEnvironmentContext == null)
+            {
+                localEnvironmentContext =
+                    GetComponent<UniverseLocalEnvironmentContext>();
+            }
+        }
+
+        private void PublishLockedEnvironment()
+        {
+            if (lockedFeatureBody == null)
+            {
+                localEnvironmentContext?.ClearIfSource(
+                    UniverseLocalEnvironmentContext.EnvironmentSource.FreeFlightLock);
+                return;
+            }
+
+            localEnvironmentContext?.SetBody(
+                lockedFeatureBody,
+                UniverseLocalEnvironmentContext.EnvironmentSource.FreeFlightLock);
         }
 
         private static DoubleVector3 Rotate(
