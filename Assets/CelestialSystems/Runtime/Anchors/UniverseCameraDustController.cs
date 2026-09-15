@@ -139,11 +139,27 @@ namespace jcan.CelestialSystems
             }
 
             previousPosition = pose.Position;
+            var velocityX = offset.x / deltaTime;
+            var velocityY = offset.y / deltaTime;
+            var velocityZ = offset.z / deltaTime;
+            var rawSpeed = Math.Sqrt(
+                velocityX * velocityX +
+                velocityY * velocityY +
+                velocityZ * velocityZ);
+            rawCameraSpeedMetersPerSecond = (float)Math.Min(
+                rawSpeed,
+                float.MaxValue);
+
+            // Clamp before converting to float. Universe-space teleports or
+            // time-scale jumps can otherwise overflow a Unity Vector3.
+            var visualScale = rawSpeed > maximumVisualSpeedMetersPerSecond &&
+                rawSpeed > double.Epsilon
+                ? maximumVisualSpeedMetersPerSecond / rawSpeed
+                : 1.0;
             var velocity = new Vector3(
-                (float)(offset.x / deltaTime),
-                (float)(offset.y / deltaTime),
-                (float)(offset.z / deltaTime));
-            rawCameraSpeedMetersPerSecond = velocity.magnitude;
+                (float)(velocityX * visualScale),
+                (float)(velocityY * visualScale),
+                (float)(velocityZ * visualScale));
 
             var blend = velocitySmoothingSeconds <= Mathf.Epsilon
                 ? 1.0f
