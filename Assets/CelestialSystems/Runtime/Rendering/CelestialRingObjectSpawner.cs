@@ -502,11 +502,12 @@ namespace jcan.CelestialSystems
                 FamilyKind = family.Kind,
                 NominalDiameterMeters = diameter
             };
+            var sourceBody = default(CelestialRingResolvedBody);
             var resolvedBySource =
                 family.BodySource != null &&
                 family.BodySource.TryResolve(
                     sourceRequest,
-                    out var sourceBody) &&
+                    out sourceBody) &&
                 sourceBody.HasVisual;
             var hasExplicitMaterial =
                 resolvedBySource &&
