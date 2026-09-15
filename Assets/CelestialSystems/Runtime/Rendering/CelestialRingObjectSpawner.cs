@@ -31,6 +31,12 @@ namespace jcan.CelestialSystems
         private float minimumPopulation =
             0.05f;
 
+        [SerializeField]
+        [Min(0.01f)]
+        [Tooltip("Temporary visibility control for placeholder meshes; leave at 1 for physical scale.")]
+        private float prototypeVisualScaleMultiplier =
+            1.0f;
+
         [Header("Streaming")]
         [SerializeField]
         [Min(1.0f)]
@@ -90,6 +96,10 @@ namespace jcan.CelestialSystems
             minimumPopulation =
                 Mathf.Clamp01(
                     minimumPopulation);
+            prototypeVisualScaleMultiplier =
+                Mathf.Max(
+                    0.01f,
+                    prototypeVisualScaleMultiplier);
             streamingRadiusMeters =
                 Mathf.Max(
                     1.0f,
@@ -489,7 +499,8 @@ namespace jcan.CelestialSystems
                                     6u))) *
                 Mathf.Max(
                     0.05f,
-                    sample.ParticleScale);
+                    sample.ParticleScale) *
+                prototypeVisualScaleMultiplier;
             instance.transform.localPosition =
                 localPosition;
             instance.transform.localRotation =
