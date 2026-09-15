@@ -69,8 +69,9 @@ namespace jcan.CelestialSystems
         private readonly Stack<GameObject> pooledObjects =
             new Stack<GameObject>();
 
-        private readonly MaterialPropertyBlock materialProperties =
-            new MaterialPropertyBlock();
+        // Created lazily because an already-instantiated component can survive
+        // a Unity script hot reload with nonserialized runtime fields cleared.
+        private MaterialPropertyBlock materialProperties;
 
         private CelestialBodyRuntimeContext body;
         private float nextRefreshTime;
@@ -552,6 +553,8 @@ namespace jcan.CelestialSystems
             CelestialBodyDefinition definition,
             CelestialRingPolarCell cell)
         {
+            materialProperties ??=
+                new MaterialPropertyBlock();
             materialProperties.Clear();
 
             if (family.MaterialVariants.Count == 0)
