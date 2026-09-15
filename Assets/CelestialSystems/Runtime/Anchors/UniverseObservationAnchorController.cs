@@ -52,6 +52,8 @@ namespace jcan.CelestialSystems
             public UniversePosition cameraPosition;
             public bool hasUniversalTime;
             public double universalTimeSeconds;
+            public bool hasNavigationMode;
+            public int navigationMode;
         }
 
         private SavedView lastRenderedView;
@@ -67,6 +69,8 @@ namespace jcan.CelestialSystems
         private Quaternion retainedRotation;
         private bool holdTransferredPose;
         private UniverseMotionState transferredPose;
+        private bool hasPendingRestoredNavigationMode;
+        private UniverseCameraModeController.NavigationMode pendingRestoredNavigationMode;
         public bool NavigationActive => navigationActive;
         private string ViewPreferenceKey =>
             "CelestialSystems.Observation.LastView.v1." + gameObject.scene.path;
@@ -614,6 +618,8 @@ namespace jcan.CelestialSystems
                 lastRenderedView.hasCameraPosition = true;
                 lastRenderedView.cameraPosition = cameraPosition;
                 CaptureUniversalTime(lastRenderedView);
+            CaptureNavigationMode(lastRenderedView);
+            ApplyPendingRestoredNavigationMode();
             }
         }
 
@@ -1362,6 +1368,14 @@ namespace jcan.CelestialSystems
             // Restore time before querying target motion or applying the saved
             // camera pose, so trajectory bodies occupy the same positions.
             RestoreUniversalTime(saved);
+            if (saved.hasNavigationMode &&
+                saved.navigationMode >= (int)UniverseCameraModeController.NavigationMode.Observer &&
+                saved.navigationMode <= (int)UniverseCameraModeController.NavigationMode.Free)
+            {
+                pendingRestoredNavigationMode =
+                    (UniverseCameraModeController.NavigationMode)saved.navigationMode;
+                hasPendingRestoredNavigationMode = true;
+            }
             originLocked = true;
             selectionController?.LockToOrigin();
             referencePlaneNormal = saved.planeNormal;
@@ -1386,6 +1400,38 @@ namespace jcan.CelestialSystems
             ClearOrbitVelocity();
             viewInitialized = true;
             recenterZoomArmed = false;
+        }
+
+        private void ApplyPendingRestoredNavigationMode()
+        {
+            if (!hasPendingRestoredNavigationMode)
+            {
+                return;
+            }
+
+            var modeController =
+                FindFirstObjectByType<UniverseCameraModeController>();
+            if (modeController == null ||
+                !modeController.SetMode(pendingRestoredNavigationMode))
+            {
+                return;
+            }
+
+            hasPendingRestoredNavigationMode = false;
+        }
+
+        private static void CaptureNavigationMode(SavedView view)
+        {
+            var modeController =
+                FindFirstObjectByType<UniverseCameraModeController>();
+            if (modeController == null)
+            {
+                view.hasNavigationMode = false;
+                return;
+            }
+
+            view.hasNavigationMode = true;
+            view.navigationMode = (int)modeController.Mode;
         }
 
         private static void CaptureUniversalTime(SavedView view)
@@ -1526,6 +1572,7 @@ namespace jcan.CelestialSystems
             lastRenderedView.hasCameraPosition = true;
             lastRenderedView.cameraPosition = pose.Position;
             CaptureUniversalTime(lastRenderedView);
+            CaptureNavigationMode(lastRenderedView);
         }
 
         private void ResolveReferences()
