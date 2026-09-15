@@ -196,6 +196,7 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                 half3 normalWS : TEXCOORD1;
                 float4 shadowCoord : TEXCOORD2;
                 half fogFactor : TEXCOORD3;
+                float3 positionWS : TEXCOORD4;
             };
 
             Varyings IceVertex(
@@ -215,6 +216,8 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                     input.positionOS.xyz;
                 output.normalWS =
                     normalInputs.normalWS;
+                output.positionWS =
+                    positionInputs.positionWS;
                 output.shadowCoord =
                     TransformWorldToShadowCoord(
                         positionInputs.positionWS);
@@ -277,18 +280,40 @@ Shader "jcan/Celestial Systems/Celestial Ring Ice Chunk"
                         _TransmissionColor.rgb *
                         backLight);
 
-                half roughnessDarkening =
+                half3 viewDirection =
+                    SafeNormalize(
+                        GetCameraPositionWS() -
+                        input.positionWS);
+                half3 halfDirection =
+                    SafeNormalize(
+                        mainLight.direction +
+                        viewDirection);
+                half smoothness =
+                    1.0h -
+                    _SurfaceRoughness;
+                half specularExponent =
                     lerp(
-                        1.0h,
-                        0.78h,
-                        _SurfaceRoughness *
-                        (dirt * 0.55h +
-                            mineral * 0.25h));
+                        7.0h,
+                        112.0h,
+                        smoothness);
+                half specular =
+                    pow(
+                        saturate(
+                            dot(
+                                normalWS,
+                                halfDirection)),
+                        specularExponent) *
+                    lerp(
+                        0.28h,
+                        0.035h,
+                        dirt);
                 half3 color =
                     MixFog(
                         baseColor *
-                        lighting *
-                        roughnessDarkening,
+                        lighting +
+                        mainLight.color *
+                        mainLight.shadowAttenuation *
+                        specular,
                         input.fogFactor);
                 half alpha =
                     saturate(
