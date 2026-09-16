@@ -27,9 +27,14 @@ namespace jcan.CelestialSystems
             private int targetReadyCount = 8;
 
             [SerializeField]
-            [Tooltip("The LOD requested while prewarming this tool's ready pool.")]
-            private CelestialSmallBodyLod prewarmLod =
-                CelestialSmallBodyLod.Low;
+            [Tooltip("Lowest LOD included in background prewarming. LOD 0 is normally the billboard representation.")]
+            private CelestialSmallBodyLod minimumPrewarmLod =
+                CelestialSmallBodyLod.Billboard;
+
+            [SerializeField]
+            [Tooltip("Highest LOD included in background prewarming.")]
+            private CelestialSmallBodyLod maximumPrewarmLod =
+                CelestialSmallBodyLod.Detail2;
 
             [SerializeField]
             [Tooltip("Checked-out objects are treated as consumed and replaced instead of returned to the ready pool.")]
@@ -41,8 +46,11 @@ namespace jcan.CelestialSystems
             public int TargetReadyCount =>
                 targetReadyCount;
 
-            public CelestialSmallBodyLod PrewarmLod =>
-                prewarmLod;
+            public CelestialSmallBodyLod MinimumPrewarmLod =>
+                minimumPrewarmLod;
+
+            public CelestialSmallBodyLod MaximumPrewarmLod =>
+                maximumPrewarmLod;
 
             public bool RegenerateAfterCheckout =>
                 regenerateAfterCheckout;
@@ -53,6 +61,53 @@ namespace jcan.CelestialSystems
                     Mathf.Max(
                         0,
                         targetReadyCount);
+                minimumPrewarmLod =
+                    ClampLod(
+                        minimumPrewarmLod);
+                maximumPrewarmLod =
+                    ClampLod(
+                        maximumPrewarmLod);
+
+                if (maximumPrewarmLod <
+                    minimumPrewarmLod)
+                {
+                    maximumPrewarmLod =
+                        minimumPrewarmLod;
+                }
+            }
+
+            public void ClampToToolLods(
+                int lodCount)
+            {
+                var maximumLod =
+                    Mathf.Max(
+                        0,
+                        lodCount - 1);
+                minimumPrewarmLod =
+                    (CelestialSmallBodyLod)Mathf.Min(
+                        (int)minimumPrewarmLod,
+                        maximumLod);
+                maximumPrewarmLod =
+                    (CelestialSmallBodyLod)Mathf.Min(
+                        (int)maximumPrewarmLod,
+                        maximumLod);
+
+                if (maximumPrewarmLod <
+                    minimumPrewarmLod)
+                {
+                    maximumPrewarmLod =
+                        minimumPrewarmLod;
+                }
+            }
+
+            private static CelestialSmallBodyLod ClampLod(
+                CelestialSmallBodyLod lod)
+            {
+                return
+                    (CelestialSmallBodyLod)Mathf.Clamp(
+                        (int)lod,
+                        (int)CelestialSmallBodyLod.Billboard,
+                        (int)CelestialSmallBodyLod.Detail4);
             }
         }
 
@@ -77,6 +132,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private List<ToolPoolConfiguration> toolPools =
             new List<ToolPoolConfiguration>();
+
+        [Header("Registered Tool Sources")]
+        [SerializeField]
+        [Tooltip("Runtime list of the sources currently registered from Tool Pools.")]
+        private List<MonoBehaviour> registeredToolSources =
+            new List<MonoBehaviour>();
 
         [SerializeField]
         [Tooltip("Optional parent used only while a body is waiting in a ready pool.")]
@@ -314,6 +375,7 @@ namespace jcan.CelestialSystems
         private void ResolvePools()
         {
             poolsByToolId.Clear();
+            registeredToolSources.Clear();
             lastError = string.Empty;
 
             foreach (var configuration in toolPools)
@@ -330,10 +392,16 @@ namespace jcan.CelestialSystems
 
                 if (tool == null ||
                     string.IsNullOrWhiteSpace(
-                        tool.ToolId))
+                        tool.ToolId) ||
+                    tool.LodCount <= 0)
                 {
                     continue;
                 }
+
+                configuration.ClampToToolLods(
+                    tool.LodCount);
+                registeredToolSources.Add(
+                    configuration.ToolSource);
 
                 if (poolsByToolId.ContainsKey(
                         tool.ToolId))
@@ -373,7 +441,8 @@ namespace jcan.CelestialSystems
                             pool.Tool.ToolId,
                             NextPrewarmSeed(),
                             false,
-                            pool.Configuration.PrewarmLod);
+                            SelectPrewarmLod(
+                                pool.Configuration));
 
                     if (!TryStartGeneration(
                             pool,
@@ -657,6 +726,24 @@ namespace jcan.CelestialSystems
             poolRoot =
                 root.transform;
             return poolRoot;
+        }
+
+        private CelestialSmallBodyLod SelectPrewarmLod(
+            ToolPoolConfiguration configuration)
+        {
+            var minimum =
+                (int)configuration.MinimumPrewarmLod;
+            var maximum =
+                (int)configuration.MaximumPrewarmLod;
+            var span =
+                Mathf.Max(
+                    1,
+                    maximum - minimum + 1);
+            var selected =
+                minimum +
+                (int)(NextPrewarmSeed() % (uint)span);
+            return
+                (CelestialSmallBodyLod)selected;
         }
 
         private uint NextPrewarmSeed()
