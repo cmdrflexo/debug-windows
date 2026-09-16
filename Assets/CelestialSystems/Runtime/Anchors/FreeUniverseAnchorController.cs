@@ -285,6 +285,9 @@ namespace jcan.CelestialSystems
         public double NearestNavigationFeatureDistanceMeters =>
             nearestNavigationFeatureDistanceMeters;
 
+        public string NearestNavigationFeatureName =>
+            nearestNavigationFeatureName;
+
         public double NearestNavigationFeatureScaleMeters =>
             nearestNavigationFeatureScaleMeters;
 
