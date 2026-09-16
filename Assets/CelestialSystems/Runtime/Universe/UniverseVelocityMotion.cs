@@ -1,6 +1,7 @@
 /*
- * Projects a constant-velocity universe motion state through an SGT floating
- * object. It is a lightweight kinematic source, not a Gravity Engine body.
+ * Projects a universe-space kinematic motion state through an SGT floating
+ * object. It can optionally inherit the current linear velocity of a body
+ * while retaining its own independent universe position.
  */
 
 using SpaceGraphicsToolkit;
@@ -18,11 +19,28 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private SgtFloatingObject floatingObject;
 
+        [Header("Initial State")]
         [SerializeField]
         private UniverseMotionState initialMotionState;
 
         [SerializeField]
         private double initialUniversalTimeSeconds;
+
+        [Header("Velocity Reference")]
+        [SerializeField]
+        [Tooltip("The body whose live linear velocity may be inherited.")]
+        private CelestialBodyRuntimeContext velocityReferenceBody;
+
+        [SerializeField]
+        [Tooltip("Continuously matches this object's linear velocity to the reference body.")]
+        private bool matchVelocityWithReferenceBody;
+
+        [Header("Runtime State")]
+        [SerializeField]
+        private UniverseMotionState currentMotionState;
+
+        [SerializeField]
+        private double lastEvaluatedUniversalTimeSeconds;
 
         [SerializeField]
         private bool initialized;
@@ -41,6 +59,12 @@ namespace jcan.CelestialSystems
 
         public string LastError =>
             lastError;
+
+        public CelestialBodyRuntimeContext VelocityReferenceBody =>
+            velocityReferenceBody;
+
+        public bool MatchVelocityWithReferenceBody =>
+            matchVelocityWithReferenceBody;
 
         public bool Initialize(
             UniverseMotionState motionState)
@@ -67,10 +91,24 @@ namespace jcan.CelestialSystems
                 motionState;
             initialUniversalTimeSeconds =
                 timeController.UniversalTimeSeconds;
+            currentMotionState =
+                motionState;
+            lastEvaluatedUniversalTimeSeconds =
+                initialUniversalTimeSeconds;
             initialized = true;
             lastError = string.Empty;
             ApplyCurrentState();
             return true;
+        }
+
+        public void SetVelocityReference(
+            CelestialBodyRuntimeContext referenceBody,
+            bool matchVelocity)
+        {
+            velocityReferenceBody =
+                referenceBody;
+            matchVelocityWithReferenceBody =
+                matchVelocity && referenceBody != null;
         }
 
         public bool TryGetMotionState(
@@ -94,6 +132,7 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            matchVelocityWithReferenceBody = false;
             return Initialize(
                 new UniverseMotionState(
                     currentState.Position,
@@ -128,26 +167,42 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
+            var universalTimeSeconds =
+                timeController.UniversalTimeSeconds;
             var elapsedSeconds =
-                timeController.UniversalTimeSeconds -
-                initialUniversalTimeSeconds;
-            var position =
-                initialMotionState.Position;
+                universalTimeSeconds -
+                lastEvaluatedUniversalTimeSeconds;
             var velocity =
-                initialMotionState
+                currentMotionState
                     .LinearVelocityMetersPerSecond;
 
+            if (matchVelocityWithReferenceBody &&
+                velocityReferenceBody != null &&
+                velocityReferenceBody.TryGetMotionState(
+                    out var referenceMotion))
+            {
+                velocity =
+                    referenceMotion
+                        .LinearVelocityMetersPerSecond;
+            }
+
+            var position =
+                currentMotionState.Position;
             position.AddLocalMeters(
                 velocity.x * elapsedSeconds,
                 velocity.y * elapsedSeconds,
                 velocity.z * elapsedSeconds);
-            motionState =
+            currentMotionState =
                 new UniverseMotionState(
                     position,
-                    initialMotionState.Rotation,
+                    currentMotionState.Rotation,
                     velocity,
-                    initialMotionState
+                    currentMotionState
                         .AngularVelocityRadiansPerSecond);
+            lastEvaluatedUniversalTimeSeconds =
+                universalTimeSeconds;
+            motionState =
+                currentMotionState;
             return true;
         }
 
