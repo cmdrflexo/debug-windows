@@ -526,10 +526,15 @@ namespace jcan.CelestialSystems
             }
 
             var rotation = movementReference.rotation;
+            // Match optical magnification with inverse turn rate: a 10x
+            // zoom uses one-tenth mouse-look and roll sensitivity.
+            var zoomRotationMultiplier = IsZooming
+                ? 1.0f / Mathf.Max(1.0f, zoomMagnification)
+                : 1.0f;
             if (lookDeltaAction != null && lookDeltaAction.action != null)
             {
                 var delta = lookDeltaAction.action.ReadValue<Vector2>() *
-                    lookDegreesPerPixel;
+                    lookDegreesPerPixel * zoomRotationMultiplier;
                 rotation *= Quaternion.Euler(
                     invertPitch ? delta.y : -delta.y,
                     delta.x,
@@ -541,6 +546,7 @@ namespace jcan.CelestialSystems
                 rotation *= Quaternion.AngleAxis(
                     -rollAction.action.ReadValue<float>() *
                     rollDegreesPerSecond *
+                    zoomRotationMultiplier *
                     Time.unscaledDeltaTime,
                     Vector3.forward);
             }
