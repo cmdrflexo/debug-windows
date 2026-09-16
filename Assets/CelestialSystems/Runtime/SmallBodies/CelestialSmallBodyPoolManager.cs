@@ -84,7 +84,9 @@ namespace jcan.CelestialSystems
 
             private void MigrateLegacyLodConvention()
             {
-                if (lodConventionVersion != 0)
+                if (lodConventionVersion != 0 &&
+                    (int)minimumPrewarmLod >=
+                    (int)maximumPrewarmLod)
                 {
                     return;
                 }
