@@ -47,6 +47,13 @@ namespace jcan.CelestialSystems
         private float velocityReferenceBlendSeconds =
             0.5f;
 
+        [Header("Position Smoothing")]
+        [SerializeField]
+        [Min(0.0f)]
+        [Tooltip("Real-time seconds used to visually blend the SGT position toward the latest universe position. Zero applies it immediately.")]
+        private float positionSmoothingSeconds =
+            0.1f;
+
         [Header("Runtime State")]
         [SerializeField]
         private UniverseMotionState currentMotionState;
@@ -65,6 +72,15 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private bool hasTargetReferenceVelocity;
+
+        [SerializeField]
+        private UniversePosition displayedUniversePosition;
+
+        [SerializeField]
+        private double lastPositionSmoothingRealtimeSeconds;
+
+        [SerializeField]
+        private bool hasDisplayedUniversePosition;
 
         [SerializeField]
         private bool initialized;
@@ -184,6 +200,10 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.0f,
                     velocityReferenceBlendSeconds);
+            positionSmoothingSeconds =
+                Mathf.Max(
+                    0.0f,
+                    positionSmoothingSeconds);
         }
 
         private void LateUpdate()
@@ -311,6 +331,12 @@ namespace jcan.CelestialSystems
                 double.NegativeInfinity;
             lastVelocityBlendRealtimeSeconds =
                 Time.realtimeSinceStartupAsDouble;
+            displayedUniversePosition =
+                currentMotionState.Position;
+            lastPositionSmoothingRealtimeSeconds =
+                lastVelocityBlendRealtimeSeconds;
+            hasDisplayedUniversePosition =
+                initialized;
         }
 
         private void ApplyCurrentState()
@@ -322,8 +348,12 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            var displayedPosition =
+                GetSmoothedDisplayPosition(
+                    motionState.Position);
+
             if (!SgtUniversePositionConverter.TryToSgtPosition(
-                    motionState.Position,
+                    displayedPosition,
                     0.0,
                     0.0,
                     0.0,
@@ -343,6 +373,55 @@ namespace jcan.CelestialSystems
                 transform.rotation =
                     motionState.Rotation;
             }
+        }
+
+        private UniversePosition GetSmoothedDisplayPosition(
+            UniversePosition targetPosition)
+        {
+            var realtimeSeconds =
+                Time.realtimeSinceStartupAsDouble;
+
+            if (!hasDisplayedUniversePosition ||
+                positionSmoothingSeconds <= 0.0f)
+            {
+                displayedUniversePosition =
+                    targetPosition;
+                hasDisplayedUniversePosition = true;
+                lastPositionSmoothingRealtimeSeconds =
+                    realtimeSeconds;
+                return displayedUniversePosition;
+            }
+
+            var elapsedSeconds =
+                Mathf.Max(
+                    0.0f,
+                    (float)(
+                        realtimeSeconds -
+                        lastPositionSmoothingRealtimeSeconds));
+            var blendFactor =
+                1.0 -
+                System.Math.Exp(
+                    -elapsedSeconds /
+                    positionSmoothingSeconds);
+
+            if (targetPosition.TryGetOffsetMetersFrom(
+                    displayedUniversePosition,
+                    out var offsetMeters))
+            {
+                displayedUniversePosition.AddLocalMeters(
+                    offsetMeters.x * blendFactor,
+                    offsetMeters.y * blendFactor,
+                    offsetMeters.z * blendFactor);
+            }
+            else
+            {
+                displayedUniversePosition =
+                    targetPosition;
+            }
+
+            lastPositionSmoothingRealtimeSeconds =
+                realtimeSeconds;
+            return displayedUniversePosition;
         }
 
         private bool Fail(
