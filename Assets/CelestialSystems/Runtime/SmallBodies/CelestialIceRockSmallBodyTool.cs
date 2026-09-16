@@ -233,14 +233,14 @@ namespace jcan.CelestialSystems
                             pending.Request.Seed));
                 var material =
                     pending.Request.DesiredLod ==
-                        CelestialSmallBodyLod.Billboard &&
+                        CelestialSmallBodyLod.Lod4 &&
                     billboardMaterial != null
                         ? billboardMaterial
                         : ResolveFamilyMaterial(
                             family);
 
                 if (pending.Request.DesiredLod ==
-                    CelestialSmallBodyLod.Billboard)
+                    CelestialSmallBodyLod.Lod4)
                 {
                     CompleteBillboard(
                         pending,
@@ -254,7 +254,7 @@ namespace jcan.CelestialSystems
                 var settings =
                     iceBodySettings
                         .CloneForDetail(
-                            (int)CelestialSmallBodyLod.Billboard -
+                            (int)CelestialSmallBodyLod.Lod4 -
                             (int)pending.Request
                                 .DesiredLod);
 
