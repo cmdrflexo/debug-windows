@@ -208,12 +208,12 @@ namespace jcan.CelestialSystems
 
             if (Application.isPlaying)
             {
-                Destroy(
+                Object.Destroy(
                     atlas);
             }
             else
             {
-                DestroyImmediate(
+                Object.DestroyImmediate(
                     atlas);
             }
 
