@@ -7,7 +7,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.InputSystem;
 using SpaceGraphicsToolkit;
 
 namespace jcan.CelestialSystems
@@ -59,24 +58,6 @@ namespace jcan.CelestialSystems
         private float refreshIntervalSeconds =
             0.25f;
 
-        [Header("Debug Properties")]
-        [SerializeField]
-        [Min(0.1f)]
-        [Tooltip("Distance in front of the main camera for a manually spawned ring object.")]
-        private float debugSpawnDistanceMeters = 20.0f;
-
-        [SerializeField]
-        [Tooltip("Input action used to spawn one debug ring object.")]
-        private InputAction debugSpawnAction =
-            new InputAction(
-                "Spawn Ring Object",
-                InputActionType.Button,
-                "<Keyboard>/h");
-
-        [SerializeField]
-        private CelestialRingObjectFamilyKind debugSpawnFamily =
-            CelestialRingObjectFamilyKind.IceChunk;
-
         [Header("Debug Gizmos")]
         [SerializeField]
         [Tooltip("Draw a wire sphere and forward line for every active streamed ring object.")]
@@ -97,9 +78,6 @@ namespace jcan.CelestialSystems
 
         private readonly Stack<GameObject> pooledObjects =
             new Stack<GameObject>();
-
-        private readonly List<GameObject> debugObjects =
-            new List<GameObject>();
 
         // Created lazily because an already-instantiated component can survive
         // a Unity script hot reload with nonserialized runtime fields cleared.
@@ -142,14 +120,11 @@ namespace jcan.CelestialSystems
         {
             nextRefreshTime =
                 0.0f;
-            debugSpawnAction?.Enable();
         }
 
         private void OnDisable()
         {
-            debugSpawnAction?.Disable();
             ClearObjects();
-            ClearDebugObjects();
         }
 
         private void OnValidate()
@@ -173,20 +148,10 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     0.05f,
                     refreshIntervalSeconds);
-            debugSpawnDistanceMeters =
-                Mathf.Max(
-                    0.1f,
-                    debugSpawnDistanceMeters);
         }
 
         private void Update()
         {
-            if (debugSpawnAction != null &&
-                debugSpawnAction.WasPressedThisFrame())
-            {
-                SpawnDebugRingObject();
-            }
-
             if (!automaticSpawning ||
                 Time.time < nextRefreshTime)
             {
@@ -197,130 +162,6 @@ namespace jcan.CelestialSystems
                 Time.time +
                 refreshIntervalSeconds;
             RefreshObjects();
-        }
-
-        /// <summary>
-        /// Creates one persistent debug object in front of the current camera.
-        /// It intentionally bypasses the ring-cell streamer and inertial-motion
-        /// prototype so it stays easy to inspect during visual testing.
-        /// </summary>
-        public void SpawnDebugRingObject()
-        {
-            var camera = observerCamera != null
-                ? observerCamera
-                : Camera.main;
-            var family = GetDebugSpawnFamily();
-
-            if (camera == null || family == null)
-            {
-                return;
-            }
-
-            var instance = AcquireObject();
-            instance.name = "Debug Ring Object";
-            instance.transform.SetParent(null, false);
-            instance.transform.position =
-                camera.transform.position +
-                camera.transform.forward *
-                debugSpawnDistanceMeters;
-            instance.transform.rotation =
-                Random.rotation;
-
-            var seed = unchecked(
-                (uint)(Time.frameCount * 747796405) +
-                (uint)debugObjects.Count * 2891336453u);
-            var diameter =
-                Mathf.Lerp(
-                    family.MinimumDiameterMeters,
-                    family.MaximumDiameterMeters,
-                    0.55f) *
-                prototypeVisualScaleMultiplier;
-            var request = new CelestialRingBodyRequest
-            {
-                Seed = seed,
-                FamilyKind = family.Kind,
-                NominalDiameterMeters = diameter
-            };
-            var sourceBody = default(CelestialRingResolvedBody);
-            var resolvedBySource =
-                family.BodySource != null &&
-                family.BodySource.TryResolve(
-                    request,
-                    out sourceBody) &&
-                sourceBody.HasVisual;
-            var filter = instance.GetComponent<MeshFilter>();
-            var renderer = instance.GetComponent<MeshRenderer>();
-
-            if (filter != null)
-            {
-                filter.sharedMesh =
-                    resolvedBySource && sourceBody.Mesh != null
-                        ? sourceBody.Mesh
-                        : family.MeshVariants.Count > 0
-                            ? family.MeshVariants[0]
-                            : CelestialRingProceduralMeshes.GetMesh(
-                                family.Kind,
-                                seed);
-            }
-
-            if (renderer != null)
-            {
-                renderer.shadowCastingMode =
-                    prototypeCastShadows
-                        ? ShadowCastingMode.On
-                        : ShadowCastingMode.Off;
-                renderer.receiveShadows =
-                    prototypeCastShadows;
-                renderer.sharedMaterial =
-                    resolvedBySource && sourceBody.Material != null
-                        ? sourceBody.Material
-                        : family.MaterialVariants.Count > 0
-                            ? family.MaterialVariants[0]
-                            : renderer.sharedMaterial;
-            }
-
-            if (resolvedBySource)
-            {
-                diameter *= sourceBody.SafeDiameterMultiplier;
-            }
-
-            instance.transform.localScale =
-                Vector3.one * diameter;
-
-            var debugGizmo =
-                instance.GetComponent<CelestialRingObjectDebugGizmo>();
-            if (debugGizmo == null)
-            {
-                debugGizmo =
-                    instance.AddComponent<CelestialRingObjectDebugGizmo>();
-            }
-
-            debugGizmo.Configure(
-                drawObjectGizmos,
-                GetGizmoColor(family.Kind));
-            debugObjects.Add(instance);
-        }
-
-        private CelestialRingObjectFamily GetDebugSpawnFamily()
-        {
-            if (objectSet == null)
-            {
-                return null;
-            }
-
-            CelestialRingObjectFamily fallback = null;
-            foreach (var family in objectSet.Families)
-            {
-                if (family == null) continue;
-                fallback ??= family;
-
-                if (family.Kind == debugSpawnFamily)
-                {
-                    return family;
-                }
-            }
-
-            return fallback;
         }
 
         private void RefreshObjects()
@@ -1052,19 +893,6 @@ namespace jcan.CelestialSystems
             }
 
             return instance;
-        }
-
-        private void ClearDebugObjects()
-        {
-            foreach (var instance in debugObjects)
-            {
-                if (instance != null)
-                {
-                    Destroy(instance);
-                }
-            }
-
-            debugObjects.Clear();
         }
 
         private void ClearObjects()
