@@ -62,12 +62,12 @@ namespace jcan.CelestialSystems
         public bool IsPoolManaged =>
             isPoolManaged;
 
-        public int HighestReadyLod
+        public int MostDetailedReadyLod
         {
             get
             {
-                var highest =
-                    -1;
+                var mostDetailed =
+                    int.MaxValue;
 
                 foreach (var representation in
                     lodRepresentations)
@@ -75,14 +75,14 @@ namespace jcan.CelestialSystems
                     if (representation != null &&
                         representation.Representation != null)
                     {
-                        highest =
-                            Mathf.Max(
-                                highest,
+                        mostDetailed =
+                            Mathf.Min(
+                                mostDetailed,
                                 (int)representation.Lod);
                     }
                 }
 
-                return highest;
+                return mostDetailed;
             }
         }
 
@@ -114,10 +114,10 @@ namespace jcan.CelestialSystems
             return false;
         }
 
-        internal bool HasAtLeastLod(
+        internal bool HasLodOrHigherDetail(
             CelestialSmallBodyLod lod)
         {
-            return HighestReadyLod >=
+            return MostDetailedReadyLod <=
                 (int)lod;
         }
 
@@ -180,8 +180,8 @@ namespace jcan.CelestialSystems
 
             lodRepresentations.Sort(
                 (left, right) =>
-                    ((int)right.Lod).CompareTo(
-                        (int)left.Lod));
+                    ((int)left.Lod).CompareTo(
+                        (int)right.Lod));
 
             var lods =
                 new List<LOD>();
@@ -217,13 +217,13 @@ namespace jcan.CelestialSystems
         {
             return lod switch
             {
-                CelestialSmallBodyLod.Detail4 =>
+                CelestialSmallBodyLod.Lod0 =>
                     0.60f,
-                CelestialSmallBodyLod.Detail3 =>
+                CelestialSmallBodyLod.Lod1 =>
                     0.30f,
-                CelestialSmallBodyLod.Detail2 =>
+                CelestialSmallBodyLod.Lod2 =>
                     0.15f,
-                CelestialSmallBodyLod.Detail1 =>
+                CelestialSmallBodyLod.Lod3 =>
                     0.05f,
                 _ => 0.01f
             };
