@@ -20,6 +20,16 @@ namespace jcan.CelestialSystems
         Lod4 = 4
     }
 
+    [Flags]
+    public enum CelestialSmallBodyImpostorMaps
+    {
+        None = 0,
+        AlbedoTransparency = 1 << 0,
+        Normal = 1 << 1,
+        Emission = 1 << 2,
+        MetallicSmoothness = 1 << 3
+    }
+
     public readonly struct CelestialSmallBodyRequest
     {
         public string ToolId { get; }
@@ -78,5 +88,17 @@ namespace jcan.CelestialSystems
         bool TryBeginGeneration(
             CelestialSmallBodyRequest request,
             Action<CelestialSmallBodyGenerationResult> completed);
+    }
+
+    // Optional capability. The pool manager owns the shared library while
+    // the tool specifies how many visual variants and which PBR channels it
+    // needs baked into that library.
+    public interface ICelestialSmallBodyImpostorProvider
+    {
+        int ImpostorVariantCount { get; }
+
+        int ImpostorResolution { get; }
+
+        CelestialSmallBodyImpostorMaps RequestedImpostorMaps { get; }
     }
 }
