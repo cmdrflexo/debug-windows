@@ -1,7 +1,7 @@
 /*
- * Maintains ready-to-use generic celestial small bodies for any attached
- * generation tool. Tools own their generation implementation; this manager
- * owns requests, ready pools, demand callbacks, and prewarm/refill policy.
+ * Maintains seeded, progressive-LOD celestial small-body containers. Tools
+ * provide one representation at a time; this manager assembles each container
+ * from billboard through its configured mesh-detail ceiling.
  */
 
 using System;
@@ -23,21 +23,21 @@ namespace jcan.CelestialSystems
 
             [SerializeField]
             [Min(0)]
-            [Tooltip("How many ready, unused bodies this tool should keep available.")]
+            [Tooltip("Target number of available small-body containers. This is not multiplied by the number of LODs.")]
             private int targetReadyCount = 8;
 
             [SerializeField]
-            [Tooltip("Lowest LOD included in background prewarming. LOD 0 is normally the billboard representation.")]
+            [Tooltip("Every container starts at billboard LOD 0, then is upgraded until this minimum is ready.")]
             private CelestialSmallBodyLod minimumPrewarmLod =
                 CelestialSmallBodyLod.Billboard;
 
             [SerializeField]
-            [Tooltip("Highest LOD included in background prewarming.")]
+            [Tooltip("Idle background upgrades stop at this LOD.")]
             private CelestialSmallBodyLod maximumPrewarmLod =
                 CelestialSmallBodyLod.Detail2;
 
             [SerializeField]
-            [Tooltip("Checked-out objects are treated as consumed and replaced instead of returned to the ready pool.")]
+            [Tooltip("Checked-out objects are consumed and immediately replaced by a new LOD 0 container.")]
             private bool regenerateAfterCheckout = true;
 
             public MonoBehaviour ToolSource =>
@@ -117,15 +117,23 @@ namespace jcan.CelestialSystems
             public Action<GameObject> Completed;
         }
 
+        private sealed class RuntimeSlot
+        {
+            public uint Seed;
+            public CelestialSmallBodyInstance Instance;
+            public bool CheckedOut;
+            public bool GenerationPending;
+            public CelestialSmallBodyLod PendingLod;
+        }
+
         private sealed class RuntimePool
         {
             public ToolPoolConfiguration Configuration;
             public ICelestialSmallBodyGenerationTool Tool;
-            public readonly Queue<GameObject> ReadyObjects =
-                new Queue<GameObject>();
+            public readonly List<RuntimeSlot> Slots =
+                new List<RuntimeSlot>();
             public readonly List<WaitingRequest> WaitingRequests =
                 new List<WaitingRequest>();
-            public int PendingGenerationCount;
         }
 
         [Header("Tool Pools")]
@@ -140,27 +148,33 @@ namespace jcan.CelestialSystems
             new List<MonoBehaviour>();
 
         [SerializeField]
-        [Tooltip("Optional parent used only while a body is waiting in a ready pool.")]
+        [Tooltip("Optional parent used only while a small-body container is available in its pool.")]
         private Transform poolRoot;
 
         [SerializeField]
         [Min(1)]
-        [Tooltip("Upper limit on new background generation requests started each frame.")]
+        [Tooltip("Upper limit on new representation jobs started each frame.")]
         private int maximumGenerationStartsPerFrame = 1;
 
         [SerializeField]
-        [Tooltip("Seed used for non-deterministic prewarmed bodies.")]
+        [Tooltip("Seed used for non-deterministic prewarmed containers.")]
         private uint prewarmSeed = 1u;
 
         [Header("Runtime Diagnostics")]
         [SerializeField]
+        [Tooltip("Available LOD 0-or-higher containers across all tools.")]
         private int readyObjectCount;
 
         [SerializeField]
+        [Tooltip("Representation jobs currently in flight across all containers.")]
         private int pendingGenerationCount;
 
         [SerializeField]
         private int waitingRequestCount;
+
+        [SerializeField]
+        [Tooltip("All currently tracked containers, including those upgrading.")]
+        private int containerCount;
 
         [SerializeField]
         private string lastError;
@@ -178,6 +192,9 @@ namespace jcan.CelestialSystems
 
         public int WaitingRequestCount =>
             waitingRequestCount;
+
+        public int ContainerCount =>
+            containerCount;
 
         public string LastError =>
             lastError;
@@ -202,7 +219,6 @@ namespace jcan.CelestialSystems
                 Mathf.Max(
                     1,
                     maximumGenerationStartsPerFrame);
-
             registeredToolSources ??=
                 new List<MonoBehaviour>();
             registeredToolSources.Clear();
@@ -241,11 +257,12 @@ namespace jcan.CelestialSystems
         {
             foreach (var pool in poolsByToolId.Values)
             {
-                foreach (var body in pool.ReadyObjects)
+                foreach (var slot in pool.Slots)
                 {
-                    if (body != null)
+                    if (slot.Instance != null)
                     {
-                        Destroy(body);
+                        Destroy(
+                            slot.Instance.gameObject);
                     }
                 }
             }
@@ -264,18 +281,21 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            if (!TryTakeMatchingReadyObject(
+            var slot =
+                FindBestAvailableSlot(
                     pool,
-                    request,
-                    out smallBody))
+                    request.DesiredLod);
+
+            if (slot == null)
             {
                 return false;
             }
 
-            PrepareForCheckout(
+            CheckoutSlot(
                 pool,
-                smallBody);
-            return true;
+                slot,
+                out smallBody);
+            return smallBody != null;
         }
 
         public void RequestSmallBody(
@@ -306,19 +326,6 @@ namespace jcan.CelestialSystems
                     Request = request,
                     Completed = completed
                 });
-
-            if (!TryStartGeneration(
-                    pool,
-                    request))
-            {
-                var waiting =
-                    pool.WaitingRequests[
-                        pool.WaitingRequests.Count - 1];
-                pool.WaitingRequests.RemoveAt(
-                    pool.WaitingRequests.Count - 1);
-                waiting.Completed?.Invoke(
-                    null);
-            }
         }
 
         public void ReturnToPool(
@@ -344,7 +351,13 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (pool.Configuration.RegenerateAfterCheckout)
+            var slot =
+                FindSlot(
+                    pool,
+                    instance);
+
+            if (slot == null ||
+                pool.Configuration.RegenerateAfterCheckout)
             {
                 instance.ClearPoolMetadata();
                 Destroy(
@@ -352,30 +365,37 @@ namespace jcan.CelestialSystems
                 return;
             }
 
+            slot.CheckedOut = false;
             smallBody.SetActive(
                 false);
             smallBody.transform.SetParent(
                 EnsurePoolRoot(),
                 false);
-            pool.ReadyObjects.Enqueue(
-                smallBody);
         }
 
-        [ContextMenu("Clear Ready Small Bodies")]
+        [ContextMenu("Clear Available Small Bodies")]
         public void ClearReadySmallBodies()
         {
             foreach (var pool in poolsByToolId.Values)
             {
-                while (pool.ReadyObjects.Count > 0)
+                for (var index =
+                        pool.Slots.Count - 1;
+                    index >= 0;
+                    index--)
                 {
-                    var body =
-                        pool.ReadyObjects.Dequeue();
+                    var slot =
+                        pool.Slots[index];
 
-                    if (body != null)
+                    if (slot.CheckedOut ||
+                        slot.Instance == null)
                     {
-                        Destroy(
-                            body);
+                        continue;
                     }
+
+                    Destroy(
+                        slot.Instance.gameObject);
+                    pool.Slots.RemoveAt(
+                        index);
                 }
             }
 
@@ -431,7 +451,6 @@ namespace jcan.CelestialSystems
             }
 
             poolsResolved = true;
-            RefreshDiagnostics();
         }
 
         private void MaintainPools()
@@ -441,43 +460,199 @@ namespace jcan.CelestialSystems
 
             foreach (var pool in poolsByToolId.Values)
             {
-                while (startsRemaining > 0 &&
-                    pool.ReadyObjects.Count +
-                        pool.PendingGenerationCount <
-                    pool.Configuration.TargetReadyCount)
-                {
-                    var request =
-                        new CelestialSmallBodyRequest(
-                            pool.Tool.ToolId,
-                            NextPrewarmSeed(),
-                            false,
-                            SelectPrewarmLod(
-                                pool.Configuration));
+                startsRemaining =
+                    CreateBaselineSlots(
+                        pool,
+                        startsRemaining);
+            }
 
-                    if (!TryStartGeneration(
-                            pool,
-                            request))
-                    {
-                        break;
-                    }
+            foreach (var pool in poolsByToolId.Values)
+            {
+                startsRemaining =
+                    UpgradeForWaitingRequests(
+                        pool,
+                        startsRemaining);
+            }
 
-                    startsRemaining--;
-                }
+            foreach (var pool in poolsByToolId.Values)
+            {
+                startsRemaining =
+                    UpgradeToMinimumLod(
+                        pool,
+                        startsRemaining);
+            }
+
+            foreach (var pool in poolsByToolId.Values)
+            {
+                startsRemaining =
+                    UpgradeInBackground(
+                        pool,
+                        startsRemaining);
             }
         }
 
-        private bool TryStartGeneration(
+        private int CreateBaselineSlots(
             RuntimePool pool,
-            CelestialSmallBodyRequest request)
+            int startsRemaining)
         {
-            if (pool.Tool == null ||
-                !pool.Tool.CanGenerate(
-                    request))
+            while (startsRemaining > 0 &&
+                pool.Slots.Count <
+                    pool.Configuration.TargetReadyCount)
+            {
+                var slot =
+                    new RuntimeSlot
+                    {
+                        Seed = NextPrewarmSeed()
+                    };
+                pool.Slots.Add(
+                    slot);
+
+                if (!TryStartLodGeneration(
+                        pool,
+                        slot,
+                        CelestialSmallBodyLod.Billboard))
+                {
+                    pool.Slots.Remove(
+                        slot);
+                    break;
+                }
+
+                startsRemaining--;
+            }
+
+            return startsRemaining;
+        }
+
+        private int UpgradeForWaitingRequests(
+            RuntimePool pool,
+            int startsRemaining)
+        {
+            foreach (var waiting in
+                pool.WaitingRequests)
+            {
+                if (startsRemaining <= 0)
+                {
+                    break;
+                }
+
+                var slot =
+                    FindUpgradeableSlot(
+                        pool,
+                        waiting.Request.DesiredLod);
+
+                if (slot == null ||
+                    !TryStartNextLodGeneration(
+                        pool,
+                        slot))
+                {
+                    continue;
+                }
+
+                startsRemaining--;
+            }
+
+            return startsRemaining;
+        }
+
+        private int UpgradeToMinimumLod(
+            RuntimePool pool,
+            int startsRemaining)
+        {
+            while (startsRemaining > 0)
+            {
+                var slot =
+                    FindUpgradeableSlot(
+                        pool,
+                        pool.Configuration
+                            .MinimumPrewarmLod);
+
+                if (slot == null ||
+                    !TryStartNextLodGeneration(
+                        pool,
+                        slot))
+                {
+                    break;
+                }
+
+                startsRemaining--;
+            }
+
+            return startsRemaining;
+        }
+
+        private int UpgradeInBackground(
+            RuntimePool pool,
+            int startsRemaining)
+        {
+            while (startsRemaining > 0)
+            {
+                var slot =
+                    FindUpgradeableSlot(
+                        pool,
+                        pool.Configuration
+                            .MaximumPrewarmLod);
+
+                if (slot == null ||
+                    !TryStartNextLodGeneration(
+                        pool,
+                        slot))
+                {
+                    break;
+                }
+
+                startsRemaining--;
+            }
+
+            return startsRemaining;
+        }
+
+        private bool TryStartNextLodGeneration(
+            RuntimePool pool,
+            RuntimeSlot slot)
+        {
+            if (slot == null ||
+                slot.Instance == null ||
+                slot.GenerationPending)
             {
                 return false;
             }
 
-            pool.PendingGenerationCount++;
+            var nextLod =
+                (CelestialSmallBodyLod)(
+                    slot.Instance.HighestReadyLod + 1);
+            return TryStartLodGeneration(
+                pool,
+                slot,
+                nextLod);
+        }
+
+        private bool TryStartLodGeneration(
+            RuntimePool pool,
+            RuntimeSlot slot,
+            CelestialSmallBodyLod lod)
+        {
+            if (slot == null ||
+                slot.GenerationPending ||
+                (int)lod >=
+                    pool.Tool.LodCount ||
+                !pool.Tool.CanGenerate(
+                    new CelestialSmallBodyRequest(
+                        pool.Tool.ToolId,
+                        slot.Seed,
+                        true,
+                        lod)))
+            {
+                return false;
+            }
+
+            var request =
+                new CelestialSmallBodyRequest(
+                    pool.Tool.ToolId,
+                    slot.Seed,
+                    true,
+                    lod);
+            slot.GenerationPending = true;
+            slot.PendingLod = lod;
 
             try
             {
@@ -485,6 +660,7 @@ namespace jcan.CelestialSystems
                         request,
                         result => HandleGenerationCompleted(
                             pool,
+                            slot,
                             result)))
                 {
                     return true;
@@ -493,209 +669,210 @@ namespace jcan.CelestialSystems
             catch (Exception exception)
             {
                 RecordError(
-                    $"Small-body tool '{request.ToolId}' threw while starting generation: {exception.Message}");
+                    $"Small-body tool '{pool.Tool.ToolId}' threw while starting generation: {exception.Message}");
             }
 
-            pool.PendingGenerationCount =
-                Mathf.Max(
-                    0,
-                    pool.PendingGenerationCount - 1);
+            slot.GenerationPending = false;
             return false;
         }
 
         private void HandleGenerationCompleted(
             RuntimePool pool,
+            RuntimeSlot slot,
             CelestialSmallBodyGenerationResult result)
         {
-            pool.PendingGenerationCount =
-                Mathf.Max(
-                    0,
-                    pool.PendingGenerationCount - 1);
+            if (slot == null)
+            {
+                if (result.Instance != null)
+                {
+                    Destroy(
+                        result.Instance);
+                }
+
+                return;
+            }
+
+            slot.GenerationPending = false;
 
             if (!result.Succeeded)
             {
                 RecordError(
                     string.IsNullOrWhiteSpace(
                         result.Error)
-                        ? $"Small-body tool '{pool.Tool.ToolId}' did not return an instance."
+                        ? $"Small-body tool '{pool.Tool.ToolId}' did not return an LOD representation."
                         : result.Error);
-                FulfillFailedWaitingRequest(
-                    pool,
-                    result.Request);
                 RefreshDiagnostics();
                 return;
             }
 
-            var body =
-                result.Instance;
-            var instance =
-                body.GetComponent<
-                    CelestialSmallBodyInstance>();
-
-            if (instance == null)
+            if (slot.Instance == null)
             {
-                instance =
-                    body.AddComponent<
+                var container =
+                    new GameObject(
+                        $"Pooled Small Body {pool.Tool.ToolId} {slot.Seed}");
+                slot.Instance =
+                    container.AddComponent<
                         CelestialSmallBodyInstance>();
+                slot.Instance.ConfigurePoolMetadata(
+                    pool.Tool.ToolId,
+                    slot.Seed);
+                container.SetActive(
+                    false);
+                container.transform.SetParent(
+                    EnsurePoolRoot(),
+                    false);
             }
 
-            instance.ConfigurePoolMetadata(
-                result.Request);
-
-            if (TryFulfillWaitingRequest(
-                    pool,
-                    result.Request,
-                    body))
+            if (!slot.Instance.TryAddLodRepresentation(
+                    result.Request.DesiredLod,
+                    result.Instance))
             {
-                RefreshDiagnostics();
-                return;
+                Destroy(
+                    result.Instance);
             }
 
-            body.SetActive(
-                false);
-            body.transform.SetParent(
-                EnsurePoolRoot(),
-                false);
-            pool.ReadyObjects.Enqueue(
-                body);
+            FulfillWaitingRequests(
+                pool);
             RefreshDiagnostics();
         }
 
-        private bool TryFulfillWaitingRequest(
-            RuntimePool pool,
-            CelestialSmallBodyRequest generatedRequest,
-            GameObject body)
+        private void FulfillWaitingRequests(
+            RuntimePool pool)
         {
             for (var index = 0;
-                index < pool.WaitingRequests.Count;
-                index++)
+                index < pool.WaitingRequests.Count;)
             {
                 var waiting =
                     pool.WaitingRequests[index];
 
-                if (!CanSatisfy(
-                        generatedRequest,
-                        waiting.Request))
+                if (!TryAcquireReady(
+                        waiting.Request,
+                        out var body))
                 {
+                    index++;
                     continue;
                 }
 
                 pool.WaitingRequests.RemoveAt(
                     index);
-                PrepareForCheckout(
-                    pool,
-                    body);
                 waiting.Completed?.Invoke(
                     body);
-                return true;
             }
-
-            return false;
         }
 
-        private void FulfillFailedWaitingRequest(
+        private RuntimeSlot FindBestAvailableSlot(
             RuntimePool pool,
-            CelestialSmallBodyRequest failedRequest)
+            CelestialSmallBodyLod desiredLod)
         {
-            for (var index = 0;
-                index < pool.WaitingRequests.Count;
-                index++)
-            {
-                var waiting =
-                    pool.WaitingRequests[index];
+            RuntimeSlot best = null;
+            var bestLod =
+                int.MaxValue;
 
-                if (!CanSatisfy(
-                        failedRequest,
-                        waiting.Request))
+            foreach (var slot in
+                pool.Slots)
+            {
+                if (slot.CheckedOut ||
+                    slot.GenerationPending ||
+                    slot.Instance == null ||
+                    !slot.Instance.HasAtLeastLod(
+                        desiredLod))
                 {
                     continue;
                 }
 
-                pool.WaitingRequests.RemoveAt(
-                    index);
-                waiting.Completed?.Invoke(
-                    null);
+                var highestLod =
+                    slot.Instance.HighestReadyLod;
+
+                if (highestLod < bestLod)
+                {
+                    best = slot;
+                    bestLod = highestLod;
+                }
+            }
+
+            return best;
+        }
+
+        private RuntimeSlot FindUpgradeableSlot(
+            RuntimePool pool,
+            CelestialSmallBodyLod desiredLod)
+        {
+            RuntimeSlot best = null;
+            var bestLod =
+                int.MaxValue;
+
+            foreach (var slot in
+                pool.Slots)
+            {
+                if (slot.CheckedOut ||
+                    slot.GenerationPending ||
+                    slot.Instance == null ||
+                    slot.Instance.HighestReadyLod >=
+                        (int)desiredLod ||
+                    slot.Instance.HighestReadyLod <
+                        (int)CelestialSmallBodyLod.Billboard)
+                {
+                    continue;
+                }
+
+                if (slot.Instance.HighestReadyLod <
+                    bestLod)
+                {
+                    best = slot;
+                    bestLod =
+                        slot.Instance.HighestReadyLod;
+                }
+            }
+
+            return best;
+        }
+
+        private void CheckoutSlot(
+            RuntimePool pool,
+            RuntimeSlot slot,
+            out GameObject smallBody)
+        {
+            smallBody =
+                slot.Instance != null
+                    ? slot.Instance.gameObject
+                    : null;
+
+            if (smallBody == null)
+            {
                 return;
             }
-        }
 
-        private bool TryTakeMatchingReadyObject(
-            RuntimePool pool,
-            CelestialSmallBodyRequest request,
-            out GameObject body)
-        {
-            body = null;
-            var count =
-                pool.ReadyObjects.Count;
-
-            for (var index = 0;
-                index < count;
-                index++)
-            {
-                var candidate =
-                    pool.ReadyObjects.Dequeue();
-
-                if (candidate == null)
-                {
-                    continue;
-                }
-
-                var instance =
-                    candidate.GetComponent<
-                        CelestialSmallBodyInstance>();
-
-                if (body == null &&
-                    instance != null &&
-                    CanSatisfy(
-                        new CelestialSmallBodyRequest(
-                            instance.SourceToolId,
-                            instance.Seed,
-                            true,
-                            instance.GeneratedLod),
-                        request))
-                {
-                    body = candidate;
-                    continue;
-                }
-
-                pool.ReadyObjects.Enqueue(
-                    candidate);
-            }
-
-            return body != null;
-        }
-
-        private static bool CanSatisfy(
-            CelestialSmallBodyRequest available,
-            CelestialSmallBodyRequest requested)
-        {
-            return
-                string.Equals(
-                    available.ToolId,
-                    requested.ToolId,
-                    StringComparison.Ordinal) &&
-                (!requested.HasExplicitSeed ||
-                    available.Seed == requested.Seed) &&
-                (int)available.DesiredLod >=
-                    (int)requested.DesiredLod;
-        }
-
-        private void PrepareForCheckout(
-            RuntimePool pool,
-            GameObject body)
-        {
-            body.transform.SetParent(
-                null,
-                true);
-            body.SetActive(
-                true);
-
-            // This setting means the caller owns the instance for the rest
-            // of its life. The manager immediately refills the missing slot.
             if (pool.Configuration.RegenerateAfterCheckout)
             {
-                MaintainPools();
+                pool.Slots.Remove(
+                    slot);
             }
+            else
+            {
+                slot.CheckedOut = true;
+            }
+
+            smallBody.transform.SetParent(
+                null,
+                true);
+            smallBody.SetActive(
+                true);
+        }
+
+        private RuntimeSlot FindSlot(
+            RuntimePool pool,
+            CelestialSmallBodyInstance instance)
+        {
+            foreach (var slot in
+                pool.Slots)
+            {
+                if (slot.Instance == instance)
+                {
+                    return slot;
+                }
+            }
+
+            return null;
         }
 
         private bool TryGetPool(
@@ -738,24 +915,6 @@ namespace jcan.CelestialSystems
             return poolRoot;
         }
 
-        private CelestialSmallBodyLod SelectPrewarmLod(
-            ToolPoolConfiguration configuration)
-        {
-            var minimum =
-                (int)configuration.MinimumPrewarmLod;
-            var maximum =
-                (int)configuration.MaximumPrewarmLod;
-            var span =
-                Mathf.Max(
-                    1,
-                    maximum - minimum + 1);
-            var selected =
-                minimum +
-                (int)(NextPrewarmSeed() % (uint)span);
-            return
-                (CelestialSmallBodyLod)selected;
-        }
-
         private uint NextPrewarmSeed()
         {
             prewarmSeed =
@@ -771,15 +930,31 @@ namespace jcan.CelestialSystems
             readyObjectCount = 0;
             pendingGenerationCount = 0;
             waitingRequestCount = 0;
+            containerCount = 0;
 
             foreach (var pool in poolsByToolId.Values)
             {
-                readyObjectCount +=
-                    pool.ReadyObjects.Count;
-                pendingGenerationCount +=
-                    pool.PendingGenerationCount;
+                containerCount +=
+                    pool.Slots.Count;
                 waitingRequestCount +=
                     pool.WaitingRequests.Count;
+
+                foreach (var slot in
+                    pool.Slots)
+                {
+                    if (slot.GenerationPending)
+                    {
+                        pendingGenerationCount++;
+                    }
+
+                    if (!slot.CheckedOut &&
+                        slot.Instance != null &&
+                        slot.Instance.HasAtLeastLod(
+                            CelestialSmallBodyLod.Billboard))
+                    {
+                        readyObjectCount++;
+                    }
+                }
             }
         }
 
