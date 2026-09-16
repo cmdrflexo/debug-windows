@@ -61,40 +61,84 @@ namespace jcan.CelestialSystems
             CelestialRingBodyRequest request,
             out CelestialRingResolvedBody body)
         {
+            return TryResolve(
+                request,
+                0,
+                out body);
+        }
+
+        /// <summary>
+        /// Resolves a cached mesh at a requested generator detail. A detail of
+        /// zero keeps this source's configured detail override/template value.
+        /// </summary>
+        public bool TryResolve(
+            CelestialRingBodyRequest request,
+            int requestedDetail,
+            out CelestialRingResolvedBody body)
+        {
             body = default;
-            var variant = ResolveVariant(request.Seed);
-            if (!cachedVariants.TryGetValue(variant, out var mesh) ||
+            var detail = requestedDetail > 0
+                ? Mathf.Clamp(
+                    requestedDetail,
+                    1,
+                    4)
+                : detailOverride;
+            var variant = ResolveVariant(
+                request.Seed);
+            var cacheKey =
+                detail * 128 +
+                variant;
+
+            if (!cachedVariants.TryGetValue(
+                    cacheKey,
+                    out var mesh) ||
                 mesh == null)
             {
                 var settings = CloneSettings();
                 settings.Seed = useRequestSeed
-                    ? MixSeed(request.Seed, seedSalt) + (uint)variant
+                    ? MixSeed(
+                        request.Seed,
+                        seedSalt) + (uint)variant
                     : settings.Seed + (uint)variant;
 
-                if (detailOverride > 0)
+                if (detail > 0)
                 {
-                    settings.ViewportDetail = detailOverride;
-                    settings.RenderDetail = detailOverride;
+                    settings.ViewportDetail = detail;
+                    settings.RenderDetail = detail;
                 }
 
                 if (overrideGenerateUVs)
+                {
                     settings.GenerateUVs = generateUVs;
-                if (overrideSmoothNormals)
-                    settings.SmoothNormals = smoothNormals;
+                }
 
-                mesh = BlenderAsteroidGenerator.Create(settings, useRenderDetail);
-                mesh.name = $"Ring Asteroid Variant {variant}";
-                cachedVariants[variant] = mesh;
+                if (overrideSmoothNormals)
+                {
+                    settings.SmoothNormals = smoothNormals;
+                }
+
+                mesh = BlenderAsteroidGenerator.Create(
+                    settings,
+                    useRenderDetail);
+                mesh.name =
+                    $"Ring Asteroid Detail {detail} Variant {variant}";
+                cachedVariants[cacheKey] = mesh;
             }
 
             var maximumExtent = Mathf.Max(
                 mesh.bounds.size.x,
-                Mathf.Max(mesh.bounds.size.y, mesh.bounds.size.z));
+                Mathf.Max(
+                    mesh.bounds.size.y,
+                    mesh.bounds.size.z));
             body = new CelestialRingResolvedBody
             {
                 Mesh = mesh,
                 Material = defaultMaterial,
-                DiameterMultiplier = 1.0f / Mathf.Max(0.001f, maximumExtent)
+                DiameterMultiplier =
+                    1.0f /
+                    Mathf.Max(
+                        0.001f,
+                        maximumExtent)
             };
             return true;
         }
