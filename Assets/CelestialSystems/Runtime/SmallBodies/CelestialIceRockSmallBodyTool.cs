@@ -38,8 +38,8 @@ namespace jcan.CelestialSystems
             "ice-rock";
 
         [SerializeField]
-        [Range(1, 5)]
-        [Tooltip("Includes LOD 0, which is the billboard representation.")]
+        [Range(5, 5)]
+        [Tooltip("This tool provides Unity LODs 0-3 plus billboard LOD 4.")]
         private int lodCount = 5;
 
         [Header("Ring Family Adapter")]
@@ -105,11 +105,7 @@ namespace jcan.CelestialSystems
             toolId =
                 toolId?.Trim() ??
                 string.Empty;
-            lodCount =
-                Mathf.Clamp(
-                    lodCount,
-                    1,
-                    5);
+            lodCount = 5;
             maximumConcurrentJobs =
                 Mathf.Max(
                     1,
@@ -258,6 +254,7 @@ namespace jcan.CelestialSystems
                 var settings =
                     iceBodySettings
                         .CloneForDetail(
+                            (int)CelestialSmallBodyLod.Billboard -
                             (int)pending.Request
                                 .DesiredLod);
 
