@@ -100,7 +100,7 @@ namespace jcan.CelestialSystems
         public string LastError =>
             lastError;
 
-        protected virtual void OnValidate()
+        private void OnValidate()
         {
             toolId =
                 toolId?.Trim() ??
@@ -122,7 +122,7 @@ namespace jcan.CelestialSystems
                 new CelestialIceBodyGenerationSettings();
         }
 
-        protected virtual void Update()
+        private void Update()
         {
             StartPendingWorkerJobs();
             CompleteFinishedWorkerJobs();
@@ -132,7 +132,7 @@ namespace jcan.CelestialSystems
                 activeGenerations.Count;
         }
 
-        protected virtual void OnDisable()
+        private void OnDisable()
         {
             while (pendingGenerations.Count > 0)
             {
@@ -157,7 +157,7 @@ namespace jcan.CelestialSystems
             activeWorkerCount = 0;
         }
 
-        protected virtual void OnDestroy()
+        private void OnDestroy()
         {
             if (billboardMesh == null)
             {
