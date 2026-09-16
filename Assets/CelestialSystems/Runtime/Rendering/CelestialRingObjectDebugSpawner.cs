@@ -222,6 +222,7 @@ namespace jcan.CelestialSystems
             Camera camera,
             out UniverseMotionState motion)
         {
+            motion = default;
             var context = velocityReference != null
                 ? velocityReference
                 : camera.GetComponentInParent<
