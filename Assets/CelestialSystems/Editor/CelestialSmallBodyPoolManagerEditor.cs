@@ -152,12 +152,12 @@ namespace jcan.CelestialSystems.Editor
                 };
             var lowest =
                 Mathf.Clamp(
-                    lowestMeshLod.intValue,
+                    lowestMeshLod.enumValueIndex,
                     0,
                     3);
             var highest =
                 Mathf.Clamp(
-                    highestMeshLod.intValue,
+                    highestMeshLod.enumValueIndex,
                     0,
                     3);
 
@@ -177,9 +177,9 @@ namespace jcan.CelestialSystems.Editor
                 Mathf.Min(
                     highest,
                     lowest);
-            lowestMeshLod.intValue =
+            lowestMeshLod.enumValueIndex =
                 lowest;
-            highestMeshLod.intValue =
+            highestMeshLod.enumValueIndex =
                 highest;
         }
 
