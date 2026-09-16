@@ -17,7 +17,7 @@ namespace jcan.CelestialSystems
         Lod1 = 1,
         Lod2 = 2,
         Lod3 = 3,
-        Billboard = 4
+        Lod4 = 4
     }
 
     public readonly struct CelestialSmallBodyRequest
