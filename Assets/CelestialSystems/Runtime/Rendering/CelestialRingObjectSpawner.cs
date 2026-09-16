@@ -495,10 +495,10 @@ namespace jcan.CelestialSystems
                 }
 
                 if (instance.GetComponent<
-                        CelestialRingObjectInertialMotion>() == null)
+                        UniverseVelocityMotion>() == null)
                 {
                     instance.AddComponent<
-                        CelestialRingObjectInertialMotion>();
+                        UniverseVelocityMotion>();
                 }
 
                 instance.SetActive(
@@ -611,11 +611,22 @@ namespace jcan.CelestialSystems
                 body.TryGetMotionState(
                     out var bodyMotion))
             {
-                instance.GetComponent<
-                    CelestialRingObjectInertialMotion>()
+                var rockPosition = bodyMotion.Position;
+                var rotatedOffset =
+                    bodyMotion.Rotation * localPosition;
+                rockPosition.AddLocalMeters(
+                    rotatedOffset.x,
+                    rotatedOffset.y,
+                    rotatedOffset.z);
+
+                instance.GetComponent<UniverseVelocityMotion>()
                     .Initialize(
-                        bodyMotion,
-                        localPosition);
+                        new UniverseMotionState(
+                            rockPosition,
+                            instance.transform.rotation,
+                            bodyMotion
+                                .LinearVelocityMetersPerSecond,
+                            DoubleVector3.zero));
             }
             instance.transform.localScale =
                 Vector3.one *
