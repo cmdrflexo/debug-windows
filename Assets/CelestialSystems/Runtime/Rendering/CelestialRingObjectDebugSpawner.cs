@@ -104,10 +104,12 @@ namespace jcan.CelestialSystems
                 spawnDistanceMeters;
             instance.transform.rotation = Random.rotation;
 
-            UniverseTrackedObject.TryGetUniversePositionFromScenePosition(
-                GetUniverseFrame(),
-                instance.transform.position,
-                out var initialUniversePosition);
+            var hasInitialUniversePosition =
+                UniverseTrackedObject
+                    .TryGetUniversePositionFromScenePosition(
+                        GetUniverseFrame(),
+                        instance.transform.position,
+                        out var initialUniversePosition);
 
             var seed = unchecked(
                 (uint)(Time.frameCount * 747796405) +
@@ -164,25 +166,28 @@ namespace jcan.CelestialSystems
             instance.transform.localScale =
                 Vector3.one * diameter;
 
-            var velocityMotion =
-                instance.AddComponent<UniverseVelocityMotion>();
-            var velocity = DoubleVector3.zero;
-
-            if (TryGetVelocityReference(
-                    camera,
-                    out var referenceMotion))
+            if (hasInitialUniversePosition)
             {
-                velocity =
-                    referenceMotion
-                        .LinearVelocityMetersPerSecond;
-            }
+                var velocityMotion =
+                    instance.AddComponent<UniverseVelocityMotion>();
+                var velocity = DoubleVector3.zero;
 
-            velocityMotion.Initialize(
-                new UniverseMotionState(
-                    initialUniversePosition,
-                    instance.transform.rotation,
-                    velocity,
-                    DoubleVector3.zero));
+                if (TryGetVelocityReference(
+                        camera,
+                        out var referenceMotion))
+                {
+                    velocity =
+                        referenceMotion
+                            .LinearVelocityMetersPerSecond;
+                }
+
+                velocityMotion.Initialize(
+                    new UniverseMotionState(
+                        initialUniversePosition,
+                        instance.transform.rotation,
+                        velocity,
+                        DoubleVector3.zero));
+            }
 
             var gizmo = instance.AddComponent<
                 CelestialRingObjectDebugGizmo>();
