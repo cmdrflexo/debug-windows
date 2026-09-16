@@ -22,6 +22,10 @@ namespace jcan.CelestialSystems
             private MonoBehaviour toolSource;
 
             [SerializeField]
+            [HideInInspector]
+            private int lodConventionVersion = 1;
+
+            [SerializeField]
             [Min(0)]
             [Tooltip("Target number of available small-body containers. This is not multiplied by the number of LODs.")]
             private int targetReadyCount = 8;
@@ -37,7 +41,7 @@ namespace jcan.CelestialSystems
                 CelestialSmallBodyLod.Lod2;
 
             [SerializeField]
-            [Tooltip("Checked-out objects are consumed and immediately replaced by a new LOD 0 container.")]
+            [Tooltip("Checked-out objects are consumed and immediately replaced by a billboard LOD 4 container.")]
             private bool regenerateAfterCheckout = true;
 
             public MonoBehaviour ToolSource =>
@@ -57,6 +61,8 @@ namespace jcan.CelestialSystems
 
             public void Validate()
             {
+                MigrateLegacyLodConvention();
+
                 targetReadyCount =
                     Mathf.Max(
                         0,
@@ -76,13 +82,48 @@ namespace jcan.CelestialSystems
                 }
             }
 
+            private void MigrateLegacyLodConvention()
+            {
+                if (lodConventionVersion != 0)
+                {
+                    return;
+                }
+
+                // Previous versions used Billboard=0 and Detail4=4. A
+                // container still starts with the billboard, so only mesh
+                // prewarm levels need converting to Unity's LOD0-LOD3 order.
+                var legacyMinimum =
+                    Mathf.Clamp(
+                        Mathf.Max(
+                            1,
+                            (int)minimumPrewarmLod),
+                        1,
+                        4);
+                var legacyMaximum =
+                    Mathf.Clamp(
+                        Mathf.Max(
+                            legacyMinimum,
+                            (int)maximumPrewarmLod),
+                        1,
+                        4);
+
+                minimumPrewarmLod =
+                    (CelestialSmallBodyLod)(
+                        4 - legacyMinimum);
+                maximumPrewarmLod =
+                    (CelestialSmallBodyLod)(
+                        4 - legacyMaximum);
+                lodConventionVersion = 1;
+            }
+
             public void ClampToToolLods(
                 int lodCount)
             {
                 var maximumLod =
-                    Mathf.Max(
-                        0,
-                        lodCount - 1);
+                    Mathf.Clamp(
+                        lodCount - 1,
+                        (int)CelestialSmallBodyLod.Lod0,
+                        (int)CelestialSmallBodyLod.Lod3);
                 minimumPrewarmLod =
                     (CelestialSmallBodyLod)Mathf.Min(
                         (int)minimumPrewarmLod,
@@ -850,7 +891,7 @@ namespace jcan.CelestialSystems
         {
             RuntimeSlot best = null;
             var bestLod =
-                int.MaxValue;
+                -1;
 
             foreach (var slot in
                 pool.Slots)
