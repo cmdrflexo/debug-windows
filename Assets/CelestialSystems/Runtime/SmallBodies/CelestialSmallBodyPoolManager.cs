@@ -27,14 +27,14 @@ namespace jcan.CelestialSystems
             private int targetReadyCount = 8;
 
             [SerializeField]
-            [Tooltip("Every container starts at billboard LOD 0, then is upgraded until this minimum is ready.")]
+            [Tooltip("Lowest mesh detail guaranteed after the always-created billboard. LOD 3 is the first mesh LOD.")]
             private CelestialSmallBodyLod minimumPrewarmLod =
-                CelestialSmallBodyLod.Billboard;
+                CelestialSmallBodyLod.Lod3;
 
             [SerializeField]
-            [Tooltip("Idle background upgrades stop at this LOD.")]
+            [Tooltip("Highest mesh detail reached by idle background upgrades. LOD 0 is the highest detail.")]
             private CelestialSmallBodyLod maximumPrewarmLod =
-                CelestialSmallBodyLod.Detail2;
+                CelestialSmallBodyLod.Lod2;
 
             [SerializeField]
             [Tooltip("Checked-out objects are consumed and immediately replaced by a new LOD 0 container.")]
@@ -68,7 +68,7 @@ namespace jcan.CelestialSystems
                     ClampLod(
                         maximumPrewarmLod);
 
-                if ((int)maximumPrewarmLod <
+                if ((int)maximumPrewarmLod >
                     (int)minimumPrewarmLod)
                 {
                     maximumPrewarmLod =
@@ -92,7 +92,7 @@ namespace jcan.CelestialSystems
                         (int)maximumPrewarmLod,
                         maximumLod);
 
-                if ((int)maximumPrewarmLod <
+                if ((int)maximumPrewarmLod >
                     (int)minimumPrewarmLod)
                 {
                     maximumPrewarmLod =
@@ -106,8 +106,8 @@ namespace jcan.CelestialSystems
                 return
                     (CelestialSmallBodyLod)Mathf.Clamp(
                         (int)lod,
-                        (int)CelestialSmallBodyLod.Billboard,
-                        (int)CelestialSmallBodyLod.Detail4);
+                        (int)CelestialSmallBodyLod.Lod0,
+                        (int)CelestialSmallBodyLod.Lod3);
             }
         }
 
@@ -178,7 +178,7 @@ namespace jcan.CelestialSystems
         private int containerCount;
 
         [SerializeField]
-        [Tooltip("Available containers with billboard LOD 0 over the configured pool target.")]
+        [Tooltip("Available containers with billboard LOD 4 over the configured pool target.")]
         private string lod0Readout = "0/0";
 
         [SerializeField]
@@ -661,7 +661,14 @@ namespace jcan.CelestialSystems
 
             var nextLod =
                 (CelestialSmallBodyLod)(
-                    slot.Instance.HighestReadyLod + 1);
+                    slot.Instance.MostDetailedReadyLod - 1);
+
+            if ((int)nextLod <
+                (int)CelestialSmallBodyLod.Lod0)
+            {
+                return false;
+            }
+
             return TryStartLodGeneration(
                 pool,
                 slot,
@@ -808,7 +815,7 @@ namespace jcan.CelestialSystems
         {
             RuntimeSlot best = null;
             var bestLod =
-                int.MaxValue;
+                -1;
 
             foreach (var slot in
                 pool.Slots)
@@ -816,7 +823,7 @@ namespace jcan.CelestialSystems
                 if (slot.CheckedOut ||
                     slot.GenerationPending ||
                     slot.Instance == null ||
-                    !slot.Instance.HasAtLeastLod(
+                    !slot.Instance.HasLodOrHigherDetail(
                         request.DesiredLod) ||
                     (request.HasExplicitSeed &&
                      slot.Seed != request.Seed))
@@ -825,9 +832,9 @@ namespace jcan.CelestialSystems
                 }
 
                 var highestLod =
-                    slot.Instance.HighestReadyLod;
+                    slot.Instance.MostDetailedReadyLod;
 
-                if (highestLod < bestLod)
+                if (highestLod > bestLod)
                 {
                     best = slot;
                     bestLod = highestLod;
@@ -851,22 +858,22 @@ namespace jcan.CelestialSystems
                 if (slot.CheckedOut ||
                     slot.GenerationPending ||
                     slot.Instance == null ||
-                    slot.Instance.HighestReadyLod >=
+                    slot.Instance.MostDetailedReadyLod <=
                         (int)request.DesiredLod ||
                     (request.HasExplicitSeed &&
                      slot.Seed != request.Seed) ||
-                    slot.Instance.HighestReadyLod <
+                    slot.Instance.MostDetailedReadyLod >
                         (int)CelestialSmallBodyLod.Billboard)
                 {
                     continue;
                 }
 
-                if (slot.Instance.HighestReadyLod <
+                if (slot.Instance.MostDetailedReadyLod >
                     bestLod)
                 {
                     best = slot;
                     bestLod =
-                        slot.Instance.HighestReadyLod;
+                        slot.Instance.MostDetailedReadyLod;
                 }
             }
 
@@ -1060,7 +1067,7 @@ namespace jcan.CelestialSystems
 
                     if (!slot.CheckedOut &&
                         slot.Instance != null &&
-                        slot.Instance.HasAtLeastLod(
+                        slot.Instance.HasLodOrHigherDetail(
                             CelestialSmallBodyLod.Billboard))
                     {
                         readyObjectCount++;
@@ -1083,7 +1090,7 @@ namespace jcan.CelestialSystems
                         if (IsLodShownInDiagnostics(
                                 pool,
                                 requestedLod) &&
-                            slot.Instance.HasAtLeastLod(
+                            slot.Instance.HasLodOrHigherDetail(
                                 requestedLod))
                         {
                             readyByLod[lod]++;
@@ -1132,10 +1139,10 @@ namespace jcan.CelestialSystems
 
             return (int)lod >=
                     (int)pool.Configuration
-                        .MinimumPrewarmLod &&
+                        .MaximumPrewarmLod &&
                 (int)lod <=
                     (int)pool.Configuration
-                        .MaximumPrewarmLod;
+                        .MinimumPrewarmLod;
         }
 
         private static string FormatLodReadout(
