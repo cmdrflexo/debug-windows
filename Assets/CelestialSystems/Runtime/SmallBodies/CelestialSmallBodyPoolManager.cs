@@ -124,6 +124,7 @@ namespace jcan.CelestialSystems
             public bool CheckedOut;
             public bool GenerationPending;
             public CelestialSmallBodyLod PendingLod;
+            public bool CountsTowardReadyTarget = true;
         }
 
         private sealed class RuntimePool
@@ -175,6 +176,26 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("All currently tracked containers, including those upgrading.")]
         private int containerCount;
+
+        [SerializeField]
+        [Tooltip("Available containers with billboard LOD 0 over the configured pool target.")]
+        private string lod0Readout = "0/0";
+
+        [SerializeField]
+        [Tooltip("Available containers with at least LOD 1 over the configured pool target, or N/A when that LOD is outside the prewarm range.")]
+        private string lod1Readout = "N/A";
+
+        [SerializeField]
+        [Tooltip("Available containers with at least LOD 2 over the configured pool target, or N/A when that LOD is outside the prewarm range.")]
+        private string lod2Readout = "N/A";
+
+        [SerializeField]
+        [Tooltip("Available containers with at least LOD 3 over the configured pool target, or N/A when that LOD is outside the prewarm range.")]
+        private string lod3Readout = "N/A";
+
+        [SerializeField]
+        [Tooltip("Available containers with at least LOD 4 over the configured pool target, or N/A when that LOD is outside the prewarm range.")]
+        private string lod4Readout = "N/A";
 
         [SerializeField]
         private string lastError;
@@ -875,7 +896,8 @@ namespace jcan.CelestialSystems
             var slot =
                 new RuntimeSlot
                 {
-                    Seed = seed
+                    Seed = seed,
+                    CountsTowardReadyTarget = false
                 };
             pool.Slots.Add(
                 slot);
@@ -999,12 +1021,34 @@ namespace jcan.CelestialSystems
             waitingRequestCount = 0;
             containerCount = 0;
 
+            var readyByLod =
+                new int[5];
+            var targetByLod =
+                new int[5];
+
             foreach (var pool in poolsByToolId.Values)
             {
                 containerCount +=
                     pool.Slots.Count;
                 waitingRequestCount +=
                     pool.WaitingRequests.Count;
+
+                for (var lod = 0;
+                    lod < readyByLod.Length;
+                    lod++)
+                {
+                    var requestedLod =
+                        (CelestialSmallBodyLod)lod;
+
+                    if (IsLodShownInDiagnostics(
+                            pool,
+                            requestedLod))
+                    {
+                        targetByLod[lod] +=
+                            pool.Configuration
+                                .TargetReadyCount;
+                    }
+                }
 
                 foreach (var slot in
                     pool.Slots)
@@ -1021,8 +1065,86 @@ namespace jcan.CelestialSystems
                     {
                         readyObjectCount++;
                     }
+
+                    if (slot.CheckedOut ||
+                        !slot.CountsTowardReadyTarget ||
+                        slot.Instance == null)
+                    {
+                        continue;
+                    }
+
+                    for (var lod = 0;
+                        lod < readyByLod.Length;
+                        lod++)
+                    {
+                        var requestedLod =
+                            (CelestialSmallBodyLod)lod;
+
+                        if (IsLodShownInDiagnostics(
+                                pool,
+                                requestedLod) &&
+                            slot.Instance.HasAtLeastLod(
+                                requestedLod))
+                        {
+                            readyByLod[lod]++;
+                        }
+                    }
                 }
             }
+
+            lod0Readout =
+                FormatLodReadout(
+                    readyByLod[0],
+                    targetByLod[0]);
+            lod1Readout =
+                FormatLodReadout(
+                    readyByLod[1],
+                    targetByLod[1]);
+            lod2Readout =
+                FormatLodReadout(
+                    readyByLod[2],
+                    targetByLod[2]);
+            lod3Readout =
+                FormatLodReadout(
+                    readyByLod[3],
+                    targetByLod[3]);
+            lod4Readout =
+                FormatLodReadout(
+                    readyByLod[4],
+                    targetByLod[4]);
+        }
+
+        private static bool IsLodShownInDiagnostics(
+            RuntimePool pool,
+            CelestialSmallBodyLod lod)
+        {
+            if (pool == null ||
+                pool.Tool == null ||
+                (int)lod >= pool.Tool.LodCount)
+            {
+                return false;
+            }
+
+            if (lod == CelestialSmallBodyLod.Billboard)
+            {
+                return true;
+            }
+
+            return (int)lod >=
+                    (int)pool.Configuration
+                        .MinimumPrewarmLod &&
+                (int)lod <=
+                    (int)pool.Configuration
+                        .MaximumPrewarmLod;
+        }
+
+        private static string FormatLodReadout(
+            int readyCount,
+            int targetCount)
+        {
+            return targetCount > 0
+                ? $"{readyCount:D3}/{targetCount:D3}"
+                : "N/A";
         }
 
         private void RecordError(
