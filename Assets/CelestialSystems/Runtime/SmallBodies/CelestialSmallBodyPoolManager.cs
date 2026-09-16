@@ -203,9 +203,19 @@ namespace jcan.CelestialSystems
                     1,
                     maximumGenerationStartsPerFrame);
 
+            registeredToolSources ??=
+                new List<MonoBehaviour>();
+            registeredToolSources.Clear();
+
             foreach (var configuration in toolPools)
             {
                 configuration?.Validate();
+
+                if (configuration?.ToolSource != null)
+                {
+                    registeredToolSources.Add(
+                        configuration.ToolSource);
+                }
             }
 
             poolsResolved = false;
