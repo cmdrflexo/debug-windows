@@ -28,6 +28,10 @@ namespace jcan.CelestialSystems
         private float spawnDistanceMeters = 20.0f;
 
         [SerializeField]
+        [Tooltip("Initialize the rock with and continuously match the nearest body's velocity. Disable to leave it fixed in universe space.")]
+        private bool initializeWithReferenceVelocity = true;
+
+        [SerializeField]
         private InputAction spawnAction =
             new InputAction(
                 "Spawn Ring Object",
@@ -175,7 +179,8 @@ namespace jcan.CelestialSystems
                         out var referenceName,
                         out var referenceBody);
 
-                if (hasVelocityReference)
+                if (initializeWithReferenceVelocity &&
+                    hasVelocityReference)
                 {
                     velocity =
                         referenceMotion
@@ -190,6 +195,7 @@ namespace jcan.CelestialSystems
                         DoubleVector3.zero));
                 velocityMotion.SetVelocityReference(
                     referenceBody,
+                    initializeWithReferenceVelocity &&
                     hasVelocityReference);
 
                 if (hasVelocityReference)
