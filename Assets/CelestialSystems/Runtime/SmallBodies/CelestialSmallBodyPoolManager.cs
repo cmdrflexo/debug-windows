@@ -174,6 +174,8 @@ namespace jcan.CelestialSystems
         {
             public ToolPoolConfiguration Configuration;
             public ICelestialSmallBodyGenerationTool Tool;
+            public ICelestialSmallBodyImpostorProvider ImpostorProvider;
+            public CelestialSmallBodyImpostorLibrary ImpostorLibrary;
             public readonly List<RuntimeSlot> Slots =
                 new List<RuntimeSlot>();
             public readonly List<WaitingRequest> WaitingRequests =
@@ -219,6 +221,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("All currently tracked containers, including those upgrading.")]
         private int containerCount;
+
+        [SerializeField]
+        [Tooltip("Tool-owned impostor libraries currently configured by this pool manager.")]
+        private int impostorLibraryCount;
 
         [SerializeField]
         [Tooltip("Available containers with billboard LOD 4 over the configured pool target.")]
@@ -505,13 +511,20 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
-                poolsByToolId.Add(
-                    tool.ToolId,
+                var runtimePool =
                     new RuntimePool
                     {
                         Configuration = configuration,
-                        Tool = tool
-                    });
+                        Tool = tool,
+                        ImpostorProvider =
+                            configuration.ToolSource as
+                                ICelestialSmallBodyImpostorProvider
+                    };
+                poolsByToolId.Add(
+                    tool.ToolId,
+                    runtimePool);
+                EnsureImpostorLibrary(
+                    runtimePool);
             }
 
             poolsResolved = true;
@@ -822,6 +835,14 @@ namespace jcan.CelestialSystems
                 Destroy(
                     result.Instance);
             }
+            else if (result.Request.DesiredLod ==
+                CelestialSmallBodyLod.Lod4)
+            {
+                BindBillboardToImpostorLibrary(
+                    pool,
+                    result.Instance,
+                    slot.Seed);
+            }
 
             FulfillWaitingRequests(
                 pool);
@@ -1036,6 +1057,62 @@ namespace jcan.CelestialSystems
             return true;
         }
 
+        private void EnsureImpostorLibrary(
+            RuntimePool pool)
+        {
+            if (pool == null ||
+                pool.ImpostorProvider == null ||
+                pool.ImpostorLibrary != null)
+            {
+                return;
+            }
+
+            var libraryObject =
+                new GameObject(
+                    $"Small Body Impostors {pool.Tool.ToolId}");
+            libraryObject.transform.SetParent(
+                EnsurePoolRoot(),
+                false);
+            pool.ImpostorLibrary =
+                libraryObject.AddComponent<
+                    CelestialSmallBodyImpostorLibrary>();
+            pool.ImpostorLibrary.Configure(
+                pool.Tool.ToolId,
+                pool.ImpostorProvider
+                    .ImpostorVariantCount,
+                pool.ImpostorProvider
+                    .ImpostorResolution,
+                pool.ImpostorProvider
+                    .RequestedImpostorMaps);
+        }
+
+        private static void BindBillboardToImpostorLibrary(
+            RuntimePool pool,
+            GameObject billboard,
+            uint seed)
+        {
+            if (pool?.ImpostorLibrary == null ||
+                billboard == null)
+            {
+                return;
+            }
+
+            var binding =
+                billboard.GetComponent<
+                    CelestialSmallBodyImpostorBinding>();
+
+            if (binding == null)
+            {
+                binding =
+                    billboard.AddComponent<
+                        CelestialSmallBodyImpostorBinding>();
+            }
+
+            binding.Configure(
+                pool.ImpostorLibrary,
+                seed);
+        }
+
         private Transform EnsurePoolRoot()
         {
             if (poolRoot != null)
@@ -1070,6 +1147,7 @@ namespace jcan.CelestialSystems
             pendingGenerationCount = 0;
             waitingRequestCount = 0;
             containerCount = 0;
+            impostorLibraryCount = 0;
 
             var readyByLod =
                 new int[5];
@@ -1078,6 +1156,11 @@ namespace jcan.CelestialSystems
 
             foreach (var pool in poolsByToolId.Values)
             {
+                if (pool.ImpostorLibrary != null)
+                {
+                    impostorLibraryCount++;
+                }
+
                 containerCount +=
                     pool.Slots.Count;
                 waitingRequestCount +=
