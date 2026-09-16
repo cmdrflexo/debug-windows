@@ -574,7 +574,7 @@ namespace jcan.CelestialSystems
                 if (!TryStartLodGeneration(
                         pool,
                         slot,
-                        CelestialSmallBodyLod.Billboard))
+                        CelestialSmallBodyLod.Lod4))
                 {
                     pool.Slots.Remove(
                         slot);
@@ -906,7 +906,7 @@ namespace jcan.CelestialSystems
                     (request.HasExplicitSeed &&
                      slot.Seed != request.Seed) ||
                     slot.Instance.MostDetailedReadyLod >
-                        (int)CelestialSmallBodyLod.Billboard)
+                        (int)CelestialSmallBodyLod.Lod4)
                 {
                     continue;
                 }
@@ -929,7 +929,7 @@ namespace jcan.CelestialSystems
             ref int startsRemaining)
         {
             if (startsRemaining <= 0 ||
-                (int)CelestialSmallBodyLod.Billboard >=
+                (int)CelestialSmallBodyLod.Lod4 >=
                     pool.Tool.LodCount)
             {
                 return null;
@@ -955,7 +955,7 @@ namespace jcan.CelestialSystems
             if (!TryStartLodGeneration(
                     pool,
                     slot,
-                    CelestialSmallBodyLod.Billboard))
+                    CelestialSmallBodyLod.Lod4))
             {
                 pool.Slots.Remove(
                     slot);
@@ -1111,7 +1111,7 @@ namespace jcan.CelestialSystems
                     if (!slot.CheckedOut &&
                         slot.Instance != null &&
                         slot.Instance.HasLodOrHigherDetail(
-                            CelestialSmallBodyLod.Billboard))
+                            CelestialSmallBodyLod.Lod4))
                     {
                         readyObjectCount++;
                     }
@@ -1175,7 +1175,7 @@ namespace jcan.CelestialSystems
                 return false;
             }
 
-            if (lod == CelestialSmallBodyLod.Billboard)
+            if (lod == CelestialSmallBodyLod.Lod4)
             {
                 return true;
             }
