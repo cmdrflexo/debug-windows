@@ -15,7 +15,8 @@ namespace jcan.CelestialSystems
     [DisallowMultipleComponent]
     public sealed class CelestialIceRockSmallBodyTool :
         MonoBehaviour,
-        ICelestialSmallBodyGenerationTool
+        ICelestialSmallBodyGenerationTool,
+        ICelestialSmallBodyImpostorProvider
     {
         private sealed class PendingGeneration
         {
@@ -54,6 +55,25 @@ namespace jcan.CelestialSystems
         [Tooltip("Optional material for LOD 0. A family material is used when empty.")]
         private Material billboardMaterial;
 
+        [Header("Impostor Library")]
+        [SerializeField]
+        [Min(1)]
+        [Tooltip("Number of reusable LOD4 impostor appearances requested from the pool manager.")]
+        private int impostorVariantCount = 16;
+
+        [SerializeField]
+        [Range(32, 2048)]
+        [Tooltip("Requested square pixel resolution for one atlas variant.")]
+        private int impostorResolution = 256;
+
+        [SerializeField]
+        [Tooltip("PBR channels the future capture pass should bake for this tool.")]
+        private CelestialSmallBodyImpostorMaps requestedImpostorMaps =
+            CelestialSmallBodyImpostorMaps.AlbedoTransparency |
+            CelestialSmallBodyImpostorMaps.Normal |
+            CelestialSmallBodyImpostorMaps.Emission |
+            CelestialSmallBodyImpostorMaps.MetallicSmoothness;
+
         [Header("Ice-Body Mesh Generation")]
         [SerializeField]
         private CelestialIceBodyGenerationSettings iceBodySettings =
@@ -91,6 +111,15 @@ namespace jcan.CelestialSystems
         public int LodCount =>
             lodCount;
 
+        public int ImpostorVariantCount =>
+            impostorVariantCount;
+
+        public int ImpostorResolution =>
+            impostorResolution;
+
+        public CelestialSmallBodyImpostorMaps RequestedImpostorMaps =>
+            requestedImpostorMaps;
+
         public int PendingGenerationCount =>
             pendingGenerationCount;
 
@@ -106,6 +135,15 @@ namespace jcan.CelestialSystems
                 toolId?.Trim() ??
                 string.Empty;
             lodCount = 5;
+            impostorVariantCount =
+                Mathf.Max(
+                    1,
+                    impostorVariantCount);
+            impostorResolution =
+                Mathf.Clamp(
+                    impostorResolution,
+                    32,
+                    2048);
             maximumConcurrentJobs =
                 Mathf.Max(
                     1,
