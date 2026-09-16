@@ -29,8 +29,7 @@ namespace jcan.CelestialSystems
             floatingObject ??=
                 GetComponent<SgtFloatingObject>();
 
-            if (floatingObject == null ||
-                CelestialTimeController.Instance == null)
+            if (floatingObject == null)
             {
                 initialized = false;
                 return false;
@@ -54,12 +53,14 @@ namespace jcan.CelestialSystems
                     0.0,
                     out var floatingPosition))
             {
-                return;
+                initialized = false;
+                return false;
             }
 
             floatingObject.SetPosition(
                 floatingPosition);
             floatingObject.ApplyPosition();
+            return true;
         }
     }
 }
