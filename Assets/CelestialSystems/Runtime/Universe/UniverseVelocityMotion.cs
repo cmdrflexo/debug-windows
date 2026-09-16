@@ -13,7 +13,7 @@ namespace jcan.CelestialSystems
     [RequireComponent(typeof(SgtFloatingObject))]
     public sealed class UniverseVelocityMotion :
         MonoBehaviour,
-        ICelestialMotionStateSource
+        ICelestialBodyMotionProvider
     {
         [SerializeField]
         private SgtFloatingObject floatingObject;
