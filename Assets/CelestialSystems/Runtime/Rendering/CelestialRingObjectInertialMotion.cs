@@ -1,7 +1,7 @@
 /*
  * Projects a lightweight streamed ring object through SGT using its own
- * universe position. It receives only the source body's initial linear
- * velocity, keeping hundreds of close-range objects out of Gravity Engine.
+ * fixed universe position. This is a visual prototype: ring objects do not
+ * inherit velocity or participate in Gravity Engine simulation.
  */
 
 using SpaceGraphicsToolkit;
@@ -18,12 +18,6 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private UniversePosition initialUniversePosition;
-
-        [SerializeField]
-        private DoubleVector3 inheritedVelocityMetersPerSecond;
-
-        [SerializeField]
-        private double initialUniversalTimeSeconds;
 
         [SerializeField]
         private bool initialized;
@@ -51,48 +45,10 @@ namespace jcan.CelestialSystems
                 rotatedOffset.x,
                 rotatedOffset.y,
                 rotatedOffset.z);
-            inheritedVelocityMetersPerSecond =
-                sourceMotion.LinearVelocityMetersPerSecond;
-            initialUniversalTimeSeconds =
-                CelestialTimeController.Instance
-                    .UniversalTimeSeconds;
             initialized = true;
-            ApplyCurrentPosition();
-            return true;
-        }
-
-        private void LateUpdate()
-        {
-            if (initialized)
-            {
-                ApplyCurrentPosition();
-            }
-        }
-
-        private void ApplyCurrentPosition()
-        {
-            if (floatingObject == null ||
-                CelestialTimeController.Instance == null)
-            {
-                return;
-            }
-
-            var elapsedSeconds =
-                CelestialTimeController.Instance
-                    .UniversalTimeSeconds -
-                initialUniversalTimeSeconds;
-            var position =
-                initialUniversePosition;
-            position.AddLocalMeters(
-                inheritedVelocityMetersPerSecond.x *
-                    elapsedSeconds,
-                inheritedVelocityMetersPerSecond.y *
-                    elapsedSeconds,
-                inheritedVelocityMetersPerSecond.z *
-                    elapsedSeconds);
 
             if (!SgtUniversePositionConverter.TryToSgtPosition(
-                    position,
+                    initialUniversePosition,
                     0.0,
                     0.0,
                     0.0,
