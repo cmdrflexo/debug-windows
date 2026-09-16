@@ -619,14 +619,19 @@ namespace jcan.CelestialSystems
                     rotatedOffset.y,
                     rotatedOffset.z);
 
-                instance.GetComponent<UniverseVelocityMotion>()
-                    .Initialize(
-                        new UniverseMotionState(
-                            rockPosition,
-                            instance.transform.rotation,
-                            bodyMotion
-                                .LinearVelocityMetersPerSecond,
-                            DoubleVector3.zero));
+                var velocityMotion =
+                    instance.GetComponent<
+                        UniverseVelocityMotion>();
+                velocityMotion.Initialize(
+                    new UniverseMotionState(
+                        rockPosition,
+                        instance.transform.rotation,
+                        bodyMotion
+                            .LinearVelocityMetersPerSecond,
+                        DoubleVector3.zero));
+                velocityMotion.SetVelocityReference(
+                    body,
+                    true);
             }
             instance.transform.localScale =
                 Vector3.one *
