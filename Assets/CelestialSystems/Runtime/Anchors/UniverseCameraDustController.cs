@@ -51,11 +51,6 @@ namespace jcan.CelestialSystems
         [Min(0.01f)]
         private float maximumVisualSpeedMetersPerSecond = 40.0f;
 
-        [SerializeField]
-        [Tooltip("Seconds used to smooth apparent dust motion and reject frame-shift noise.")]
-        [Min(0.0f)]
-        private float velocitySmoothingSeconds = 0.15f;
-
         [Header("Runtime")]
         [SerializeField]
         private bool hasPoseSample;
@@ -80,7 +75,6 @@ namespace jcan.CelestialSystems
         private UniversePosition previousReferencePosition;
         private CelestialBodyRuntimeContext sampledReferenceBody;
         private bool hasReferenceFrameSample;
-        private Vector3 smoothedUniverseVelocity;
         private float baseEmissionRateMultiplier = 1.0f;
         private bool capturedEmissionRate;
 
@@ -115,9 +109,6 @@ namespace jcan.CelestialSystems
             maximumVisualSpeedMetersPerSecond = Mathf.Max(
                 0.01f,
                 maximumVisualSpeedMetersPerSecond);
-            velocitySmoothingSeconds = Mathf.Max(
-                0.0f,
-                velocitySmoothingSeconds);
         }
 
         private void LateUpdate()
@@ -137,7 +128,6 @@ namespace jcan.CelestialSystems
             {
                 previousPosition = pose.Position;
                 hasPoseSample = true;
-                smoothedUniverseVelocity = Vector3.zero;
                 rawCameraSpeedMetersPerSecond = 0.0f;
                 ApplyDustVelocity(Vector3.zero);
                 SetEmissionDensity(1.0f);
@@ -205,17 +195,8 @@ namespace jcan.CelestialSystems
                 (float)(velocityY * visualScale),
                 (float)(velocityZ * visualScale));
 
-            var blend = velocitySmoothingSeconds <= Mathf.Epsilon
-                ? 1.0f
-                : 1.0f - Mathf.Exp(
-                    -deltaTime / velocitySmoothingSeconds);
-            smoothedUniverseVelocity = Vector3.Lerp(
-                smoothedUniverseVelocity,
-                velocity,
-                blend);
-
             var visualVelocity = Vector3.ClampMagnitude(
-                smoothedUniverseVelocity,
+                velocity,
                 maximumVisualSpeedMetersPerSecond);
             ApplyDustVelocity(visualVelocity);
             SetEmissionDensity(EvaluateEmissionDensity(
@@ -378,7 +359,6 @@ namespace jcan.CelestialSystems
             sampledReferenceBody = null;
             hasReferenceFrameSample = false;
             activeReferenceFrameName = string.Empty;
-            smoothedUniverseVelocity = Vector3.zero;
             rawCameraSpeedMetersPerSecond = 0.0f;
             visualDustSpeedMetersPerSecond = 0.0f;
             localDustVelocityMetersPerSecond = Vector3.zero;
