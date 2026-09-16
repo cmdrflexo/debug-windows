@@ -87,6 +87,35 @@ namespace jcan.CelestialSystems
             propertyBlock.SetFloat(
                 "_CelestialImpostorMaps",
                 (float)requestedMaps);
+
+            if (library.AlbedoTransparencyAtlas != null)
+            {
+                propertyBlock.SetTexture(
+                    "_CelestialImpostorAlbedoTransparencyAtlas",
+                    library.AlbedoTransparencyAtlas);
+            }
+
+            if (library.NormalAtlas != null)
+            {
+                propertyBlock.SetTexture(
+                    "_CelestialImpostorNormalAtlas",
+                    library.NormalAtlas);
+            }
+
+            if (library.EmissionAtlas != null)
+            {
+                propertyBlock.SetTexture(
+                    "_CelestialImpostorEmissionAtlas",
+                    library.EmissionAtlas);
+            }
+
+            if (library.MetallicSmoothnessAtlas != null)
+            {
+                propertyBlock.SetTexture(
+                    "_CelestialImpostorMetallicSmoothnessAtlas",
+                    library.MetallicSmoothnessAtlas);
+            }
+
             renderer.SetPropertyBlock(
                 propertyBlock);
         }
