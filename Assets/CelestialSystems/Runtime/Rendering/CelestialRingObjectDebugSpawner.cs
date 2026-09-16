@@ -24,10 +24,6 @@ namespace jcan.CelestialSystems
         private UniverseFrameController universeFrame;
 
         [SerializeField]
-        [Tooltip("Optional nearest body/ring context. If empty, the camera's context is used.")]
-        private UniverseLocalEnvironmentContext velocityReference;
-
-        [SerializeField]
         [Min(0.1f)]
         private float spawnDistanceMeters = 20.0f;
 
@@ -244,23 +240,57 @@ namespace jcan.CelestialSystems
         {
             motion = default;
             referenceName = "None";
-            var context = velocityReference != null
-                ? velocityReference
-                : camera.GetComponentInParent<
-                    UniverseLocalEnvironmentContext>();
 
-            context ??= FindFirstObjectByType<
-                UniverseLocalEnvironmentContext>();
-
-            if (context == null ||
-                !context.TryGetReferenceMotion(out motion))
+            if (camera == null ||
+                !UniverseTrackedObject
+                    .TryGetUniversePositionFromScenePosition(
+                        GetUniverseFrame(),
+                        camera.transform.position,
+                        out var cameraUniversePosition))
             {
                 return false;
             }
 
-            referenceName =
-                $"{context.DisplayName} ({context.Type})";
-            return true;
+            var closestDistanceSquared =
+                double.PositiveInfinity;
+            var foundBody = false;
+
+            foreach (var candidate in
+                CelestialBodyRuntimeContext.ActiveContexts)
+            {
+                if (candidate == null ||
+                    !candidate.TryGetMotionState(
+                        out var candidateMotion) ||
+                    !cameraUniversePosition
+                        .TryGetOffsetMetersFrom(
+                            candidateMotion.Position,
+                            out var offsetMeters))
+                {
+                    continue;
+                }
+
+                var distanceSquared =
+                    offsetMeters.x * offsetMeters.x +
+                    offsetMeters.y * offsetMeters.y +
+                    offsetMeters.z * offsetMeters.z;
+
+                if (double.IsNaN(distanceSquared) ||
+                    double.IsInfinity(distanceSquared) ||
+                    distanceSquared >= closestDistanceSquared)
+                {
+                    continue;
+                }
+
+                closestDistanceSquared =
+                    distanceSquared;
+                motion =
+                    candidateMotion;
+                referenceName =
+                    candidate.name + " (nearest body)";
+                foundBody = true;
+            }
+
+            return foundBody;
         }
 
         private CelestialRingObjectFamily GetSpawnFamily()
