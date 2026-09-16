@@ -1,7 +1,7 @@
 /*
  * Projects a universe-space kinematic motion state through an SGT floating
- * object. It can optionally inherit the current linear velocity of a body
- * while retaining its own independent universe position.
+ * object. It can optionally inherit a body's velocity without becoming
+ * position-locked to that body.
  */
 
 using SpaceGraphicsToolkit;
@@ -32,8 +32,20 @@ namespace jcan.CelestialSystems
         private CelestialBodyRuntimeContext velocityReferenceBody;
 
         [SerializeField]
-        [Tooltip("Continuously matches this object's linear velocity to the reference body.")]
+        [Tooltip("Samples and smoothly follows the reference body's linear velocity.")]
         private bool matchVelocityWithReferenceBody;
+
+        [SerializeField]
+        [Min(0.0f)]
+        [Tooltip("Real-time seconds between reference velocity samples. Zero samples every evaluation.")]
+        private float velocityReferenceUpdateIntervalSeconds =
+            1.0f;
+
+        [SerializeField]
+        [Min(0.0f)]
+        [Tooltip("Real-time seconds used to blend toward each sampled reference velocity. Zero changes immediately.")]
+        private float velocityReferenceBlendSeconds =
+            0.5f;
 
         [Header("Runtime State")]
         [SerializeField]
@@ -41,6 +53,18 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private double lastEvaluatedUniversalTimeSeconds;
+
+        [SerializeField]
+        private DoubleVector3 targetReferenceVelocity;
+
+        [SerializeField]
+        private double lastVelocityReferenceSampleRealtimeSeconds;
+
+        [SerializeField]
+        private double lastVelocityBlendRealtimeSeconds;
+
+        [SerializeField]
+        private bool hasTargetReferenceVelocity;
 
         [SerializeField]
         private bool initialized;
@@ -95,6 +119,7 @@ namespace jcan.CelestialSystems
                 motionState;
             lastEvaluatedUniversalTimeSeconds =
                 initialUniversalTimeSeconds;
+            ResetVelocityReferenceRuntimeState();
             initialized = true;
             lastError = string.Empty;
             ApplyCurrentState();
@@ -109,6 +134,7 @@ namespace jcan.CelestialSystems
                 referenceBody;
             matchVelocityWithReferenceBody =
                 matchVelocity && referenceBody != null;
+            ResetVelocityReferenceRuntimeState();
         }
 
         public bool TryGetMotionState(
@@ -133,6 +159,7 @@ namespace jcan.CelestialSystems
             }
 
             matchVelocityWithReferenceBody = false;
+            ResetVelocityReferenceRuntimeState();
             return Initialize(
                 new UniverseMotionState(
                     currentState.Position,
@@ -145,6 +172,18 @@ namespace jcan.CelestialSystems
         {
             floatingObject =
                 GetComponent<SgtFloatingObject>();
+        }
+
+        private void OnValidate()
+        {
+            velocityReferenceUpdateIntervalSeconds =
+                Mathf.Max(
+                    0.0f,
+                    velocityReferenceUpdateIntervalSeconds);
+            velocityReferenceBlendSeconds =
+                Mathf.Max(
+                    0.0f,
+                    velocityReferenceBlendSeconds);
         }
 
         private void LateUpdate()
@@ -169,29 +208,26 @@ namespace jcan.CelestialSystems
 
             var universalTimeSeconds =
                 timeController.UniversalTimeSeconds;
-            var elapsedSeconds =
+            var elapsedUniverseSeconds =
                 universalTimeSeconds -
                 lastEvaluatedUniversalTimeSeconds;
             var velocity =
                 currentMotionState
                     .LinearVelocityMetersPerSecond;
-
-            if (matchVelocityWithReferenceBody &&
-                velocityReferenceBody != null &&
-                velocityReferenceBody.TryGetMotionState(
-                    out var referenceMotion))
-            {
-                velocity =
-                    referenceMotion
-                        .LinearVelocityMetersPerSecond;
-            }
-
             var position =
                 currentMotionState.Position;
+
+            // Integrate the time since the previous state with the velocity
+            // that was already active. A fresh reference sample changes only
+            // the next segment of travel.
             position.AddLocalMeters(
-                velocity.x * elapsedSeconds,
-                velocity.y * elapsedSeconds,
-                velocity.z * elapsedSeconds);
+                velocity.x * elapsedUniverseSeconds,
+                velocity.y * elapsedUniverseSeconds,
+                velocity.z * elapsedUniverseSeconds);
+
+            UpdateReferenceVelocity(
+                ref velocity);
+
             currentMotionState =
                 new UniverseMotionState(
                     position,
@@ -204,6 +240,77 @@ namespace jcan.CelestialSystems
             motionState =
                 currentMotionState;
             return true;
+        }
+
+        private void UpdateReferenceVelocity(
+            ref DoubleVector3 velocity)
+        {
+            var realtimeSeconds =
+                Time.realtimeSinceStartupAsDouble;
+
+            if (matchVelocityWithReferenceBody &&
+                velocityReferenceBody != null &&
+                ShouldSampleReferenceVelocity(
+                    realtimeSeconds) &&
+                velocityReferenceBody.TryGetMotionState(
+                    out var referenceMotion))
+            {
+                targetReferenceVelocity =
+                    referenceMotion
+                        .LinearVelocityMetersPerSecond;
+                hasTargetReferenceVelocity = true;
+                lastVelocityReferenceSampleRealtimeSeconds =
+                    realtimeSeconds;
+            }
+
+            if (!hasTargetReferenceVelocity)
+            {
+                lastVelocityBlendRealtimeSeconds =
+                    realtimeSeconds;
+                return;
+            }
+
+            var blendElapsedSeconds =
+                Mathf.Max(
+                    0.0f,
+                    (float)(
+                        realtimeSeconds -
+                        lastVelocityBlendRealtimeSeconds));
+            var blendFactor =
+                velocityReferenceBlendSeconds <= 0.0f
+                    ? 1.0
+                    : 1.0 -
+                        System.Math.Exp(
+                            -blendElapsedSeconds /
+                            velocityReferenceBlendSeconds);
+
+            velocity +=
+                (targetReferenceVelocity - velocity) *
+                blendFactor;
+            lastVelocityBlendRealtimeSeconds =
+                realtimeSeconds;
+        }
+
+        private bool ShouldSampleReferenceVelocity(
+            double realtimeSeconds)
+        {
+            return
+                !hasTargetReferenceVelocity ||
+                velocityReferenceUpdateIntervalSeconds <= 0.0f ||
+                realtimeSeconds -
+                    lastVelocityReferenceSampleRealtimeSeconds >=
+                    velocityReferenceUpdateIntervalSeconds;
+        }
+
+        private void ResetVelocityReferenceRuntimeState()
+        {
+            targetReferenceVelocity =
+                DoubleVector3.zero;
+            hasTargetReferenceVelocity = false;
+            lastVelocityReferenceSampleRealtimeSeconds =
+                double.NegativeInfinity;
+            lastVelocityBlendRealtimeSeconds =
+                Time.realtimeSinceStartupAsDouble;
         }
 
         private void ApplyCurrentState()
