@@ -198,7 +198,7 @@ namespace jcan.CelestialSystems
                 else
                 {
                     Debug.Log(
-                        "Debug Ring Object found no valid local body/ring " +
+                        "Debug Ring Object found no valid nearby body " +
                         "velocity reference; initialized at zero velocity.",
                         instance);
                 }
