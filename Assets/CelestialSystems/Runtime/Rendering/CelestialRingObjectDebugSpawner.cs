@@ -172,9 +172,13 @@ namespace jcan.CelestialSystems
                     instance.AddComponent<UniverseVelocityMotion>();
                 var velocity = DoubleVector3.zero;
 
-                if (TryGetVelocityReference(
+                var hasVelocityReference =
+                    TryGetVelocityReference(
                         camera,
-                        out var referenceMotion))
+                        out var referenceMotion,
+                        out var referenceName);
+
+                if (hasVelocityReference)
                 {
                     velocity =
                         referenceMotion
@@ -187,6 +191,21 @@ namespace jcan.CelestialSystems
                         instance.transform.rotation,
                         velocity,
                         DoubleVector3.zero));
+
+                if (hasVelocityReference)
+                {
+                    Debug.Log(
+                        $"Debug Ring Object velocity: {velocity} m/s. " +
+                        $"Reference: {referenceName}.",
+                        instance);
+                }
+                else
+                {
+                    Debug.Log(
+                        "Debug Ring Object found no valid local body/ring " +
+                        "velocity reference; initialized at zero velocity.",
+                        instance);
+                }
             }
 
             var gizmo = instance.AddComponent<
@@ -220,9 +239,11 @@ namespace jcan.CelestialSystems
 
         private bool TryGetVelocityReference(
             Camera camera,
-            out UniverseMotionState motion)
+            out UniverseMotionState motion,
+            out string referenceName)
         {
             motion = default;
+            referenceName = "None";
             var context = velocityReference != null
                 ? velocityReference
                 : camera.GetComponentInParent<
@@ -230,8 +251,16 @@ namespace jcan.CelestialSystems
 
             context ??= FindFirstObjectByType<
                 UniverseLocalEnvironmentContext>();
-            return context != null &&
-                context.TryGetReferenceMotion(out motion);
+
+            if (context == null ||
+                !context.TryGetReferenceMotion(out motion))
+            {
+                return false;
+            }
+
+            referenceName =
+                $"{context.DisplayName} ({context.Type})";
+            return true;
         }
 
         private CelestialRingObjectFamily GetSpawnFamily()
