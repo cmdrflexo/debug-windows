@@ -597,8 +597,8 @@ namespace jcan.CelestialSystems
                     StringComparison.Ordinal) &&
                 (!requested.HasExplicitSeed ||
                     available.Seed == requested.Seed) &&
-                available.DesiredLod >=
-                    requested.DesiredLod;
+                (int)available.DesiredLod >=
+                    (int)requested.DesiredLod;
         }
 
         private void PrepareForCheckout(
