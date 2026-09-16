@@ -1,10 +1,8 @@
 /*
- * Projects a lightweight streamed ring object through SGT using its own
- * fixed universe position. This is a visual prototype: ring objects do not
- * inherit velocity or participate in Gravity Engine simulation.
+ * Resolves a streamed ring cell into one fixed universe position, then hands
+ * that state to the reusable SGT velocity-motion component.
  */
 
-using SpaceGraphicsToolkit;
 using UnityEngine;
 
 namespace jcan.CelestialSystems
@@ -14,7 +12,7 @@ namespace jcan.CelestialSystems
         MonoBehaviour
     {
         [SerializeField]
-        private SgtFloatingObject floatingObject;
+        private UniverseVelocityMotion velocityMotion;
 
         [SerializeField]
         private UniversePosition initialUniversePosition;
@@ -26,13 +24,13 @@ namespace jcan.CelestialSystems
             UniverseMotionState sourceMotion,
             Vector3 sourceLocalOffsetMeters)
         {
-            floatingObject ??=
-                GetComponent<SgtFloatingObject>();
+            velocityMotion ??=
+                GetComponent<UniverseVelocityMotion>();
 
-            if (floatingObject == null)
+            if (velocityMotion == null)
             {
-                initialized = false;
-                return false;
+                velocityMotion =
+                    gameObject.AddComponent<UniverseVelocityMotion>();
             }
 
             var rotatedOffset =
@@ -44,23 +42,13 @@ namespace jcan.CelestialSystems
                 rotatedOffset.x,
                 rotatedOffset.y,
                 rotatedOffset.z);
-            initialized = true;
 
-            if (!SgtUniversePositionConverter.TryToSgtPosition(
-                    initialUniversePosition,
-                    0.0,
-                    0.0,
-                    0.0,
-                    out var floatingPosition))
-            {
-                initialized = false;
-                return false;
-            }
-
-            floatingObject.SetPosition(
-                floatingPosition);
-            floatingObject.ApplyPosition();
-            return true;
+            initialized =
+                velocityMotion.Initialize(
+                    new UniverseMotionState(
+                        initialUniversePosition,
+                        Quaternion.identity));
+            return initialized;
         }
     }
 }
