@@ -32,9 +32,11 @@ namespace jcan.CelestialSystems
             UniverseFrameController frame,
             Vector3 scenePositionMeters)
         {
+            UnsubscribeFromFrame();
             universeFrame = frame != null
                 ? frame
                 : universeFrame;
+            SubscribeToFrame();
 
             if (universeFrame == null ||
                 !universeFrame.FrameOriginInitialized)
