@@ -68,8 +68,8 @@ namespace jcan.CelestialSystems
                     ClampLod(
                         maximumPrewarmLod);
 
-                if (maximumPrewarmLod <
-                    minimumPrewarmLod)
+                if ((int)maximumPrewarmLod <
+                    (int)minimumPrewarmLod)
                 {
                     maximumPrewarmLod =
                         minimumPrewarmLod;
@@ -92,8 +92,8 @@ namespace jcan.CelestialSystems
                         (int)maximumPrewarmLod,
                         maximumLod);
 
-                if (maximumPrewarmLod <
-                    minimumPrewarmLod)
+                if ((int)maximumPrewarmLod <
+                    (int)minimumPrewarmLod)
                 {
                     maximumPrewarmLod =
                         minimumPrewarmLod;
