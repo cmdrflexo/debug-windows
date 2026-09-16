@@ -284,7 +284,7 @@ namespace jcan.CelestialSystems
             var slot =
                 FindBestAvailableSlot(
                     pool,
-                    request.DesiredLod);
+                    request);
 
             if (slot == null)
             {
@@ -538,7 +538,20 @@ namespace jcan.CelestialSystems
                 var slot =
                     FindUpgradeableSlot(
                         pool,
-                        waiting.Request.DesiredLod);
+                        waiting.Request);
+
+                if (slot == null &&
+                    waiting.Request.HasExplicitSeed)
+                {
+                    slot =
+                        CreateExplicitSeedSlot(
+                            pool,
+                            waiting.Request.Seed,
+                            ref startsRemaining);
+
+                    // The new slot is still generating its billboard.
+                    continue;
+                }
 
                 if (slot == null ||
                     !TryStartNextLodGeneration(
@@ -762,7 +775,7 @@ namespace jcan.CelestialSystems
 
         private RuntimeSlot FindBestAvailableSlot(
             RuntimePool pool,
-            CelestialSmallBodyLod desiredLod)
+            CelestialSmallBodyRequest request)
         {
             RuntimeSlot best = null;
             var bestLod =
@@ -775,7 +788,9 @@ namespace jcan.CelestialSystems
                     slot.GenerationPending ||
                     slot.Instance == null ||
                     !slot.Instance.HasAtLeastLod(
-                        desiredLod))
+                        request.DesiredLod) ||
+                    (request.HasExplicitSeed &&
+                     slot.Seed != request.Seed))
                 {
                     continue;
                 }
@@ -795,7 +810,7 @@ namespace jcan.CelestialSystems
 
         private RuntimeSlot FindUpgradeableSlot(
             RuntimePool pool,
-            CelestialSmallBodyLod desiredLod)
+            CelestialSmallBodyRequest request)
         {
             RuntimeSlot best = null;
             var bestLod =
@@ -808,7 +823,9 @@ namespace jcan.CelestialSystems
                     slot.GenerationPending ||
                     slot.Instance == null ||
                     slot.Instance.HighestReadyLod >=
-                        (int)desiredLod ||
+                        (int)request.DesiredLod ||
+                    (request.HasExplicitSeed &&
+                     slot.Seed != request.Seed) ||
                     slot.Instance.HighestReadyLod <
                         (int)CelestialSmallBodyLod.Billboard)
                 {
@@ -825,6 +842,48 @@ namespace jcan.CelestialSystems
             }
 
             return best;
+        }
+
+        private RuntimeSlot CreateExplicitSeedSlot(
+            RuntimePool pool,
+            uint seed,
+            ref int startsRemaining)
+        {
+            if (startsRemaining <= 0 ||
+                (int)CelestialSmallBodyLod.Billboard >=
+                    pool.Tool.LodCount)
+            {
+                return null;
+            }
+
+            foreach (var existing in pool.Slots)
+            {
+                if (existing.Seed == seed)
+                {
+                    return existing;
+                }
+            }
+
+            var slot =
+                new RuntimeSlot
+                {
+                    Seed = seed
+                };
+            pool.Slots.Add(
+                slot);
+
+            if (!TryStartLodGeneration(
+                    pool,
+                    slot,
+                    CelestialSmallBodyLod.Billboard))
+            {
+                pool.Slots.Remove(
+                    slot);
+                return null;
+            }
+
+            startsRemaining--;
+            return slot;
         }
 
         private void CheckoutSlot(
