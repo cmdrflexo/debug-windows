@@ -20,6 +20,10 @@ namespace jcan.CelestialSystems
         private Camera observerCamera;
 
         [SerializeField]
+        [Tooltip("Optional explicit frame. If empty, the active scene frame is used.")]
+        private UniverseFrameController universeFrame;
+
+        [SerializeField]
         [Min(0.1f)]
         private float spawnDistanceMeters = 20.0f;
 
@@ -96,6 +100,12 @@ namespace jcan.CelestialSystems
                 spawnDistanceMeters;
             instance.transform.rotation = Random.rotation;
 
+            var trackedObject =
+                instance.AddComponent<UniverseTrackedObject>();
+            trackedObject.InitializeFromScenePosition(
+                GetUniverseFrame(),
+                instance.transform.position);
+
             var seed = unchecked(
                 (uint)(Time.frameCount * 747796405) +
                 (uint)spawnedObjects.Count * 2891336453u);
@@ -171,6 +181,13 @@ namespace jcan.CelestialSystems
             }
 
             spawnedObjects.Clear();
+        }
+
+        private UniverseFrameController GetUniverseFrame()
+        {
+            return universeFrame != null
+                ? universeFrame
+                : FindFirstObjectByType<UniverseFrameController>();
         }
 
         private CelestialRingObjectFamily GetSpawnFamily()
