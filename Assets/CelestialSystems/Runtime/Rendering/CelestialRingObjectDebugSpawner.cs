@@ -24,6 +24,10 @@ namespace jcan.CelestialSystems
         private UniverseFrameController universeFrame;
 
         [SerializeField]
+        [Tooltip("Optional nearest body/ring context. If empty, the camera's context is used.")]
+        private UniverseLocalEnvironmentContext velocityReference;
+
+        [SerializeField]
         [Min(0.1f)]
         private float spawnDistanceMeters = 20.0f;
 
@@ -100,11 +104,10 @@ namespace jcan.CelestialSystems
                 spawnDistanceMeters;
             instance.transform.rotation = Random.rotation;
 
-            var trackedObject =
-                instance.AddComponent<UniverseTrackedObject>();
-            trackedObject.InitializeFromScenePosition(
+            UniverseTrackedObject.TryGetUniversePositionFromScenePosition(
                 GetUniverseFrame(),
-                instance.transform.position);
+                instance.transform.position,
+                out var initialUniversePosition);
 
             var seed = unchecked(
                 (uint)(Time.frameCount * 747796405) +
@@ -161,6 +164,26 @@ namespace jcan.CelestialSystems
             instance.transform.localScale =
                 Vector3.one * diameter;
 
+            var velocityMotion =
+                instance.AddComponent<UniverseVelocityMotion>();
+            var velocity = DoubleVector3.zero;
+
+            if (TryGetVelocityReference(
+                    camera,
+                    out var referenceMotion))
+            {
+                velocity =
+                    referenceMotion
+                        .LinearVelocityMetersPerSecond;
+            }
+
+            velocityMotion.Initialize(
+                new UniverseMotionState(
+                    initialUniversePosition,
+                    instance.transform.rotation,
+                    velocity,
+                    DoubleVector3.zero));
+
             var gizmo = instance.AddComponent<
                 CelestialRingObjectDebugGizmo>();
             gizmo.Configure(
@@ -188,6 +211,21 @@ namespace jcan.CelestialSystems
             return universeFrame != null
                 ? universeFrame
                 : FindFirstObjectByType<UniverseFrameController>();
+        }
+
+        private bool TryGetVelocityReference(
+            Camera camera,
+            out UniverseMotionState motion)
+        {
+            var context = velocityReference != null
+                ? velocityReference
+                : camera.GetComponentInParent<
+                    UniverseLocalEnvironmentContext>();
+
+            context ??= FindFirstObjectByType<
+                UniverseLocalEnvironmentContext>();
+            return context != null &&
+                context.TryGetReferenceMotion(out motion);
         }
 
         private CelestialRingObjectFamily GetSpawnFamily()
