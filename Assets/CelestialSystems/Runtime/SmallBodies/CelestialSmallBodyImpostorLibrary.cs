@@ -1,0 +1,141 @@
+/*
+ * Pool-owned description and runtime texture allocation for the shared
+ * impostor variants of one small-body generation tool.
+ */
+
+using UnityEngine;
+
+namespace jcan.CelestialSystems
+{
+    [DisallowMultipleComponent]
+    public sealed class CelestialSmallBodyImpostorLibrary :
+        MonoBehaviour
+    {
+        [SerializeField]
+        private string toolId;
+
+        [SerializeField]
+        private int variantCount;
+
+        [SerializeField]
+        private int variantResolution;
+
+        [SerializeField]
+        private CelestialSmallBodyImpostorMaps requestedMaps;
+
+        [SerializeField]
+        private int atlasColumnCount;
+
+        [SerializeField]
+        private int atlasRowCount;
+
+        [SerializeField]
+        private bool isConfigured;
+
+        public string ToolId =>
+            toolId;
+
+        public int VariantCount =>
+            variantCount;
+
+        public int VariantResolution =>
+            variantResolution;
+
+        public CelestialSmallBodyImpostorMaps RequestedMaps =>
+            requestedMaps;
+
+        public bool IsConfigured =>
+            isConfigured;
+
+        public void Configure(
+            string newToolId,
+            int newVariantCount,
+            int newVariantResolution,
+            CelestialSmallBodyImpostorMaps newRequestedMaps)
+        {
+            toolId =
+                newToolId ?? string.Empty;
+            variantCount =
+                Mathf.Max(
+                    1,
+                    newVariantCount);
+            variantResolution =
+                Mathf.Clamp(
+                    newVariantResolution,
+                    32,
+                    2048);
+            requestedMaps =
+                newRequestedMaps;
+            atlasColumnCount =
+                Mathf.CeilToInt(
+                    Mathf.Sqrt(
+                        variantCount));
+            atlasRowCount =
+                Mathf.CeilToInt(
+                    variantCount /
+                    (float)atlasColumnCount);
+            isConfigured = true;
+        }
+
+        public int GetVariantIndex(
+            uint seed)
+        {
+            if (variantCount <= 0)
+            {
+                return 0;
+            }
+
+            return
+                (int)(Hash(
+                    seed) %
+                    (uint)variantCount);
+        }
+
+        public Vector4 GetVariantScaleOffset(
+            int variantIndex)
+        {
+            if (atlasColumnCount <= 0 ||
+                atlasRowCount <= 0)
+            {
+                return new Vector4(
+                    1.0f,
+                    1.0f,
+                    0.0f,
+                    0.0f);
+            }
+
+            variantIndex =
+                Mathf.Clamp(
+                    variantIndex,
+                    0,
+                    Mathf.Max(
+                        0,
+                        variantCount - 1));
+            var column =
+                variantIndex %
+                atlasColumnCount;
+            var row =
+                variantIndex /
+                atlasColumnCount;
+            var scale = new Vector2(
+                1.0f / atlasColumnCount,
+                1.0f / atlasRowCount);
+            return new Vector4(
+                scale.x,
+                scale.y,
+                column * scale.x,
+                row * scale.y);
+        }
+
+        private static uint Hash(
+            uint value)
+        {
+            value ^= value >> 16;
+            value *= 0x7FEB352Du;
+            value ^= value >> 15;
+            value *= 0x846CA68Bu;
+            value ^= value >> 16;
+            return value;
+        }
+    }
+}
