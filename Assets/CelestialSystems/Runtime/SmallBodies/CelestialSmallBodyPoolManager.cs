@@ -576,8 +576,12 @@ namespace jcan.CelestialSystems
                 var slot =
                     FindUpgradeableSlot(
                         pool,
-                        pool.Configuration
-                            .MinimumPrewarmLod);
+                        new CelestialSmallBodyRequest(
+                            pool.Tool.ToolId,
+                            0u,
+                            false,
+                            pool.Configuration
+                                .MinimumPrewarmLod));
 
                 if (slot == null ||
                     !TryStartNextLodGeneration(
@@ -602,8 +606,12 @@ namespace jcan.CelestialSystems
                 var slot =
                     FindUpgradeableSlot(
                         pool,
-                        pool.Configuration
-                            .MaximumPrewarmLod);
+                        new CelestialSmallBodyRequest(
+                            pool.Tool.ToolId,
+                            0u,
+                            false,
+                            pool.Configuration
+                                .MaximumPrewarmLod));
 
                 if (slot == null ||
                     !TryStartNextLodGeneration(
