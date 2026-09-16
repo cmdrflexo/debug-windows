@@ -32,7 +32,7 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         private CelestialSmallBodyLod desiredLod =
-            CelestialSmallBodyLod.Detail2;
+            CelestialSmallBodyLod.Lod2;
 
         [SerializeField]
         private bool useExplicitSeed;
@@ -44,6 +44,10 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Min(0.1f)]
         private float spawnDistanceMeters = 20.0f;
+
+        [SerializeField]
+        [Tooltip("Initialize the rock with and continuously match the nearest body's velocity. Disable to leave it fixed in universe space.")]
+        private bool initializeWithReferenceVelocity = true;
 
         [SerializeField]
         private InputAction spawnAction =
@@ -237,7 +241,8 @@ namespace jcan.CelestialSystems
             CelestialBodyRuntimeContext referenceBody =
                 null;
 
-            if (TryFindNearestBody(
+            if (initializeWithReferenceVelocity &&
+                TryFindNearestBody(
                     camera,
                     out var referenceMotion,
                     out referenceBody))
@@ -255,6 +260,7 @@ namespace jcan.CelestialSystems
                     DoubleVector3.zero));
             motion.SetVelocityReference(
                 referenceBody,
+                initializeWithReferenceVelocity &&
                 referenceBody != null);
         }
 
