@@ -9,13 +9,15 @@ using UnityEngine;
 
 namespace jcan.CelestialSystems
 {
+    // Matches Unity LODGroup convention: LOD 0 is the highest detail and
+    // LOD 4 is the billboard/impostor fallback.
     public enum CelestialSmallBodyLod
     {
-        Billboard = 0,
-        Detail1 = 1,
-        Detail2 = 2,
-        Detail3 = 3,
-        Detail4 = 4
+        Lod0 = 0,
+        Lod1 = 1,
+        Lod2 = 2,
+        Lod3 = 3,
+        Billboard = 4
     }
 
     public readonly struct CelestialSmallBodyRequest
