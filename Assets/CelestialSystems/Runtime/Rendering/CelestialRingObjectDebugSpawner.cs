@@ -172,7 +172,8 @@ namespace jcan.CelestialSystems
                     TryGetVelocityReference(
                         camera,
                         out var referenceMotion,
-                        out var referenceName);
+                        out var referenceName,
+                        out var referenceBody);
 
                 if (hasVelocityReference)
                 {
@@ -187,6 +188,9 @@ namespace jcan.CelestialSystems
                         instance.transform.rotation,
                         velocity,
                         DoubleVector3.zero));
+                velocityMotion.SetVelocityReference(
+                    referenceBody,
+                    hasVelocityReference);
 
                 if (hasVelocityReference)
                 {
@@ -236,10 +240,12 @@ namespace jcan.CelestialSystems
         private bool TryGetVelocityReference(
             Camera camera,
             out UniverseMotionState motion,
-            out string referenceName)
+            out string referenceName,
+            out CelestialBodyRuntimeContext referenceBody)
         {
             motion = default;
             referenceName = "None";
+            referenceBody = null;
 
             if (camera == null ||
                 !UniverseTrackedObject
@@ -287,6 +293,8 @@ namespace jcan.CelestialSystems
                     candidateMotion;
                 referenceName =
                     candidate.name + " (nearest body)";
+                referenceBody =
+                    candidate;
                 foundBody = true;
             }
 
