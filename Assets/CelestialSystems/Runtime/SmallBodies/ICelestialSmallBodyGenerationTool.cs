@@ -12,9 +12,10 @@ namespace jcan.CelestialSystems
     public enum CelestialSmallBodyLod
     {
         Billboard = 0,
-        Low = 1,
-        Medium = 2,
-        High = 3
+        Detail1 = 1,
+        Detail2 = 2,
+        Detail3 = 3,
+        Detail4 = 4
     }
 
     public readonly struct CelestialSmallBodyRequest
@@ -66,6 +67,8 @@ namespace jcan.CelestialSystems
     public interface ICelestialSmallBodyGenerationTool
     {
         string ToolId { get; }
+
+        int LodCount { get; }
 
         bool CanGenerate(
             CelestialSmallBodyRequest request);
