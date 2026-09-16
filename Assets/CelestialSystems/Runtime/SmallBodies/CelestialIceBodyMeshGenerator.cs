@@ -736,9 +736,9 @@ namespace jcan.CelestialSystems
                     var uvIndex =
                         index * 2;
                     uvs[uvIndex] =
-                        uv.X;
+                        uv.x;
                     uvs[uvIndex + 1] =
-                        uv.Y;
+                        uv.y;
                 }
             }
 
@@ -825,9 +825,9 @@ namespace jcan.CelestialSystems
                         var uvOffset =
                             vertexIndex * 2;
                         uvs[uvOffset] =
-                            uv.X;
+                            uv.x;
                         uvs[uvOffset + 1] =
-                            uv.Y;
+                            uv.y;
                     }
                 }
             }
