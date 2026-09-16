@@ -12,6 +12,7 @@ namespace jcan.CelestialSystems.Editor
         private static readonly string[] HiddenProperties =
         {
             "m_Script",
+            "toolPools",
             "lod0Readout",
             "lod1Readout",
             "lod2Readout",
@@ -26,6 +27,8 @@ namespace jcan.CelestialSystems.Editor
             DrawPropertiesExcluding(
                 serializedObject,
                 HiddenProperties);
+
+            DrawToolPools();
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
@@ -52,6 +55,132 @@ namespace jcan.CelestialSystems.Editor
             EditorGUI.EndDisabledGroup();
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawToolPools()
+        {
+            var pools =
+                serializedObject.FindProperty(
+                    "toolPools");
+
+            if (pools == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Tool Pools",
+                EditorStyles.boldLabel);
+
+            for (var index = 0;
+                index < pools.arraySize;
+                index++)
+            {
+                var pool =
+                    pools.GetArrayElementAtIndex(
+                        index);
+                var toolSource =
+                    pool.FindPropertyRelative(
+                        "toolSource");
+                var targetReadyCount =
+                    pool.FindPropertyRelative(
+                        "targetReadyCount");
+                var minimumPrewarmLod =
+                    pool.FindPropertyRelative(
+                        "minimumPrewarmLod");
+                var maximumPrewarmLod =
+                    pool.FindPropertyRelative(
+                        "maximumPrewarmLod");
+                var regenerateAfterCheckout =
+                    pool.FindPropertyRelative(
+                        "regenerateAfterCheckout");
+
+                EditorGUILayout.BeginVertical(
+                    EditorStyles.helpBox);
+                EditorGUILayout.LabelField(
+                    $"Pool {index + 1}",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(
+                    toolSource,
+                    new GUIContent(
+                        "Tool Source"));
+                EditorGUILayout.PropertyField(
+                    targetReadyCount,
+                    new GUIContent(
+                        "Target Ready Count"));
+
+                DrawPrewarmLodFields(
+                    minimumPrewarmLod,
+                    maximumPrewarmLod);
+
+                EditorGUILayout.PropertyField(
+                    regenerateAfterCheckout,
+                    new GUIContent(
+                        "Regenerate After Checkout"));
+
+                if (GUILayout.Button(
+                        "Remove Pool"))
+                {
+                    pools.DeleteArrayElementAtIndex(
+                        index);
+                    break;
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (GUILayout.Button(
+                    "Add Tool Pool"))
+            {
+                pools.InsertArrayElementAtIndex(
+                    pools.arraySize);
+            }
+        }
+
+        private static void DrawPrewarmLodFields(
+            SerializedProperty lowestMeshLod,
+            SerializedProperty highestMeshLod)
+        {
+            var options =
+                new[]
+                {
+                    "LOD0 (highest)",
+                    "LOD1",
+                    "LOD2",
+                    "LOD3 (lowest mesh)"
+                };
+            var lowest =
+                Mathf.Clamp(
+                    lowestMeshLod.intValue,
+                    0,
+                    3);
+            var highest =
+                Mathf.Clamp(
+                    highestMeshLod.intValue,
+                    0,
+                    3);
+
+            lowest = EditorGUILayout.Popup(
+                "Lowest Mesh LOD (guaranteed)",
+                lowest,
+                options);
+            highest = EditorGUILayout.Popup(
+                "Highest Mesh LOD (idle)",
+                highest,
+                options);
+
+            // Unity LOD numbering runs from highest detail (0) to lowest
+            // detail (3 here). The idle ceiling cannot be lower detail than
+            // the guaranteed level.
+            highest =
+                Mathf.Min(
+                    highest,
+                    lowest);
+            lowestMeshLod.intValue =
+                lowest;
+            highestMeshLod.intValue =
+                highest;
         }
 
         private void DrawReadout(
