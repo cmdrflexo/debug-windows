@@ -38,20 +38,36 @@ namespace jcan.CelestialSystems
                 : universeFrame;
             SubscribeToFrame();
 
-            if (universeFrame == null ||
-                !universeFrame.FrameOriginInitialized)
+            if (!TryGetUniversePositionFromScenePosition(
+                    universeFrame,
+                    scenePositionMeters,
+                    out universePosition))
             {
                 initialized = false;
                 return false;
             }
 
-            universePosition = universeFrame.FrameOrigin;
-            universePosition.AddLocalMeters(
+            initialized = ApplyUniversePosition();
+            return initialized;
+        }
+
+        public static bool TryGetUniversePositionFromScenePosition(
+            UniverseFrameController frame,
+            Vector3 scenePositionMeters,
+            out UniversePosition position)
+        {
+            if (frame == null || !frame.FrameOriginInitialized)
+            {
+                position = default;
+                return false;
+            }
+
+            position = frame.FrameOrigin;
+            position.AddLocalMeters(
                 scenePositionMeters.x,
                 scenePositionMeters.y,
                 scenePositionMeters.z);
-            initialized = ApplyUniversePosition();
-            return initialized;
+            return true;
         }
 
         public bool SetUniversePosition(
