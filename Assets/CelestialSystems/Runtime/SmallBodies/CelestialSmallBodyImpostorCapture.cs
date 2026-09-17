@@ -68,6 +68,9 @@ namespace jcan.CelestialSystems
                     CaptureLayer);
                 ConfigureCamera(
                     bounds);
+                library.SetVariantBillboardSize(
+                    variantIndex,
+                    GetCaptureFrameSize(bounds));
 
                 if ((library.RequestedMaps &
                     CelestialSmallBodyImpostorMaps.AlbedoTransparency) != 0)
@@ -260,6 +263,14 @@ namespace jcan.CelestialSystems
                 Quaternion.LookRotation(
                     Vector3.forward,
                     Vector3.up);
+        }
+
+        private static float GetCaptureFrameSize(
+            Bounds bounds)
+        {
+            return Mathf.Max(
+                0.0001f,
+                bounds.extents.magnitude * 2.20f);
         }
 
         private static void RenderWithCurrentMaterials(
