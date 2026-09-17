@@ -71,10 +71,24 @@ Shader "jcan/Celestial Small Body Impostor"
                     _CelestialImpostorAlbedoTransparencyAtlas,
                     sampler_CelestialImpostorAlbedoTransparencyAtlas,
                     input.uv);
-                half silhouette = SAMPLE_TEXTURE2D(
+                half normalSilhouette = SAMPLE_TEXTURE2D(
                     _CelestialImpostorNormalAtlas,
                     sampler_CelestialImpostorNormalAtlas,
                     input.uv).a;
+
+                // Some source shaders don't preserve alpha in an off-screen
+                // color capture. The visible albedo atlas is still a reliable
+                // fallback for the current bright ice-rock variants.
+                half albedoSilhouette = step(
+                    _Cutoff,
+                    max(
+                        albedo.r,
+                        max(
+                            albedo.g,
+                            albedo.b)));
+                half silhouette = max(
+                    normalSilhouette,
+                    albedoSilhouette);
                 clip(silhouette - _Cutoff);
 
                 half3 emission = SAMPLE_TEXTURE2D(
