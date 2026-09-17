@@ -99,6 +99,10 @@ namespace jcan.CelestialSystems
 
         int ImpostorResolution { get; }
 
+        // Horizontal capture angles per procedural appearance. A value of one
+        // preserves the original single-view billboard behavior.
+        int ImpostorViewCount { get; }
+
         CelestialSmallBodyLod ImpostorSourceLod { get; }
 
         CelestialSmallBodyImpostorMaps RequestedImpostorMaps { get; }
