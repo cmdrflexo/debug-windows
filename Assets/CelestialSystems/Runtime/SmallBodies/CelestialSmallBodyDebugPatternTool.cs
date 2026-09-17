@@ -250,8 +250,8 @@ namespace jcan.CelestialSystems
         {
             if (value == null) return;
 
-            if (Application.isPlaying) Destroy(value);
-            else DestroyImmediate(value);
+            if (Application.isPlaying) UnityEngine.Object.Destroy(value);
+            else UnityEngine.Object.DestroyImmediate(value);
         }
     }
 }
