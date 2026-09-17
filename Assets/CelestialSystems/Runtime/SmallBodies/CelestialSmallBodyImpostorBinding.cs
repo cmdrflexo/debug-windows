@@ -124,6 +124,12 @@ namespace jcan.CelestialSystems
 
             atlasScaleOffset = library.GetVariantScaleOffset(variantIndex, activeViewIndex);
             materialInstance.SetVector("_CelestialImpostorScaleOffset", atlasScaleOffset);
+
+            var captureFrameSize = library.GetVariantBillboardSize(variantIndex);
+            if (captureFrameSize > 0.0f)
+            {
+                transform.localScale = Vector3.one * captureFrameSize;
+            }
         }
     }
 }
