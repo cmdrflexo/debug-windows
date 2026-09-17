@@ -27,6 +27,7 @@ namespace jcan.CelestialSystems
 
         private bool[] readyCaptures;
         private int[] readyCaptureCounts;
+        private float[] variantBillboardSizes;
 
         public string ToolId => toolId;
         public int VariantCount => variantCount;
@@ -59,6 +60,7 @@ namespace jcan.CelestialSystems
             atlasRowCount = Mathf.CeilToInt(captureCount / (float)atlasColumnCount);
             readyCaptures = new bool[captureCount];
             readyCaptureCounts = new int[variantCount];
+            variantBillboardSizes = new float[variantCount];
             readyVariantCount = 0;
             AllocateRequestedAtlases();
             CreateImpostorMaterial();
@@ -80,6 +82,35 @@ namespace jcan.CelestialSystems
                 captureIndex >= 0 &&
                 captureIndex < readyCaptures.Length &&
                 readyCaptures[captureIndex];
+        }
+
+        public void SetVariantBillboardSize(
+            int variantIndex,
+            float captureFrameSize)
+        {
+            if (variantBillboardSizes == null ||
+                variantIndex < 0 ||
+                variantIndex >= variantBillboardSizes.Length)
+            {
+                return;
+            }
+
+            // All yaw views are framed square. Retaining the largest frame
+            // avoids a size pop if one asymmetric view has slightly wider
+            // bounds than the others.
+            variantBillboardSizes[variantIndex] = Mathf.Max(
+                variantBillboardSizes[variantIndex],
+                Mathf.Max(0.0001f, captureFrameSize));
+        }
+
+        public float GetVariantBillboardSize(
+            int variantIndex)
+        {
+            return variantBillboardSizes != null &&
+                variantIndex >= 0 &&
+                variantIndex < variantBillboardSizes.Length
+                ? variantBillboardSizes[variantIndex]
+                : 0.0f;
         }
 
         public void MarkCaptureReady(int variantIndex, int viewIndex)
