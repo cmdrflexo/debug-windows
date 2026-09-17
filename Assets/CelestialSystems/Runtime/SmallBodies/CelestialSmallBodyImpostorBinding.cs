@@ -64,6 +64,16 @@ namespace jcan.CelestialSystems
             ApplyProperties();
         }
 
+        private void LateUpdate()
+        {
+            if (library != null &&
+                library.IsVariantReady(
+                    variantIndex))
+            {
+                ApplyProperties();
+            }
+        }
+
         private void ApplyProperties()
         {
             var renderer =
@@ -72,6 +82,15 @@ namespace jcan.CelestialSystems
             if (renderer == null)
             {
                 return;
+            }
+
+            if (library != null &&
+                library.IsVariantReady(
+                    variantIndex) &&
+                library.ImpostorMaterial != null)
+            {
+                renderer.sharedMaterial =
+                    library.ImpostorMaterial;
             }
 
             propertyBlock ??=
