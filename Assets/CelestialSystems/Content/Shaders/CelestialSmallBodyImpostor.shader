@@ -3,7 +3,9 @@ Shader "jcan/Celestial Small Body Impostor"
     Properties
     {
         _CelestialImpostorAlbedoTransparencyAtlas("Albedo Transparency Atlas", 2D) = "white" {}
+        _CelestialImpostorNormalAtlas("Normal Atlas", 2D) = "bump" {}
         _CelestialImpostorEmissionAtlas("Emission Atlas", 2D) = "black" {}
+        _CelestialImpostorScaleOffset("Atlas Scale Offset", Vector) = (1, 1, 0, 0)
         _Cutoff("Alpha Cutoff", Range(0, 1)) = 0.02
     }
 
@@ -32,6 +34,8 @@ Shader "jcan/Celestial Small Body Impostor"
 
             TEXTURE2D(_CelestialImpostorAlbedoTransparencyAtlas);
             SAMPLER(sampler_CelestialImpostorAlbedoTransparencyAtlas);
+            TEXTURE2D(_CelestialImpostorNormalAtlas);
+            SAMPLER(sampler_CelestialImpostorNormalAtlas);
             TEXTURE2D(_CelestialImpostorEmissionAtlas);
             SAMPLER(sampler_CelestialImpostorEmissionAtlas);
 
@@ -67,7 +71,11 @@ Shader "jcan/Celestial Small Body Impostor"
                     _CelestialImpostorAlbedoTransparencyAtlas,
                     sampler_CelestialImpostorAlbedoTransparencyAtlas,
                     input.uv);
-                clip(albedo.a - _Cutoff);
+                half silhouette = SAMPLE_TEXTURE2D(
+                    _CelestialImpostorNormalAtlas,
+                    sampler_CelestialImpostorNormalAtlas,
+                    input.uv).a;
+                clip(silhouette - _Cutoff);
 
                 half3 emission = SAMPLE_TEXTURE2D(
                     _CelestialImpostorEmissionAtlas,
