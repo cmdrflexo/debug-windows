@@ -103,10 +103,10 @@ namespace jcan.CelestialSystems
             towardCamera.y = 0.0f;
             if (towardCamera.sqrMagnitude < 0.000001f) return;
 
-            // Capture view zero looks at the body's -Z face. Quantizing the
-            // horizontal camera direction makes the atlas select its nearest
-            // yaw capture while CelestialSmallBodyBillboard faces the quad.
-            var angle = Mathf.Atan2(towardCamera.x, -towardCamera.z);
+            // Capture view zero looks at the body's -Z face. Capture rotates
+            // the source positively around Y, so selection uses the inverse
+            // horizontal camera yaw before choosing the nearest atlas tile.
+            var angle = Mathf.Atan2(-towardCamera.x, -towardCamera.z);
             var normalizedAngle = Mathf.Repeat(angle, Mathf.PI * 2.0f);
             var selectedView = Mathf.RoundToInt(
                 normalizedAngle / (Mathf.PI * 2.0f) * library.ViewCount) %
