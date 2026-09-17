@@ -30,7 +30,9 @@ Shader "jcan/Celestial Small Body Impostor"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/LODCrossFade.hlsl"
 
             TEXTURE2D(_CelestialImpostorAlbedoTransparencyAtlas);
             SAMPLER(sampler_CelestialImpostorAlbedoTransparencyAtlas);
@@ -95,6 +97,11 @@ Shader "jcan/Celestial Small Body Impostor"
                     normalSilhouette,
                     albedoSilhouette);
                 clip(silhouette - _Cutoff);
+
+                // Unity writes the LOD fade value per renderer. Apply its
+                // dithered clip after the shape silhouette so this billboard
+                // can cross-fade with LOD 3 instead of popping.
+                LODFadeCrossFade(input.positionCS);
 
                 half3 emission = SAMPLE_TEXTURE2D_LOD(
                     _CelestialImpostorEmissionAtlas,
