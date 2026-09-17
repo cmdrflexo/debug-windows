@@ -292,7 +292,7 @@ namespace jcan.CelestialSystems
                 captureTexture;
             captureCamera.RenderWithShader(
                 normalCaptureShader,
-                "RenderType");
+                string.Empty);
             captureCamera.ResetReplacementShader();
         }
 
