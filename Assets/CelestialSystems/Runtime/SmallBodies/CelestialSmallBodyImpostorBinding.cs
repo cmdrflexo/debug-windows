@@ -1,7 +1,7 @@
 /*
- * Connects an LOD4 billboard representation to the pool-owned impostor
- * library. Texture-channel assignment is intentionally centralized here so
- * tools never need to know which spawner or pool owns them.
+ * Connects one LOD4 representation to a selected pool-owned impostor variant.
+ * A per-representation material instance is used for atlas UVs; this keeps the
+ * initial runtime implementation deterministic and easy to inspect.
  */
 
 using UnityEngine;
@@ -24,7 +24,8 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private Vector4 atlasScaleOffset;
 
-        private MaterialPropertyBlock propertyBlock;
+        private Material materialInstance;
+        private bool materialApplied;
 
         public CelestialSmallBodyImpostorLibrary Library =>
             library;
@@ -36,8 +37,7 @@ namespace jcan.CelestialSystems
             CelestialSmallBodyImpostorLibrary newLibrary,
             uint seed)
         {
-            library =
-                newLibrary;
+            library = newLibrary;
 
             if (library == null)
             {
@@ -61,21 +61,35 @@ namespace jcan.CelestialSystems
             atlasScaleOffset =
                 library.GetVariantScaleOffset(
                     variantIndex);
-            ApplyProperties();
+            materialApplied = false;
+            TryApplyMaterial();
         }
 
         private void LateUpdate()
         {
-            if (library != null &&
-                library.IsVariantReady(
-                    variantIndex))
+            TryApplyMaterial();
+        }
+
+        private void OnDestroy()
+        {
+            if (materialInstance != null)
             {
-                ApplyProperties();
+                Destroy(
+                    materialInstance);
             }
         }
 
-        private void ApplyProperties()
+        private void TryApplyMaterial()
         {
+            if (materialApplied ||
+                library == null ||
+                !library.IsVariantReady(
+                    variantIndex) ||
+                library.ImpostorMaterial == null)
+            {
+                return;
+            }
+
             var renderer =
                 GetComponent<MeshRenderer>();
 
@@ -84,59 +98,37 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (library != null &&
-                library.IsVariantReady(
-                    variantIndex) &&
-                library.ImpostorMaterial != null)
+            if (materialInstance != null)
             {
-                renderer.sharedMaterial =
-                    library.ImpostorMaterial;
+                Destroy(
+                    materialInstance);
             }
 
-            propertyBlock ??=
-                new MaterialPropertyBlock();
-            renderer.GetPropertyBlock(
-                propertyBlock);
-            propertyBlock.SetFloat(
-                "_CelestialImpostorVariant",
-                variantIndex);
-            propertyBlock.SetVector(
+            materialInstance =
+                new Material(
+                    library.ImpostorMaterial)
+                {
+                    name =
+                        $"{library.ToolId} Impostor Variant {variantIndex}"
+                };
+            materialInstance.SetVector(
                 "_CelestialImpostorScaleOffset",
                 atlasScaleOffset);
-            propertyBlock.SetFloat(
-                "_CelestialImpostorMaps",
-                (float)requestedMaps);
-
-            if (library.AlbedoTransparencyAtlas != null)
-            {
-                propertyBlock.SetTexture(
-                    "_CelestialImpostorAlbedoTransparencyAtlas",
-                    library.AlbedoTransparencyAtlas);
-            }
-
-            if (library.NormalAtlas != null)
-            {
-                propertyBlock.SetTexture(
-                    "_CelestialImpostorNormalAtlas",
-                    library.NormalAtlas);
-            }
-
-            if (library.EmissionAtlas != null)
-            {
-                propertyBlock.SetTexture(
-                    "_CelestialImpostorEmissionAtlas",
-                    library.EmissionAtlas);
-            }
-
-            if (library.MetallicSmoothnessAtlas != null)
-            {
-                propertyBlock.SetTexture(
-                    "_CelestialImpostorMetallicSmoothnessAtlas",
-                    library.MetallicSmoothnessAtlas);
-            }
-
-            renderer.SetPropertyBlock(
-                propertyBlock);
+            materialInstance.SetTexture(
+                "_CelestialImpostorAlbedoTransparencyAtlas",
+                library.AlbedoTransparencyAtlas);
+            materialInstance.SetTexture(
+                "_CelestialImpostorNormalAtlas",
+                library.NormalAtlas);
+            materialInstance.SetTexture(
+                "_CelestialImpostorEmissionAtlas",
+                library.EmissionAtlas);
+            materialInstance.SetTexture(
+                "_CelestialImpostorMetallicSmoothnessAtlas",
+                library.MetallicSmoothnessAtlas);
+            renderer.sharedMaterial =
+                materialInstance;
+            materialApplied = true;
         }
     }
 }
