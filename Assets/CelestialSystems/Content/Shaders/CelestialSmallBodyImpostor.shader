@@ -67,14 +67,19 @@ Shader "jcan/Celestial Small Body Impostor"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                half4 albedo = SAMPLE_TEXTURE2D(
+                // A tile atlas is populated only at mip 0. Explicitly reading
+                // that level prevents a distant billboard from sampling empty
+                // or neighbouring atlas mips.
+                half4 albedo = SAMPLE_TEXTURE2D_LOD(
                     _CelestialImpostorAlbedoTransparencyAtlas,
                     sampler_CelestialImpostorAlbedoTransparencyAtlas,
-                    input.uv);
-                half normalSilhouette = SAMPLE_TEXTURE2D(
+                    input.uv,
+                    0.0);
+                half normalSilhouette = SAMPLE_TEXTURE2D_LOD(
                     _CelestialImpostorNormalAtlas,
                     sampler_CelestialImpostorNormalAtlas,
-                    input.uv).a;
+                    input.uv,
+                    0.0).a;
 
                 // Some source shaders don't preserve alpha in an off-screen
                 // color capture. The visible albedo atlas is still a reliable
@@ -91,10 +96,11 @@ Shader "jcan/Celestial Small Body Impostor"
                     albedoSilhouette);
                 clip(silhouette - _Cutoff);
 
-                half3 emission = SAMPLE_TEXTURE2D(
+                half3 emission = SAMPLE_TEXTURE2D_LOD(
                     _CelestialImpostorEmissionAtlas,
                     sampler_CelestialImpostorEmissionAtlas,
-                    input.uv).rgb;
+                    input.uv,
+                    0.0).rgb;
                 return half4(albedo.rgb + emission, 1.0h);
             }
             ENDHLSL
