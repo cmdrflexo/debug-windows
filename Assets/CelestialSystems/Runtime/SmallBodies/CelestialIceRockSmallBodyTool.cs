@@ -62,6 +62,10 @@ namespace jcan.CelestialSystems
         private int impostorVariantCount = 16;
 
         [SerializeField]
+        [Tooltip("Deterministic seed stream used only to build this tool's shared impostor variants.")]
+        private uint impostorSeed = 1187u;
+
+        [SerializeField]
         [Range(32, 2048)]
         [Tooltip("Requested square pixel resolution for one atlas variant.")]
         private int impostorResolution = 256;
@@ -119,6 +123,14 @@ namespace jcan.CelestialSystems
 
         public CelestialSmallBodyImpostorMaps RequestedImpostorMaps =>
             requestedImpostorMaps;
+
+        public uint GetImpostorVariantSeed(
+            int variantIndex)
+        {
+            return HashImpostorSeed(
+                impostorSeed,
+                variantIndex);
+        }
 
         public int PendingGenerationCount =>
             pendingGenerationCount;
@@ -511,6 +523,23 @@ namespace jcan.CelestialSystems
                 };
             billboardMesh.RecalculateBounds();
             return billboardMesh;
+        }
+
+        private static uint HashImpostorSeed(
+            uint baseSeed,
+            int variantIndex)
+        {
+            var value =
+                baseSeed +
+                unchecked(
+                    (uint)variantIndex *
+                    747796405u);
+            value ^= value >> 16;
+            value *= 0x7FEB352Du;
+            value ^= value >> 15;
+            value *= 0x846CA68Bu;
+            value ^= value >> 16;
+            return value;
         }
 
         private static float HashToUnitFloat(
