@@ -147,10 +147,10 @@ namespace jcan.CelestialSystems
         {
             var width = atlasColumnCount * variantResolution;
             var height = atlasRowCount * variantResolution;
-            AllocateAtlas(ref albedoTransparencyAtlas, CelestialSmallBodyImpostorMaps.AlbedoTransparency, "Albedo Transparency", RenderTextureFormat.ARGB32, width, height);
-            AllocateAtlas(ref normalAtlas, CelestialSmallBodyImpostorMaps.Normal, "Normal", RenderTextureFormat.ARGB32, width, height);
+            AllocateAtlas(ref albedoTransparencyAtlas, CelestialSmallBodyImpostorMaps.AlbedoTransparency, "Albedo Transparency", RenderTextureFormat.ARGBHalf, width, height);
+            AllocateAtlas(ref normalAtlas, CelestialSmallBodyImpostorMaps.Normal, "Normal", RenderTextureFormat.ARGBHalf, width, height);
             AllocateAtlas(ref emissionAtlas, CelestialSmallBodyImpostorMaps.Emission, "Emission", RenderTextureFormat.ARGBHalf, width, height);
-            AllocateAtlas(ref metallicSmoothnessAtlas, CelestialSmallBodyImpostorMaps.MetallicSmoothness, "Metallic Smoothness", RenderTextureFormat.ARGB32, width, height);
+            AllocateAtlas(ref metallicSmoothnessAtlas, CelestialSmallBodyImpostorMaps.MetallicSmoothness, "Metallic Smoothness", RenderTextureFormat.ARGBHalf, width, height);
         }
 
         private void AllocateAtlas(
