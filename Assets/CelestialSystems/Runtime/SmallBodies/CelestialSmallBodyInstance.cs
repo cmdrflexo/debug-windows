@@ -49,6 +49,16 @@ namespace jcan.CelestialSystems
         [SerializeField]
         private LODGroup lodGroup;
 
+        [Header("LOD Transitions")]
+        [SerializeField]
+        [Tooltip("Uses Unity dithered cross-fades where the representation shaders support LOD fading.")]
+        private bool useCrossFade = true;
+
+        [SerializeField]
+        [Range(0.01f, 1.0f)]
+        [Tooltip("Fraction of each LOD range reserved for its cross-fade.")]
+        private float crossFadeTransitionWidth = 0.20f;
+
         [SerializeField]
         private List<LodRepresentation> lodRepresentations =
             new List<LodRepresentation>();
@@ -200,13 +210,30 @@ namespace jcan.CelestialSystems
                     continue;
                 }
 
-                lods.Add(
+                var unityLod =
                     new LOD(
                         GetTransitionHeight(
                             representation.Lod),
-                        renderers));
+                        renderers)
+                    {
+                        fadeTransitionWidth =
+                            crossFadeTransitionWidth
+                    };
+                lods.Add(
+                    unityLod);
             }
 
+            crossFadeTransitionWidth =
+                Mathf.Clamp(
+                    crossFadeTransitionWidth,
+                    0.01f,
+                    1.0f);
+            lodGroup.fadeMode =
+                useCrossFade
+                    ? LODFadeMode.CrossFade
+                    : LODFadeMode.None;
+            lodGroup.animateCrossFading =
+                useCrossFade;
             lodGroup.SetLODs(
                 lods.ToArray());
             lodGroup.RecalculateBounds();
