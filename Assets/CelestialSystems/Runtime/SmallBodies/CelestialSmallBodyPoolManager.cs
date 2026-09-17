@@ -598,14 +598,20 @@ namespace jcan.CelestialSystems
 
             while (startsRemaining > 0 &&
                 pool.NextImpostorVariantIndex <
-                    pool.ImpostorProvider
-                        .ImpostorVariantCount)
+                    pool.ImpostorLibrary.CaptureCount)
             {
-                var variantIndex =
+                var captureIndex =
                     pool.NextImpostorVariantIndex++;
+                var viewCount =
+                    Mathf.Max(1, pool.ImpostorLibrary.ViewCount);
+                var variantIndex =
+                    captureIndex / viewCount;
+                var viewIndex =
+                    captureIndex % viewCount;
 
-                if (pool.ImpostorLibrary.IsVariantReady(
-                        variantIndex))
+                if (pool.ImpostorLibrary.IsCaptureReady(
+                        variantIndex,
+                        viewIndex))
                 {
                     continue;
                 }
@@ -613,18 +619,15 @@ namespace jcan.CelestialSystems
                 var request =
                     new CelestialSmallBodyRequest(
                         pool.Tool.ToolId,
-                        pool.ImpostorProvider
-                            .GetImpostorVariantSeed(
-                                variantIndex),
+                        pool.ImpostorProvider.GetImpostorVariantSeed(
+                            variantIndex),
                         true,
-                        pool.ImpostorProvider
-                            .ImpostorSourceLod);
+                        pool.ImpostorProvider.ImpostorSourceLod);
 
-                if (!pool.Tool.CanGenerate(
-                        request))
+                if (!pool.Tool.CanGenerate(request))
                 {
                     RecordError(
-                        $"Small-body tool '{pool.Tool.ToolId}' cannot generate its configured impostor source LOD for variant {variantIndex}.");
+                        $"Small-body tool '{pool.Tool.ToolId}' cannot generate its configured impostor source LOD for variant {variantIndex}, view {viewIndex}.");
                     continue;
                 }
 
@@ -634,11 +637,11 @@ namespace jcan.CelestialSystems
                 {
                     if (pool.Tool.TryBeginGeneration(
                             request,
-                            result =>
-                                HandleImpostorVariantGenerated(
-                                    pool,
-                                    variantIndex,
-                                    result)))
+                            result => HandleImpostorVariantGenerated(
+                                pool,
+                                variantIndex,
+                                viewIndex,
+                                result)))
                     {
                         startsRemaining--;
                         break;
@@ -647,7 +650,7 @@ namespace jcan.CelestialSystems
                 catch (Exception exception)
                 {
                     RecordError(
-                        $"Small-body tool '{pool.Tool.ToolId}' threw while preparing impostor variant {variantIndex}: {exception.Message}");
+                        $"Small-body tool '{pool.Tool.ToolId}' threw while preparing impostor variant {variantIndex}, view {viewIndex}: {exception.Message}");
                 }
 
                 pool.ImpostorBakePending = false;
@@ -659,14 +662,14 @@ namespace jcan.CelestialSystems
         private void HandleImpostorVariantGenerated(
             RuntimePool pool,
             int variantIndex,
+            int viewIndex,
             CelestialSmallBodyGenerationResult result)
         {
             if (pool == null)
             {
                 if (result.Instance != null)
                 {
-                    Destroy(
-                        result.Instance);
+                    Destroy(result.Instance);
                 }
 
                 return;
@@ -677,27 +680,25 @@ namespace jcan.CelestialSystems
             if (!result.Succeeded)
             {
                 RecordError(
-                    string.IsNullOrWhiteSpace(
-                        result.Error)
-                        ? $"Small-body tool '{pool.Tool.ToolId}' failed to generate impostor variant {variantIndex}."
+                    string.IsNullOrWhiteSpace(result.Error)
+                        ? $"Small-body tool '{pool.Tool.ToolId}' failed to generate impostor variant {variantIndex}, view {viewIndex}."
                         : result.Error);
                 RefreshDiagnostics();
                 return;
             }
 
-            if (!CelestialSmallBodyImpostorCapture
-                    .TryCaptureVariant(
-                        pool.ImpostorLibrary,
-                        variantIndex,
-                        result.Instance,
-                        out var captureError))
+            if (!CelestialSmallBodyImpostorCapture.TryCaptureVariant(
+                    pool.ImpostorLibrary,
+                    variantIndex,
+                    viewIndex,
+                    result.Instance,
+                    out var captureError))
             {
                 RecordError(
-                    $"Failed to capture impostor variant {variantIndex} for '{pool.Tool.ToolId}': {captureError}");
+                    $"Failed to capture impostor variant {variantIndex}, view {viewIndex} for '{pool.Tool.ToolId}': {captureError}");
             }
 
-            Destroy(
-                result.Instance);
+            Destroy(result.Instance);
             RefreshDiagnostics();
         }
 
@@ -1215,6 +1216,8 @@ namespace jcan.CelestialSystems
                     .ImpostorVariantCount,
                 pool.ImpostorProvider
                     .ImpostorResolution,
+                pool.ImpostorProvider
+                    .ImpostorViewCount,
                 pool.ImpostorProvider
                     .RequestedImpostorMaps);
         }
