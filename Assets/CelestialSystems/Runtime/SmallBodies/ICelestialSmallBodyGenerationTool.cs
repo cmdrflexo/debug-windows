@@ -100,5 +100,8 @@ namespace jcan.CelestialSystems
         int ImpostorResolution { get; }
 
         CelestialSmallBodyImpostorMaps RequestedImpostorMaps { get; }
+
+        uint GetImpostorVariantSeed(
+            int variantIndex);
     }
 }
