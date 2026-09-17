@@ -67,8 +67,13 @@ namespace jcan.CelestialSystems
 
         [SerializeField]
         [Range(32, 2048)]
-        [Tooltip("Requested square pixel resolution for one atlas variant.")]
+        [Tooltip("Requested square pixel resolution for one impostor atlas tile.")]
         private int impostorResolution = 256;
+
+        [SerializeField]
+        [Range(1, 16)]
+        [Tooltip("Horizontal capture angles baked per appearance. Eight gives a useful first multi-view impostor.")]
+        private int impostorViewCount = 8;
 
         [SerializeField]
         [Tooltip("Mesh detail used only while baking shared impostor variants.")]
@@ -126,6 +131,9 @@ namespace jcan.CelestialSystems
         public int ImpostorResolution =>
             impostorResolution;
 
+        public int ImpostorViewCount =>
+            impostorViewCount;
+
         public CelestialSmallBodyLod ImpostorSourceLod =>
             impostorSourceLod;
 
@@ -164,6 +172,11 @@ namespace jcan.CelestialSystems
                     impostorResolution,
                     32,
                     2048);
+            impostorViewCount =
+                Mathf.Clamp(
+                    impostorViewCount,
+                    1,
+                    16);
             impostorSourceLod =
                 (CelestialSmallBodyLod)Mathf.Clamp(
                     (int)impostorSourceLod,
