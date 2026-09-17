@@ -171,8 +171,8 @@ namespace jcan.CelestialSystems
                 var baseIndex = face * 4;
                 colorCubeMesh.SetTriangles(new[]
                 {
-                    baseIndex, baseIndex + 1, baseIndex + 2,
-                    baseIndex, baseIndex + 2, baseIndex + 3
+                    baseIndex + 2, baseIndex + 1, baseIndex,
+                    baseIndex + 3, baseIndex + 2, baseIndex
                 }, face);
             }
 
