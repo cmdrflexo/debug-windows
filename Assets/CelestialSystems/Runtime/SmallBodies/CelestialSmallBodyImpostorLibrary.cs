@@ -1,6 +1,6 @@
 /*
- * Pool-owned description and runtime texture allocation for the shared
- * impostor variants of one small-body generation tool.
+ * Pool-owned runtime atlas library for one small-body tool. The manager fills
+ * its variant slots; LOD4 representations only reference this shared data.
  */
 
 using UnityEngine;
@@ -11,65 +11,33 @@ namespace jcan.CelestialSystems
     public sealed class CelestialSmallBodyImpostorLibrary :
         MonoBehaviour
     {
-        [SerializeField]
-        private string toolId;
+        [SerializeField] private string toolId;
+        [SerializeField] private int variantCount;
+        [SerializeField] private int variantResolution;
+        [SerializeField] private CelestialSmallBodyImpostorMaps requestedMaps;
+        [SerializeField] private int atlasColumnCount;
+        [SerializeField] private int atlasRowCount;
+        [SerializeField] private bool isConfigured;
+        [SerializeField] private int readyVariantCount;
+        [SerializeField] private RenderTexture albedoTransparencyAtlas;
+        [SerializeField] private RenderTexture normalAtlas;
+        [SerializeField] private RenderTexture emissionAtlas;
+        [SerializeField] private RenderTexture metallicSmoothnessAtlas;
+        [SerializeField] private Material impostorMaterial;
 
-        [SerializeField]
-        private int variantCount;
+        private bool[] readyVariants;
 
-        [SerializeField]
-        private int variantResolution;
-
-        [SerializeField]
-        private CelestialSmallBodyImpostorMaps requestedMaps;
-
-        [SerializeField]
-        private int atlasColumnCount;
-
-        [SerializeField]
-        private int atlasRowCount;
-
-        [SerializeField]
-        private bool isConfigured;
-
-        [SerializeField]
-        private RenderTexture albedoTransparencyAtlas;
-
-        [SerializeField]
-        private RenderTexture normalAtlas;
-
-        [SerializeField]
-        private RenderTexture emissionAtlas;
-
-        [SerializeField]
-        private RenderTexture metallicSmoothnessAtlas;
-
-        public string ToolId =>
-            toolId;
-
-        public int VariantCount =>
-            variantCount;
-
-        public int VariantResolution =>
-            variantResolution;
-
-        public CelestialSmallBodyImpostorMaps RequestedMaps =>
-            requestedMaps;
-
-        public bool IsConfigured =>
-            isConfigured;
-
-        public RenderTexture AlbedoTransparencyAtlas =>
-            albedoTransparencyAtlas;
-
-        public RenderTexture NormalAtlas =>
-            normalAtlas;
-
-        public RenderTexture EmissionAtlas =>
-            emissionAtlas;
-
-        public RenderTexture MetallicSmoothnessAtlas =>
-            metallicSmoothnessAtlas;
+        public string ToolId => toolId;
+        public int VariantCount => variantCount;
+        public int VariantResolution => variantResolution;
+        public CelestialSmallBodyImpostorMaps RequestedMaps => requestedMaps;
+        public bool IsConfigured => isConfigured;
+        public int ReadyVariantCount => readyVariantCount;
+        public RenderTexture AlbedoTransparencyAtlas => albedoTransparencyAtlas;
+        public RenderTexture NormalAtlas => normalAtlas;
+        public RenderTexture EmissionAtlas => emissionAtlas;
+        public RenderTexture MetallicSmoothnessAtlas => metallicSmoothnessAtlas;
+        public Material ImpostorMaterial => impostorMaterial;
 
         public void Configure(
             string newToolId,
@@ -77,82 +45,112 @@ namespace jcan.CelestialSystems
             int newVariantResolution,
             CelestialSmallBodyImpostorMaps newRequestedMaps)
         {
-            toolId =
-                newToolId ?? string.Empty;
-            variantCount =
-                Mathf.Max(
-                    1,
-                    newVariantCount);
-            variantResolution =
-                Mathf.Clamp(
-                    newVariantResolution,
-                    32,
-                    2048);
-            requestedMaps =
-                newRequestedMaps;
-            atlasColumnCount =
-                Mathf.CeilToInt(
-                    Mathf.Sqrt(
-                        variantCount));
-            atlasRowCount =
-                Mathf.CeilToInt(
-                    variantCount /
-                    (float)atlasColumnCount);
+            toolId = newToolId ?? string.Empty;
+            variantCount = Mathf.Max(1, newVariantCount);
+            variantResolution = Mathf.Clamp(newVariantResolution, 32, 2048);
+            requestedMaps = newRequestedMaps;
+            atlasColumnCount = Mathf.CeilToInt(Mathf.Sqrt(variantCount));
+            atlasRowCount = Mathf.CeilToInt(variantCount / (float)atlasColumnCount);
+            readyVariants = new bool[variantCount];
+            readyVariantCount = 0;
             AllocateRequestedAtlases();
+            CreateImpostorMaterial();
             isConfigured = true;
+        }
+
+        public bool IsVariantReady(int variantIndex)
+        {
+            return readyVariants != null &&
+                variantIndex >= 0 &&
+                variantIndex < readyVariants.Length &&
+                readyVariants[variantIndex];
+        }
+
+        public void MarkVariantReady(int variantIndex)
+        {
+            if (readyVariants == null ||
+                variantIndex < 0 ||
+                variantIndex >= readyVariants.Length ||
+                readyVariants[variantIndex])
+            {
+                return;
+            }
+
+            readyVariants[variantIndex] = true;
+            readyVariantCount++;
+        }
+
+        public int GetVariantIndex(uint seed)
+        {
+            return variantCount <= 0 ? 0 : (int)(Hash(seed) % (uint)variantCount);
+        }
+
+        public Vector4 GetVariantScaleOffset(int variantIndex)
+        {
+            if (atlasColumnCount <= 0 || atlasRowCount <= 0)
+            {
+                return new Vector4(1.0f, 1.0f, 0.0f, 0.0f);
+            }
+
+            variantIndex = Mathf.Clamp(variantIndex, 0, Mathf.Max(0, variantCount - 1));
+            var column = variantIndex % atlasColumnCount;
+            var row = variantIndex / atlasColumnCount;
+            var scale = new Vector2(1.0f / atlasColumnCount, 1.0f / atlasRowCount);
+            return new Vector4(scale.x, scale.y, column * scale.x, row * scale.y);
+        }
+
+        public bool TryCopyCapture(
+            CelestialSmallBodyImpostorMaps map,
+            RenderTexture source,
+            int variantIndex)
+        {
+            var target = GetAtlas(map);
+
+            if (target == null || source == null ||
+                variantIndex < 0 || variantIndex >= variantCount)
+            {
+                return false;
+            }
+
+            var column = variantIndex % atlasColumnCount;
+            var row = variantIndex / atlasColumnCount;
+            Graphics.CopyTexture(
+                source,
+                0,
+                0,
+                0,
+                0,
+                variantResolution,
+                variantResolution,
+                target,
+                0,
+                0,
+                column * variantResolution,
+                row * variantResolution);
+            return true;
         }
 
         private void OnDestroy()
         {
-            ReleaseAtlas(
-                ref albedoTransparencyAtlas);
-            ReleaseAtlas(
-                ref normalAtlas);
-            ReleaseAtlas(
-                ref emissionAtlas);
-            ReleaseAtlas(
-                ref metallicSmoothnessAtlas);
+            ReleaseAtlas(ref albedoTransparencyAtlas);
+            ReleaseAtlas(ref normalAtlas);
+            ReleaseAtlas(ref emissionAtlas);
+            ReleaseAtlas(ref metallicSmoothnessAtlas);
+
+            if (impostorMaterial != null)
+            {
+                Object.Destroy(impostorMaterial);
+            }
         }
 
         private void AllocateRequestedAtlases()
         {
-            var atlasWidth =
-                atlasColumnCount *
-                variantResolution;
-            var atlasHeight =
-                atlasRowCount *
-                variantResolution;
-
-            AllocateAtlas(
-                ref albedoTransparencyAtlas,
-                CelestialSmallBodyImpostorMaps
-                    .AlbedoTransparency,
-                "Albedo Transparency",
-                RenderTextureFormat.ARGB32,
-                atlasWidth,
-                atlasHeight);
-            AllocateAtlas(
-                ref normalAtlas,
-                CelestialSmallBodyImpostorMaps.Normal,
-                "Normal",
-                RenderTextureFormat.ARGB32,
-                atlasWidth,
-                atlasHeight);
-            AllocateAtlas(
-                ref emissionAtlas,
-                CelestialSmallBodyImpostorMaps.Emission,
-                "Emission",
-                RenderTextureFormat.ARGBHalf,
-                atlasWidth,
-                atlasHeight);
-            AllocateAtlas(
-                ref metallicSmoothnessAtlas,
-                CelestialSmallBodyImpostorMaps
-                    .MetallicSmoothness,
-                "Metallic Smoothness",
-                RenderTextureFormat.ARGB32,
-                atlasWidth,
-                atlasHeight);
+            var width = atlasColumnCount * variantResolution;
+            var height = atlasRowCount * variantResolution;
+            AllocateAtlas(ref albedoTransparencyAtlas, CelestialSmallBodyImpostorMaps.AlbedoTransparency, "Albedo Transparency", RenderTextureFormat.ARGB32, width, height);
+            AllocateAtlas(ref normalAtlas, CelestialSmallBodyImpostorMaps.Normal, "Normal", RenderTextureFormat.ARGB32, width, height);
+            AllocateAtlas(ref emissionAtlas, CelestialSmallBodyImpostorMaps.Emission, "Emission", RenderTextureFormat.ARGBHalf, width, height);
+            AllocateAtlas(ref metallicSmoothnessAtlas, CelestialSmallBodyImpostorMaps.MetallicSmoothness, "Metallic Smoothness", RenderTextureFormat.ARGB32, width, height);
         }
 
         private void AllocateAtlas(
@@ -165,39 +163,62 @@ namespace jcan.CelestialSystems
         {
             if ((requestedMaps & map) == 0)
             {
-                ReleaseAtlas(
-                    ref atlas);
+                ReleaseAtlas(ref atlas);
                 return;
             }
 
-            if (atlas != null &&
-                atlas.width == width &&
-                atlas.height == height &&
-                atlas.format == format)
+            if (atlas != null && atlas.width == width && atlas.height == height && atlas.format == format)
             {
                 return;
             }
 
-            ReleaseAtlas(
-                ref atlas);
-            atlas =
-                new RenderTexture(
-                    width,
-                    height,
-                    0,
-                    format,
-                    RenderTextureReadWrite.Linear)
-                {
-                    name =
-                        $"{toolId} Impostor {mapName} Atlas",
-                    useMipMap = true,
-                    autoGenerateMips = true
-                };
+            ReleaseAtlas(ref atlas);
+            atlas = new RenderTexture(width, height, 0, format, RenderTextureReadWrite.Linear)
+            {
+                name = $"{toolId} Impostor {mapName} Atlas",
+                useMipMap = true,
+                autoGenerateMips = true
+            };
             atlas.Create();
         }
 
-        private static void ReleaseAtlas(
-            ref RenderTexture atlas)
+        private RenderTexture GetAtlas(CelestialSmallBodyImpostorMaps map)
+        {
+            return map switch
+            {
+                CelestialSmallBodyImpostorMaps.AlbedoTransparency => albedoTransparencyAtlas,
+                CelestialSmallBodyImpostorMaps.Normal => normalAtlas,
+                CelestialSmallBodyImpostorMaps.Emission => emissionAtlas,
+                CelestialSmallBodyImpostorMaps.MetallicSmoothness => metallicSmoothnessAtlas,
+                _ => null
+            };
+        }
+
+        private void CreateImpostorMaterial()
+        {
+            if (impostorMaterial != null)
+            {
+                Object.Destroy(impostorMaterial);
+            }
+
+            var shader = Shader.Find("jcan/Celestial Small Body Impostor");
+
+            if (shader == null)
+            {
+                return;
+            }
+
+            impostorMaterial = new Material(shader)
+            {
+                name = $"{toolId} Impostor Material"
+            };
+            impostorMaterial.SetTexture("_CelestialImpostorAlbedoTransparencyAtlas", albedoTransparencyAtlas);
+            impostorMaterial.SetTexture("_CelestialImpostorNormalAtlas", normalAtlas);
+            impostorMaterial.SetTexture("_CelestialImpostorEmissionAtlas", emissionAtlas);
+            impostorMaterial.SetTexture("_CelestialImpostorMetallicSmoothnessAtlas", metallicSmoothnessAtlas);
+        }
+
+        private static void ReleaseAtlas(ref RenderTexture atlas)
         {
             if (atlas == null)
             {
@@ -205,73 +226,11 @@ namespace jcan.CelestialSystems
             }
 
             atlas.Release();
-
-            if (Application.isPlaying)
-            {
-                Object.Destroy(
-                    atlas);
-            }
-            else
-            {
-                Object.DestroyImmediate(
-                    atlas);
-            }
-
+            Object.Destroy(atlas);
             atlas = null;
         }
 
-        public int GetVariantIndex(
-            uint seed)
-        {
-            if (variantCount <= 0)
-            {
-                return 0;
-            }
-
-            return
-                (int)(Hash(
-                    seed) %
-                    (uint)variantCount);
-        }
-
-        public Vector4 GetVariantScaleOffset(
-            int variantIndex)
-        {
-            if (atlasColumnCount <= 0 ||
-                atlasRowCount <= 0)
-            {
-                return new Vector4(
-                    1.0f,
-                    1.0f,
-                    0.0f,
-                    0.0f);
-            }
-
-            variantIndex =
-                Mathf.Clamp(
-                    variantIndex,
-                    0,
-                    Mathf.Max(
-                        0,
-                        variantCount - 1));
-            var column =
-                variantIndex %
-                atlasColumnCount;
-            var row =
-                variantIndex /
-                atlasColumnCount;
-            var scale = new Vector2(
-                1.0f / atlasColumnCount,
-                1.0f / atlasRowCount);
-            return new Vector4(
-                scale.x,
-                scale.y,
-                column * scale.x,
-                row * scale.y);
-        }
-
-        private static uint Hash(
-            uint value)
+        private static uint Hash(uint value)
         {
             value ^= value >> 16;
             value *= 0x7FEB352Du;
