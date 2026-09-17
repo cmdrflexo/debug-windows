@@ -617,13 +617,14 @@ namespace jcan.CelestialSystems
                             .GetImpostorVariantSeed(
                                 variantIndex),
                         true,
-                        CelestialSmallBodyLod.Lod0);
+                        pool.ImpostorProvider
+                            .ImpostorSourceLod);
 
                 if (!pool.Tool.CanGenerate(
                         request))
                 {
                     RecordError(
-                        $"Small-body tool '{pool.Tool.ToolId}' cannot generate LOD0 for impostor variant {variantIndex}.");
+                        $"Small-body tool '{pool.Tool.ToolId}' cannot generate its configured impostor source LOD for variant {variantIndex}.");
                     continue;
                 }
 
