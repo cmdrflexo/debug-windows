@@ -167,7 +167,11 @@ namespace jcan.CelestialSystems
                 return;
             }
 
-            if (atlas != null && atlas.width == width && atlas.height == height && atlas.format == format)
+            // Atlas tiles are independently copied at mip 0. Generating atlas
+            // mipmaps would leave stale levels after CopyTexture and would also
+            // bleed neighbouring variants into each other at distance.
+            if (atlas != null && atlas.width == width && atlas.height == height &&
+                atlas.format == format && !atlas.useMipMap)
             {
                 return;
             }
