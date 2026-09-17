@@ -176,6 +176,8 @@ namespace jcan.CelestialSystems
             public ICelestialSmallBodyGenerationTool Tool;
             public ICelestialSmallBodyImpostorProvider ImpostorProvider;
             public CelestialSmallBodyImpostorLibrary ImpostorLibrary;
+            public int NextImpostorVariantIndex;
+            public bool ImpostorBakePending;
             public readonly List<RuntimeSlot> Slots =
                 new List<RuntimeSlot>();
             public readonly List<WaitingRequest> WaitingRequests =
@@ -225,6 +227,12 @@ namespace jcan.CelestialSystems
         [SerializeField]
         [Tooltip("Tool-owned impostor libraries currently configured by this pool manager.")]
         private int impostorLibraryCount;
+
+        [SerializeField]
+        private int readyImpostorVariantCount;
+
+        [SerializeField]
+        private int targetImpostorVariantCount;
 
         [SerializeField]
         [Tooltip("Available containers with billboard LOD 4 over the configured pool target.")]
@@ -538,6 +546,14 @@ namespace jcan.CelestialSystems
             foreach (var pool in poolsByToolId.Values)
             {
                 startsRemaining =
+                    StartImpostorVariantBakes(
+                        pool,
+                        startsRemaining);
+            }
+
+            foreach (var pool in poolsByToolId.Values)
+            {
+                startsRemaining =
                     CreateBaselineSlots(
                         pool,
                         startsRemaining);
@@ -566,6 +582,122 @@ namespace jcan.CelestialSystems
                         pool,
                         startsRemaining);
             }
+        }
+
+        private int StartImpostorVariantBakes(
+            RuntimePool pool,
+            int startsRemaining)
+        {
+            if (startsRemaining <= 0 ||
+                pool.ImpostorProvider == null ||
+                pool.ImpostorLibrary == null ||
+                pool.ImpostorBakePending)
+            {
+                return startsRemaining;
+            }
+
+            while (startsRemaining > 0 &&
+                pool.NextImpostorVariantIndex <
+                    pool.ImpostorProvider
+                        .ImpostorVariantCount)
+            {
+                var variantIndex =
+                    pool.NextImpostorVariantIndex++;
+
+                if (pool.ImpostorLibrary.IsVariantReady(
+                        variantIndex))
+                {
+                    continue;
+                }
+
+                var request =
+                    new CelestialSmallBodyRequest(
+                        pool.Tool.ToolId,
+                        pool.ImpostorProvider
+                            .GetImpostorVariantSeed(
+                                variantIndex),
+                        true,
+                        CelestialSmallBodyLod.Lod0);
+
+                if (!pool.Tool.CanGenerate(
+                        request))
+                {
+                    RecordError(
+                        $"Small-body tool '{pool.Tool.ToolId}' cannot generate LOD0 for impostor variant {variantIndex}.");
+                    continue;
+                }
+
+                pool.ImpostorBakePending = true;
+
+                try
+                {
+                    if (pool.Tool.TryBeginGeneration(
+                            request,
+                            result =>
+                                HandleImpostorVariantGenerated(
+                                    pool,
+                                    variantIndex,
+                                    result)))
+                    {
+                        startsRemaining--;
+                        break;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    RecordError(
+                        $"Small-body tool '{pool.Tool.ToolId}' threw while preparing impostor variant {variantIndex}: {exception.Message}");
+                }
+
+                pool.ImpostorBakePending = false;
+            }
+
+            return startsRemaining;
+        }
+
+        private void HandleImpostorVariantGenerated(
+            RuntimePool pool,
+            int variantIndex,
+            CelestialSmallBodyGenerationResult result)
+        {
+            if (pool == null)
+            {
+                if (result.Instance != null)
+                {
+                    Destroy(
+                        result.Instance);
+                }
+
+                return;
+            }
+
+            pool.ImpostorBakePending = false;
+
+            if (!result.Succeeded)
+            {
+                RecordError(
+                    string.IsNullOrWhiteSpace(
+                        result.Error)
+                        ? $"Small-body tool '{pool.Tool.ToolId}' failed to generate impostor variant {variantIndex}."
+                        : result.Error);
+                RefreshDiagnostics();
+                return;
+            }
+
+            if (!CelestialSmallBodyImpostorCapture
+                    .TryCaptureVariant(
+                        pool.ImpostorLibrary,
+                        variantIndex,
+                        result.Instance,
+                        out var captureError))
+            {
+                RecordError(
+                    $"Failed to capture impostor variant {variantIndex} for '{pool.Tool.ToolId}': {captureError}");
+            }
+
+            Destroy(
+                result.Instance);
+            RefreshDiagnostics();
         }
 
         private int CreateBaselineSlots(
@@ -1148,6 +1280,8 @@ namespace jcan.CelestialSystems
             waitingRequestCount = 0;
             containerCount = 0;
             impostorLibraryCount = 0;
+            readyImpostorVariantCount = 0;
+            targetImpostorVariantCount = 0;
 
             var readyByLod =
                 new int[5];
@@ -1159,6 +1293,12 @@ namespace jcan.CelestialSystems
                 if (pool.ImpostorLibrary != null)
                 {
                     impostorLibraryCount++;
+                    readyImpostorVariantCount +=
+                        pool.ImpostorLibrary
+                            .ReadyVariantCount;
+                    targetImpostorVariantCount +=
+                        pool.ImpostorLibrary
+                            .VariantCount;
                 }
 
                 containerCount +=
