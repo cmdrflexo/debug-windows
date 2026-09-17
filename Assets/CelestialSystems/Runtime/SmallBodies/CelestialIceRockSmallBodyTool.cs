@@ -71,6 +71,11 @@ namespace jcan.CelestialSystems
         private int impostorResolution = 256;
 
         [SerializeField]
+        [Tooltip("Mesh detail used only while baking shared impostor variants.")]
+        private CelestialSmallBodyLod impostorSourceLod =
+            CelestialSmallBodyLod.Lod1;
+
+        [SerializeField]
         [Tooltip("PBR channels the future capture pass should bake for this tool.")]
         private CelestialSmallBodyImpostorMaps requestedImpostorMaps =
             CelestialSmallBodyImpostorMaps.AlbedoTransparency |
@@ -121,6 +126,9 @@ namespace jcan.CelestialSystems
         public int ImpostorResolution =>
             impostorResolution;
 
+        public CelestialSmallBodyLod ImpostorSourceLod =>
+            impostorSourceLod;
+
         public CelestialSmallBodyImpostorMaps RequestedImpostorMaps =>
             requestedImpostorMaps;
 
@@ -156,6 +164,11 @@ namespace jcan.CelestialSystems
                     impostorResolution,
                     32,
                     2048);
+            impostorSourceLod =
+                (CelestialSmallBodyLod)Mathf.Clamp(
+                    (int)impostorSourceLod,
+                    (int)CelestialSmallBodyLod.Lod0,
+                    (int)CelestialSmallBodyLod.Lod3);
             maximumConcurrentJobs =
                 Mathf.Max(
                     1,
