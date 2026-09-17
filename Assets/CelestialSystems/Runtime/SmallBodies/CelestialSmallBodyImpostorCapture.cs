@@ -18,6 +18,7 @@ namespace jcan.CelestialSystems
         public static bool TryCaptureVariant(
             CelestialSmallBodyImpostorLibrary library,
             int variantIndex,
+            int viewIndex,
             GameObject representation,
             out string error)
         {
@@ -50,9 +51,13 @@ namespace jcan.CelestialSystems
 
             try
             {
+                var yawDegrees =
+                    library.ViewCount <= 1
+                        ? 0.0f
+                        : 360.0f * viewIndex / library.ViewCount;
                 representation.transform.SetPositionAndRotation(
                     Vector3.zero,
-                    Quaternion.identity);
+                    Quaternion.Euler(0.0f, yawDegrees, 0.0f));
 
                 var bounds =
                     GetBounds(
@@ -72,7 +77,7 @@ namespace jcan.CelestialSystems
                     library.TryCopyCapture(
                         CelestialSmallBodyImpostorMaps.AlbedoTransparency,
                         captureTexture,
-                        variantIndex);
+                        variantIndex, viewIndex);
                 }
 
                 if ((library.RequestedMaps &
@@ -82,7 +87,7 @@ namespace jcan.CelestialSystems
                     library.TryCopyCapture(
                         CelestialSmallBodyImpostorMaps.Normal,
                         captureTexture,
-                        variantIndex);
+                        variantIndex, viewIndex);
                 }
 
                 if ((library.RequestedMaps &
@@ -93,7 +98,7 @@ namespace jcan.CelestialSystems
                     library.TryCopyCapture(
                         CelestialSmallBodyImpostorMaps.Emission,
                         captureTexture,
-                        variantIndex);
+                        variantIndex, viewIndex);
                 }
 
                 if ((library.RequestedMaps &
@@ -110,11 +115,12 @@ namespace jcan.CelestialSystems
                     library.TryCopyCapture(
                         CelestialSmallBodyImpostorMaps.MetallicSmoothness,
                         captureTexture,
-                        variantIndex);
+                        variantIndex, viewIndex);
                 }
 
-                library.MarkVariantReady(
-                    variantIndex);
+                library.MarkCaptureReady(
+                    variantIndex,
+                    viewIndex);
                 return true;
             }
             catch (System.Exception exception)
@@ -231,10 +237,12 @@ namespace jcan.CelestialSystems
         private static void ConfigureCamera(
             Bounds bounds)
         {
+            // Every yaw capture needs the same square framing so the runtime
+            // billboard keeps a stable size while changing view tiles.
             var extent =
                 Mathf.Max(
-                    bounds.extents.x,
-                    bounds.extents.y);
+                    0.01f,
+                    bounds.extents.magnitude);
             var distance =
                 Mathf.Max(
                     1.0f,
