@@ -40,9 +40,13 @@ namespace jcan.CelestialSystems
                 gizmoColor.g,
                 gizmoColor.b,
                 0.8f);
+            Gizmos.color = new Color(1, 0, 0, 0.35f);
             Gizmos.DrawWireSphere(
                 transform.position,
-                1000.0f);
+                10.0f);
+            Gizmos.DrawWireSphere(
+                transform.position,
+                100.0f);
             Gizmos.color = new Color(
                 gizmoColor.r,
                 gizmoColor.g,
@@ -50,7 +54,7 @@ namespace jcan.CelestialSystems
                 0.35f);
             Gizmos.DrawWireSphere(
                 transform.position,
-                10000.0f);
+                1000.0f);
 
             Gizmos.matrix = previousMatrix;
             Gizmos.color = previousColor;

@@ -16,6 +16,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Lock To Origin",
+                    "type": "Button",
+                    "id": "9664e6ef-b8e0-437a-80bd-550b1f6d35d5",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Orbit",
                     "type": "Button",
                     "id": "3f2ed4f0-d950-40fe-b076-3457d752cc42",
@@ -122,33 +131,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "Toggle Trails",
-                    "type": "Button",
-                    "id": "1c629245-83ab-4cc8-a1a3-07a8d4961f49",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Toggle Orbits",
-                    "type": "Button",
-                    "id": "3f8749df-e70e-4d47-a94e-8c593657252c",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Lock To Origin",
-                    "type": "Button",
-                    "id": "f06c1a81-1bae-445c-a11a-a74d6a690bbd",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -204,6 +186,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Pointer Delta",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8f3f90ca-5419-49db-a17a-99b62a811d74",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Lock To Origin",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -371,10 +364,84 @@
                     "action": "Plane Elevation Modifier",
                     "isComposite": false,
                     "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "Free Camera Controls",
+            "id": "3651e8ac-6906-473e-94f7-2de9c1f9d9bc",
+            "actions": [
+                {
+                    "name": "Zoom",
+                    "type": "Button",
+                    "id": "39ba675f-971d-499e-af35-9d5649ebfeb6",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Lock to Nearest",
+                    "type": "Button",
+                    "id": "149d27e0-6c07-4a36-a045-51c20dc1ac83",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "16f45760-62ca-47ee-a89c-58cee02dbff2",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Zoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 },
                 {
                     "name": "",
-                    "id": "c2551fd8-d243-4bde-a2cc-b62508c96cd1",
+                    "id": "26fc6b82-bec7-4d5d-a96c-7d81449f41f5",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Lock to Nearest",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "Shared Controls",
+            "id": "142f0046-6579-4055-aabd-4421a65cb84a",
+            "actions": [
+                {
+                    "name": "Toggle Trails",
+                    "type": "Button",
+                    "id": "b197b60f-de89-453f-98b6-729c37c71941",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Toggle Orbits",
+                    "type": "Button",
+                    "id": "e2314795-4c36-4275-ac13-7cabbe329a77",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "dbfa5cb4-80d9-4ecf-9c3d-9ec2f8e9e58f",
                     "path": "<Keyboard>/t",
                     "interactions": "",
                     "processors": "",
@@ -385,23 +452,12 @@
                 },
                 {
                     "name": "",
-                    "id": "a33cb7e4-ee6c-4311-aa2f-b220060bd337",
+                    "id": "f0dad5e3-0a73-4a72-9a5f-e745fd38fec8",
                     "path": "<Keyboard>/o",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "Toggle Orbits",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "ec6aefaa-ab1d-46f2-a4f0-3c1483adb695",
-                    "path": "<Keyboard>/escape",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Lock To Origin",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

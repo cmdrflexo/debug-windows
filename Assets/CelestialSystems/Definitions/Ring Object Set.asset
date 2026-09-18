@@ -15,6 +15,7 @@ MonoBehaviour:
   families:
   - displayName: Fine Ice
     kind: 0
+    bodySource: {fileID: 0}
     meshVariants: []
     materialVariants: []
     baseSelectionWeight: 1
@@ -25,6 +26,7 @@ MonoBehaviour:
     maximumDiameterMeters: 0.2
   - displayName: Ice Chunk
     kind: 1
+    bodySource: {fileID: 11400000, guid: a425ea6f799c6d9408919e52c72a468e, type: 2}
     meshVariants: []
     materialVariants:
     - {fileID: 2100000, guid: 39a88d378f61d5249ae9c53c95cb278a, type: 2}
@@ -36,6 +38,7 @@ MonoBehaviour:
     maximumDiameterMeters: 5
   - displayName: Dark Rubble
     kind: 2
+    bodySource: {fileID: 0}
     meshVariants: []
     materialVariants: []
     baseSelectionWeight: 1
@@ -46,6 +49,7 @@ MonoBehaviour:
     maximumDiameterMeters: 3
   - displayName: Dust Cluster
     kind: 3
+    bodySource: {fileID: 0}
     meshVariants: []
     materialVariants: []
     baseSelectionWeight: 1
