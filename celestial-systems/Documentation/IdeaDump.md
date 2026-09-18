@@ -33,6 +33,10 @@ section. No format required — a sentence fragment is fine.
 
 ## Wild / Long-shot
 
+- Hook LLMs (Claude, ChatGPT, other remote/local models), TTS, and speech-to-text directly into the game. Inspired by SkyrimNet. Two angles:
+  - Dev-facing: bring AI dev-assistant services (like this one) into the game itself for realtime inspection of live game state during development/testing, rather than working from outside.
+  - Player-facing: use those same kinds of models to drive gamemaster-style behavior and NPC/actor intelligence in-game for more immersive, emergent character behavior.
+- Related to the above: "take" an AI assistant around in-game like a companion, and point things out to it more free-form and naturally (rather than typing into a console) — a looser, more conversational way of showing it the project than a formal interface.
 -
 
 ## Parked (revisit someday)
