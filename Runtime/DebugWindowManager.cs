@@ -505,9 +505,6 @@ namespace jcan.DebugWindows
             Canvas.ForceUpdateCanvases();
             foreach (var view in views.Values)
                 ClampToCanvas(view);
-
-            // Rewriting only registered windows removes IDs left by deleted code.
-            SaveLayout();
         }
 
         private void ResolveWindowsRoot()
